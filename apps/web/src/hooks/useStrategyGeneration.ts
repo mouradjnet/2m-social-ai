@@ -20,6 +20,10 @@ interface BudgetBody {
   limit_cents: number
 }
 
+interface MessageBody {
+  message: string
+}
+
 /**
  * O unico lugar que sabe que existem URL, intervalo de polling e mutacao.
  *
@@ -99,6 +103,14 @@ function deriveState(
     const body = generationError.body as BudgetBody
 
     return { kind: 'budget', spentCents: body.spent_cents, limitCents: body.limit_cents }
+  }
+
+  // Ja existe uma geracao em andamento — tipicamente uma segunda aba. Insistir
+  // nao adianta: quem precisa terminar e a outra. Nunca `retryable`.
+  if (generationError instanceof ApiError && generationError.status === 409) {
+    const body = generationError.body as MessageBody
+
+    return { kind: 'failed', message: body.message, retryable: false }
   }
 
   if (runId && runError instanceof ApiError && runError.status === 404) {

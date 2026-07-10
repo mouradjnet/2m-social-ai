@@ -271,6 +271,39 @@ test('aprovar o rascunho troca o chip para Ativa', async () => {
 })
 
 /**
+ * O botao desabilitado protege o clique, nao a API. Com duas abas abertas no
+ * mesmo projeto, a segunda nao sabe que a primeira esta gerando: o servidor
+ * devolve 409. Sem este tratamento, o erro sumia em silencio e a tela nao
+ * dizia nada.
+ */
+test('409 de geração concorrente aparece na tela e não oferece retry', async () => {
+  const user = setup()
+
+  server.use(
+    strategies(),
+    http.post('/api/v1/projects/1/strategies:generate', () =>
+      HttpResponse.json(
+        { message: 'Ja existe uma geracao em andamento para este projeto.' },
+        { status: 409 },
+      ),
+    ),
+    // Sem handler para /ai-runs/*: se a tela fizer polling, o MSW estoura.
+  )
+
+  renderWithProviders(<StrategyPage />, ROUTE)
+
+  await user.click(await screen.findByRole('button', { name: /gerar estratégia/i }))
+
+  expect(
+    await screen.findByText(/já existe uma geração em andamento|ja existe uma geracao em andamento/i),
+  ).toBeInTheDocument()
+
+  // Insistir nao adianta: a outra geracao e que precisa terminar.
+  expect(screen.queryByRole('button', { name: /tentar de novo/i })).not.toBeInTheDocument()
+  expect(currentSearch()).toBe('')
+})
+
+/**
  * Encontrado dirigindo o browser contra o servidor real: com uma estrategia
  * ativa na tela, "Gerar nova" continuava habilitado durante a geracao. Dois
  * cliques criavam duas execucoes e cobravam duas vezes do orcamento — o Budget
