@@ -40,6 +40,23 @@ class MockProvider implements LlmProvider
             ];
         }
 
+        // Copywriter: schema com a chave `pieces`.
+        if (isset($properties['pieces'])) {
+            $pilares = ['Educacao', 'Prova social', 'Bastidores', 'Educacao', 'Prova social'];
+
+            return [
+                'pieces' => array_map(fn (int $i) => [
+                    'title' => "Peca {$i}",
+                    'caption' => "Legenda da peca {$i}, no tom da marca.",
+                    'cta' => 'Fale com a gente no WhatsApp.',
+                    'hashtags' => ['#marca', '#conteudo'],
+                    'format' => 'post',
+                    'channel' => 'instagram',
+                    'pillar' => $pilares[$i],
+                ], range(0, 4)),
+            ];
+        }
+
         return [];
     }
 }
