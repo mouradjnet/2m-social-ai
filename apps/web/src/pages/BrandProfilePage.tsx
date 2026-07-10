@@ -8,6 +8,7 @@ import { Shell } from '@/components/ui/Shell'
 import { Stepper, type Step } from '@/components/ui/Stepper'
 import { Textarea } from '@/components/ui/Textarea'
 import { ApiError, api } from '@/lib/api'
+import { fromLines, toLines } from '@/lib/listField'
 import type { BrandProfileResponse } from '@/lib/types'
 
 /** So os campos que o wizard edita — `id` e `project_id` ficam de fora. */
@@ -18,6 +19,11 @@ type EditableField =
   | 'persona'
   | 'tone_of_voice'
   | 'differentiators'
+  | 'products'
+  | 'services'
+  | 'competitors'
+  | 'required_words'
+  | 'forbidden_words'
   | 'website'
   | 'instagram'
   | 'linkedin'
@@ -25,12 +31,12 @@ type EditableField =
 type Field = {
   name: EditableField
   label: string
-  kind: 'text' | 'textarea'
+  kind: 'text' | 'textarea' | 'list'
   placeholder?: string
   hint?: string
 }
 
-const STEPS: Array<Step & { fields: Field[] }> = [
+const STEPS: Array<Step & { fields: Field[]; description?: string }> = [
   {
     id: 'identity',
     label: 'Passo 1',
@@ -64,9 +70,30 @@ const STEPS: Array<Step & { fields: Field[] }> = [
     ],
   },
   {
-    id: 'social',
+    id: 'offer',
     label: 'Passo 4',
+    title: 'Oferta',
+    fields: [
+      { name: 'products', label: 'Produtos', kind: 'list', hint: 'Um por linha' },
+      { name: 'services', label: 'Serviços', kind: 'list', hint: 'Um por linha' },
+    ],
+  },
+  {
+    id: 'vocabulary',
+    label: 'Passo 5',
+    title: 'Vocabulário e Concorrência',
+    description: 'Influencia o texto gerado. Palavras proibidas nunca aparecerão nas peças.',
+    fields: [
+      { name: 'competitors', label: 'Concorrentes', kind: 'list', hint: 'Um por linha' },
+      { name: 'required_words', label: 'Palavras obrigatórias', kind: 'list', hint: 'Uma por linha' },
+      { name: 'forbidden_words', label: 'Palavras proibidas', kind: 'list', hint: 'Uma por linha' },
+    ],
+  },
+  {
+    id: 'social',
+    label: 'Passo 6',
     title: 'Links Sociais',
+    description: 'Não afeta a estratégia. Usado na exportação.',
     fields: [
       { name: 'website', label: 'Site', kind: 'text', hint: 'Precisa começar com https://' },
       { name: 'instagram', label: 'Instagram', kind: 'text' },
@@ -87,7 +114,7 @@ export function BrandProfilePage() {
   })
 
   const save = useMutation({
-    mutationFn: (payload: Partial<Record<EditableField, string>>) =>
+    mutationFn: (payload: Partial<Record<EditableField, string | string[]>>) =>
       api<BrandProfileResponse>(`/projects/${projectId}/brand-profile`, {
         method: 'PATCH',
         body: JSON.stringify(payload),
@@ -103,9 +130,8 @@ export function BrandProfilePage() {
   const stepIndex = STEPS.indexOf(step)
   const nextStep = STEPS[stepIndex + 1]
 
-  const completedIds = STEPS.filter((s) => completion[s.id as keyof typeof completion]).map(
-    (s) => s.id,
-  )
+  const completedIds = completion.steps.filter((s) => s.complete).map((s) => s.id)
+  const optionalIds = completion.steps.filter((s) => !s.required).map((s) => s.id)
 
   const error = save.error instanceof ApiError ? save.error : null
 
@@ -114,9 +140,13 @@ export function BrandProfilePage() {
     const form = new FormData(event.currentTarget)
 
     // Envia apenas os campos deste passo: o PATCH e um merge parcial.
+    // Campos `list` viram array de strings; o resto vai como texto.
     const payload = Object.fromEntries(
-      step.fields.map((field) => [field.name, String(form.get(field.name) ?? '')]),
-    ) as Partial<Record<EditableField, string>>
+      step.fields.map((field) => {
+        const raw = String(form.get(field.name) ?? '')
+        return [field.name, field.kind === 'list' ? fromLines(raw) : raw]
+      }),
+    ) as Partial<Record<EditableField, string | string[]>>
 
     save.mutate(payload, {
       onSuccess: () => {
@@ -150,6 +180,7 @@ export function BrandProfilePage() {
             steps={STEPS}
             currentId={currentId}
             completedIds={completedIds}
+            optionalIds={optionalIds}
             onSelect={setCurrentId}
           />
         </div>
@@ -163,22 +194,24 @@ export function BrandProfilePage() {
           <div className="mt-4">
             <CardTitle>{step.title}</CardTitle>
             <CardDescription>
-              Seja conciso; vamos expandir isso mais tarde.
+              {step.description ?? 'Seja conciso; vamos expandir isso mais tarde.'}
             </CardDescription>
           </div>
 
           <form onSubmit={submit} className="mt-6 flex flex-col gap-6">
             {step.fields.map((field) => {
+              const value = data[field.name]
               const props = {
                 name: field.name,
                 label: field.label,
                 placeholder: field.placeholder,
                 hint: field.hint,
-                defaultValue: data[field.name] ?? '',
+                defaultValue:
+                  field.kind === 'list' ? toLines(value as string[] | null) : (value ?? ''),
                 error: error?.fieldError(field.name),
               }
 
-              return field.kind === 'textarea' ? (
+              return field.kind === 'textarea' || field.kind === 'list' ? (
                 <Textarea key={field.name} {...props} />
               ) : (
                 <Input key={field.name} {...props} />

@@ -11,6 +11,8 @@ interface StepperProps {
   currentId: string
   /** Vem do campo `completion` da API: um passo pode estar completo fora de ordem. */
   completedIds?: string[]
+  /** Passos que a API marcou como nao-obrigatorios; ganham a marca "opcional". */
+  optionalIds?: string[]
   onSelect?: (id: string) => void
 }
 
@@ -18,13 +20,20 @@ interface StepperProps {
  * Linhas finas e indicadores circulares pequenos, como o design pede.
  * Cada passo do wizard vive no seu proprio card — o Stepper e so a navegacao.
  */
-export function Stepper({ steps, currentId, completedIds = [], onSelect }: StepperProps) {
+export function Stepper({
+  steps,
+  currentId,
+  completedIds = [],
+  optionalIds = [],
+  onSelect,
+}: StepperProps) {
   return (
     <nav aria-label="Progresso">
       <ol className="flex flex-col">
         {steps.map((step, index) => {
           const isCurrent = step.id === currentId
           const isComplete = completedIds.includes(step.id)
+          const isOptional = optionalIds.includes(step.id)
           const isLast = index === steps.length - 1
 
           return (
@@ -73,6 +82,9 @@ export function Stepper({ steps, currentId, completedIds = [], onSelect }: Stepp
                   )}
                 >
                   {step.title}
+                  {isOptional && (
+                    <span className="text-label-sm text-on-surface-variant"> · opcional</span>
+                  )}
                 </span>
               </button>
             </li>

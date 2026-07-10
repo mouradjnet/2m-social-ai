@@ -32,17 +32,25 @@ export interface BrandProfileData {
   persona: string | null
   tone_of_voice: string | null
   differentiators: string | null
+  products: string[] | null
+  services: string[] | null
+  competitors: string[] | null
+  required_words: string[] | null
+  forbidden_words: string[] | null
   website: string | null
   instagram: string | null
   linkedin: string | null
 }
 
+export interface CompletionStep {
+  id: 'identity' | 'audience' | 'positioning' | 'offer' | 'vocabulary' | 'social'
+  complete: boolean
+  required: boolean
+}
+
 /** Quem decide o que esta completo e o servidor. O Stepper so desenha. */
 export interface BrandProfileCompletion {
-  identity: boolean
-  audience: boolean
-  positioning: boolean
-  social: boolean
+  steps: CompletionStep[]
   percent: number
 }
 
