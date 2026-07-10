@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Attributes\ScopedBy;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 
 #[ScopedBy(WorkspaceMemberScope::class)]
@@ -33,5 +34,10 @@ class Project extends Model
     public function brandProfile(): HasOne
     {
         return $this->hasOne(BrandProfile::class);
+    }
+
+    public function strategies(): HasMany
+    {
+        return $this->hasMany(Strategy::class);
     }
 }

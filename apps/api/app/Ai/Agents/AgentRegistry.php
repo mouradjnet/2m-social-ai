@@ -1,0 +1,24 @@
+<?php
+
+namespace App\Ai\Agents;
+
+use InvalidArgumentException;
+
+/**
+ * `ai_runs.agent` guarda o nome; aqui ele vira instancia. Os outros seis agentes
+ * entram como uma linha cada, sem tocar no RunAgentJob.
+ */
+class AgentRegistry
+{
+    /** @var array<string, class-string<Agent>> */
+    private const AGENTS = [
+        'strategist' => StrategistAgent::class,
+    ];
+
+    public function get(string $name): Agent
+    {
+        $class = self::AGENTS[$name] ?? throw new InvalidArgumentException("Agente desconhecido: {$name}");
+
+        return app($class);
+    }
+}
