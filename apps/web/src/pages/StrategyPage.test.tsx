@@ -186,3 +186,61 @@ test('402 mostra o orçamento e não inicia polling', async () => {
   expect(currentSearch()).toBe('')
   expect(screen.queryByText(/gerando/i)).not.toBeInTheDocument()
 })
+
+test('montar com ?run na URL retoma o acompanhamento sem disparar POST', async () => {
+  let posts = 0
+
+  server.use(
+    strategies(),
+    http.post('/api/v1/projects/1/strategies:generate', () => {
+      posts++
+
+      return HttpResponse.json({ ai_run_id: 42 }, { status: 202 })
+    }),
+    http.get('/api/v1/ai-runs/42', () => HttpResponse.json(run({ status: 'running' }))),
+  )
+
+  renderWithProviders(<StrategyPage />, {
+    path: ROUTE.path,
+    entry: '/projects/1/strategy?run=42',
+  })
+
+  expect(await screen.findByText(/gerando/i)).toBeInTheDocument()
+  expect(posts).toBe(0)
+
+  // A execucao acabou de comecar: o aviso de demora nao pode aparecer. Sem
+  // isto, um `slow` sempre verdadeiro passaria despercebido.
+  expect(screen.queryByText(/está demorando/i)).not.toBeInTheDocument()
+})
+
+test('?run apontando para execução inexistente vira estado perdido', async () => {
+  server.use(
+    strategies(),
+    http.get('/api/v1/ai-runs/404', () => new HttpResponse(null, { status: 404 })),
+  )
+
+  renderWithProviders(<StrategyPage />, {
+    path: ROUTE.path,
+    entry: '/projects/1/strategy?run=404',
+  })
+
+  expect(await screen.findByText(/não encontramos essa geração/i)).toBeInTheDocument()
+})
+
+test('execução parada há mais de dois minutos avisa que está demorando', async () => {
+  const velha = new Date(Date.now() - 3 * 60_000).toISOString()
+
+  server.use(
+    strategies(),
+    http.get('/api/v1/ai-runs/42', () =>
+      HttpResponse.json(run({ status: 'running', created_at: velha })),
+    ),
+  )
+
+  renderWithProviders(<StrategyPage />, {
+    path: ROUTE.path,
+    entry: '/projects/1/strategy?run=42',
+  })
+
+  expect(await screen.findByText(/está demorando mais que o normal/i)).toBeInTheDocument()
+})
