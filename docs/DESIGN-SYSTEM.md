@@ -144,4 +144,10 @@ As quatro telas usam nomes diferentes para os mesmos itens:
 
 ## Implementação
 
-Tokens vão para `tailwind.config.ts` como escala semântica — `bg-surface`, `text-on-surface`, `border-outline-variant`, `bg-primary`. **Nenhum componente escreve hex.** Isso é o que torna o tema trocável e evita a divergência prosa-vs-token virar dívida.
+Tokens vivem em `apps/web/src/index.css`, no bloco `@theme` do **Tailwind v4** — não existe mais `tailwind.config.ts` na v4, a configuração é CSS-first. Viram utilitários semânticos: `bg-surface`, `text-on-surface`, `border-outline-variant`, `bg-primary`, `text-headline-md`, `rounded-control`.
+
+**Nenhum componente escreve hex.** É o que torna o tema trocável e evita a divergência prosa-vs-token virar dívida.
+
+Fontes **auto-hospedadas** via `@fontsource-variable/geist` e `@fontsource-variable/inter`: sem CDN, sem FOUT, e sem enviar o IP de cada visitante ao Google Fonts (LGPD). O Vite subseta e versiona os `.woff2` no build.
+
+O `index.html` declara `lang="pt-BR"`. Com o `lang="en"` que o Vite gera por padrão, o Chrome detecta português numa página marcada como inglês, **traduz automaticamente** e reescreve o conteúdo — chegamos a ver o placeholder "ex: Acme Corp" virar "Exemplo: Acme Corp" no browser. Um leitor de tela também pronunciaria tudo em inglês.

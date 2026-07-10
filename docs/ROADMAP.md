@@ -76,11 +76,18 @@ Laravel 13.19 em `apps/api`, com:
 
 > Duas pegadinhas registradas: o pluralizador do Laravel trata `research` como invariável (ver ADR-12), e `php artisan test` não aceita `--no-interaction` (é o PHPUnit que recebe o argumento).
 
-### 1b — Frontend (pendente)
+### 1b — Frontend ✅ concluído em 2026-07-09
 
-Scaffold Vite/React/TS, tokens do [design system](DESIGN-SYSTEM.md) no `tailwind.config.ts`.
+Vite 8 + React 19 + TypeScript 6 + Tailwind 4 em `apps/web`.
 
-**Verificação:** `pnpm build` passa e Botão, Card, Input e Stepper renderizam com os tokens.
+- Tokens do [design system](DESIGN-SYSTEM.md) no bloco `@theme` de `src/index.css` (Tailwind v4 é CSS-first; não há `tailwind.config.ts`).
+- Fontes Geist e Inter **auto-hospedadas**, subsetadas pelo Vite no build.
+- Quatro componentes base: `Button` (primary/secondary/ghost), `Card`, `Input` (label acima, borda esmeralda só no foco, erro anunciado por `aria-describedby`) e `Stepper` (linhas finas, indicadores circulares).
+- Proxy `/api` → `127.0.0.1:8000` no dev server.
+
+**Verificação executada:** `pnpm build` passa; a página renderizada no browser reproduz o passo 1 do wizard do Perfil da Marca, e preencher o nome da marca pinta o passo 1 do Stepper de esmeralda. Nenhum erro no console vindo do nosso código.
+
+> Duas pegadinhas registradas. **`baseUrl` foi depreciado no TypeScript 6** — com `moduleResolution: "bundler"`, os `paths` já resolvem sem ele. E o `index.html` do Vite nasce com **`lang="en"`**: o Chrome detecta o português, decide que a página está em inglês e **traduz automaticamente**, reescrevendo textos (vimos `ex:` virar `Exemplo:`). Corrigido para `pt-BR`.
 
 ---
 

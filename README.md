@@ -2,8 +2,8 @@
 
 Plataforma SaaS de planejamento estratégico de conteúdo com Inteligência Artificial.
 
-> **Estado atual: Fase 0 (infraestrutura) e Fase 1a (backend) concluídas e verificadas.**
-> Backend em `apps/api` — Laravel 13, 20 tabelas, Sanctum, isolamento de tenant testado. Próximo: Fase 1b (frontend).
+> **Estado atual: Fases 0 e 1 concluídas e verificadas.**
+> Backend em `apps/api` (Laravel 13, 20 tabelas, Sanctum, isolamento de tenant testado) e frontend em `apps/web` (Vite/React/Tailwind com os tokens do design). Próximo: Fase 2 — a fatia vertical Auth → Projeto → Perfil da Marca.
 
 ## Documentos
 
@@ -57,7 +57,18 @@ php artisan serve                  # http://localhost:8000
 
 Testes rodam contra `2m_social_ai_test` no Postgres, **não** em SQLite — `jsonb`, `timestamptz` e enums não existem lá.
 
+## Frontend
+
+```powershell
+cd apps\web
+pnpm install
+pnpm dev      # http://localhost:5173, com proxy /api -> :8000
+pnpm build
+```
+
+Tokens do design no bloco `@theme` de `src/index.css` (Tailwind v4 é CSS-first). Nenhum componente escreve hex.
+
 ## Próximo passo
 
-**Fase 1b** — scaffold Vite/React/TS e os tokens do design no `tailwind.config.ts`.
-Critério: `pnpm build` passa e Botão, Card, Input e Stepper renderizam com os tokens.
+**Fase 2** — fatia vertical Auth → Projeto → Perfil da Marca, de ponta a ponta.
+Critério: criar conta, criar projeto, completar os 4 passos do wizard, recarregar a página e os dados persistirem.
