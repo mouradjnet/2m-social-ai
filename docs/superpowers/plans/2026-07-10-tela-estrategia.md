@@ -30,6 +30,10 @@ Se já estiver rodando, o comando avisa e não faz mal.
 
 **Formatação:** rodar `./vendor/bin/pint <arquivos>` antes de cada commit do backend. O Pint renomeia métodos de teste para snake_case (`php_unit_method_casing`); é esperado.
 
+**Lint do frontend: `pnpm exec oxlint`, não `pnpm lint`.** Neste ambiente o `pnpm lint` é interceptado por um wrapper que tenta rodar ESLint, que não está instalado, e falha com `Command "eslint" not found`. O script do `package.json` é `oxlint`; chame-o direto.
+
+**Dois warnings de `oxlint` são esperados e não bloqueiam** (a regra `react(only-export-components)` sai com código 0): um em `src/main.tsx`, pré-existente; outro em `src/test/utils.tsx`, porque o arquivo exporta um componente (`LocationProbe`) e uma função (`currentSearch`). É um aviso sobre Fast Refresh, sem efeito num arquivo que só roda em teste.
+
 ---
 
 ## Estrutura de arquivos
@@ -133,7 +137,11 @@ Acrescentar em `apps/api/tests/Feature/StrategyGenerationTest.php`, dentro da cl
 cd apps/api && php artisan test --filter "error_code"
 ```
 
-Esperado: FAIL, 2 testes. Ambos param em `SQLSTATE[42703]: Undefined column: ... column "error_code" ... does not exist` — o primeiro no `assertDatabaseHas`, o segundo no `AiRun::create`.
+Esperado: FAIL, 2 testes, por motivos diferentes.
+
+O primeiro para em `SQLSTATE[42703]: Undefined column: ... column "error_code" ... does not exist`, no `assertDatabaseHas`.
+
+O segundo falha com `Failed asserting that null is identical to 'refused'` — e **não** com erro de SQL: o `$fillable` descarta `error_code` antes do insert, então a coluna inexistente nunca chega ao banco.
 
 - [ ] **Step 3: Criar a migration**
 
@@ -437,21 +445,33 @@ Em `StrategyGenerationTest.php`, dentro da classe:
     }
 ```
 
-- [ ] **Step 2: Rodar para ver falhar**
+- [ ] **Step 2: Rodar — e esperar que PASSE**
 
 ```bash
 cd apps/api && php artisan test --filter "saida_fora_das_regras"
 ```
 
-Esperado: FAIL. `Failed asserting that null is identical to 'rejected_output'`.
+Esperado: **PASS**, 1 teste. Nenhuma implementação nova é necessária: o `errorCodeFor()` da Task A2 já manda `OutputRejectedException` para o braço `rejected_output`.
 
-Se falhar em `$provider->chamadas` sendo `1`, o `bindProvider` está devolvendo uma instância nova por resolução — confirme que o closure é `fn () => $provider` (captura a mesma instância) e não `fn () => new ...`.
+Isto é um teste de caracterização, não TDD — ele nasce verde. Se falhar em `$provider->chamadas` sendo `1`, o `bindProvider` está devolvendo uma instância nova por resolução; confirme que o closure é `fn () => $provider` e não `fn () => new ...`.
 
-- [ ] **Step 3: Nenhuma implementação nova**
+- [ ] **Step 3: Falsificar o teste**
 
-Este teste passa apenas com o `errorCodeFor()` da Task A2 — `OutputRejectedException` já cai no braço `rejected_output`. Se ele falhar aqui, a Task A2 está incompleta.
+Um teste que nunca foi visto falhando não provou nada. Trocar, no fake provider, o peso do terceiro pilar de `24` para `25` — a soma vira 100 e o `validate()` passa:
 
-- [ ] **Step 4: Rodar para ver passar**
+```php
+                            ['name' => 'c', 'weight' => 25, 'description' => 'd'],
+```
+
+```bash
+cd apps/api && php artisan test --filter "saida_fora_das_regras"
+```
+
+Esperado: **FAIL** — `Failed asserting that two strings are identical` (a execução teve sucesso; `error_code` é `null`, não `rejected_output`).
+
+**Desfazer**: voltar o peso para `24`.
+
+- [ ] **Step 4: Rodar para ver passar de novo**
 
 ```bash
 cd apps/api && php artisan test --filter "saida_fora_das_regras"
@@ -719,7 +739,7 @@ Em `apps/web/src/pages/BrandProfilePage.tsx`: apagar a função `Shell` local (l
 - [ ] **Step 4: Verificar que compila e nada quebrou**
 
 ```bash
-cd apps/web && pnpm build && pnpm lint && pnpm test
+cd apps/web && pnpm build && pnpm exec oxlint && pnpm test
 ```
 
 Esperado: build sem erro, lint sem erro, 1 teste passando. O `noUnusedLocals` do tsconfig pega uma função `Shell` esquecida.
@@ -1652,7 +1672,7 @@ Esperado: PASS, 9 testes. Nenhuma implementação nova.
 - [ ] **Step 3: Rodar a suíte inteira do frontend**
 
 ```bash
-cd apps/web && pnpm test && pnpm lint && pnpm build
+cd apps/web && pnpm test && pnpm exec oxlint && pnpm build
 ```
 
 Esperado: 11 testes (1 Button + 1 Pillars + 9 StrategyPage), lint limpo, build sem erro.
@@ -1716,7 +1736,7 @@ O `Link` já está importado nesse arquivo.
 - [ ] **Step 3: Verificar**
 
 ```bash
-cd apps/web && pnpm build && pnpm lint && pnpm test
+cd apps/web && pnpm build && pnpm exec oxlint && pnpm test
 ```
 
 Esperado: tudo verde.
@@ -1797,7 +1817,7 @@ Esperado: saída vazia. Se `MockProvider.php` aparecer como modificado, o `sleep
 
 - `cd apps/api && php artisan test` → 52 testes verdes.
 - `cd apps/web && pnpm test` → 11 testes verdes.
-- `cd apps/web && pnpm lint && pnpm build` → limpo.
+- `cd apps/web && pnpm exec oxlint && pnpm build` → limpo.
 - O caminho feliz percorrido no browser, incluindo o reload no meio da geração.
 - O teste da recusa foi visto **falhando** quando a condição `state.retryable` é removida (Task B5, Step 3).
 - `git status --porcelain` vazio ao fim.
