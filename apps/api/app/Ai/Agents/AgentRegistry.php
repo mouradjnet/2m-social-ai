@@ -13,6 +13,7 @@ class AgentRegistry
     /** @var array<string, class-string<Agent>> */
     private const AGENTS = [
         'strategist' => StrategistAgent::class,
+        'copywriter' => CopywriterAgent::class,
     ];
 
     public function get(string $name): Agent

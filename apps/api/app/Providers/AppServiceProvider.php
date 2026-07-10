@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 use Anthropic\Client;
+use App\Ai\Agents\CopywriterAgent;
 use App\Ai\Exceptions\LlmFailedException;
 use App\Ai\Providers\AnthropicProvider;
 use App\Ai\Providers\LlmProvider;
@@ -22,6 +23,12 @@ class AppServiceProvider extends ServiceProvider
                 ),
             };
         });
+
+        // O batch_size do copywriter e canonico no config; injetado aqui para
+        // que o agente nao dependa de config() nos seus metodos (testavel puro).
+        $this->app->bind(CopywriterAgent::class, fn () => new CopywriterAgent(
+            (int) config('ai.agents.copywriter.batch_size'),
+        ));
     }
 
     public function boot(): void

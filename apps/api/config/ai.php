@@ -37,6 +37,12 @@ return [
             'effort' => 'high',
             'max_tokens' => 16000,
         ],
+        'copywriter' => [
+            'model' => env('AI_MODEL_COPYWRITER', env('AI_MODEL_DEFAULT', 'claude-opus-4-8')),
+            'effort' => 'high',
+            'max_tokens' => 16000,
+            'batch_size' => 5,
+        ],
     ],
 
     'workspace_monthly_budget_cents' => (int) env('AI_WORKSPACE_MONTHLY_BUDGET_CENTS', 5000),
