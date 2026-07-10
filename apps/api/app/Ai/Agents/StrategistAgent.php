@@ -60,6 +60,11 @@ class StrategistAgent implements Agent
         - Cada `weight` e um inteiro de 1 a 100, e a soma dos pesos e exatamente 100.
         - `editorial_line` descreve como a marca fala, nao o que ela vende.
         - Escreva em portugues do Brasil.
+        - Nunca use, em nenhum campo da resposta, as palavras ou expressoes
+          listadas em `forbidden_words` do perfil. Se uma delas for a forma
+          natural de dizer algo, reescreva com outra palavra.
+        - Quando `required_words` trouxer termos, prefira-os ao redigir, desde
+          que caibam com naturalidade — nao os force.
         - Se o perfil da marca estiver vazio ou raso, proponha uma estrategia
           conservadora e diga isso no `summary`, em vez de inventar fatos.
         TXT;

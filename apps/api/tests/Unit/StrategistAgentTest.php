@@ -127,4 +127,17 @@ class StrategistAgentTest extends TestCase
         $this->assertFalse($schema['additionalProperties']);
         $this->assertFalse($schema['properties']['pillars']['items']['additionalProperties']);
     }
+
+    /**
+     * O AgentContext envia forbidden_words/required_words no perfil, mas o
+     * modelo so os respeita se o prompt mandar. Sem esta regra, dar tela a
+     * esses campos nao muda a saida — o contrato fica pela metade.
+     */
+    public function test_instructions_mandam_respeitar_o_vocabulario_da_marca(): void
+    {
+        $instructions = (new StrategistAgent)->instructions();
+
+        $this->assertStringContainsString('forbidden_words', $instructions);
+        $this->assertStringContainsString('required_words', $instructions);
+    }
 }
