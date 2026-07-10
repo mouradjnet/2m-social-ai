@@ -202,6 +202,16 @@ o significado muda.
 Enquanto uma nova geração corre, a tela **continua mostrando a estratégia atual**.
 Nada de piscar para vazio.
 
+**Mas o botão `Gerar nova` fica desabilitado durante a geração.** Isto não estava
+no design original e custou caro: ao dirigir o browser contra o servidor real,
+dois cliques rápidos criaram duas execuções, duas estratégias e cobraram duas
+vezes do orçamento. O `Budget` só verifica **antes** de enfileirar; nada impede
+duas gerações concorrentes no mesmo projeto. A defesa é o `disabled`, e o teste
+que a segura clica duas vezes e exige um único POST.
+
+Nenhum dos nove testes originais pegava isso — todos clicavam uma vez. Foi o
+browser que encontrou.
+
 ### Duas regras que não são duplicadas no cliente
 
 `Pillars` não confere que os pesos somam 100: quem garante é
