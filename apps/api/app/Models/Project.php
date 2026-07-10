@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Models\Scopes\WorkspaceMemberScope;
+use Database\Factories\ProjectFactory;
 use Illuminate\Database\Eloquent\Attributes\ScopedBy;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -13,7 +14,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 #[ScopedBy(WorkspaceMemberScope::class)]
 class Project extends Model
 {
-    /** @use HasFactory<\Database\Factories\ProjectFactory> */
+    /** @use HasFactory<ProjectFactory> */
     use HasFactory;
 
     protected $fillable = [
@@ -39,5 +40,10 @@ class Project extends Model
     public function strategies(): HasMany
     {
         return $this->hasMany(Strategy::class);
+    }
+
+    public function contents(): HasMany
+    {
+        return $this->hasMany(Content::class);
     }
 }
