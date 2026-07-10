@@ -77,6 +77,33 @@ export interface Strategy {
   ai_run_id: number | null
 }
 
+export type ContentStatus =
+  | 'idea'
+  | 'production'
+  | 'review'
+  | 'approved'
+  | 'scheduled'
+  | 'published'
+  | 'archived'
+
+export type ContentFormat = 'post' | 'carousel' | 'reel' | 'story' | 'video' | 'article' | 'thread'
+
+export type ContentChannel = 'instagram' | 'facebook' | 'linkedin' | 'tiktok' | 'youtube' | 'blog'
+
+export interface Content {
+  id: number
+  project_id: number
+  title: string
+  caption: string | null
+  cta: string | null
+  hashtags: string[]
+  format: ContentFormat
+  channel: ContentChannel
+  status: ContentStatus
+  source: 'manual' | 'ai' | 'research'
+  origin_ai_run_id: number | null
+}
+
 /** Classificacao da falha. `provider_failed` e o unico onde insistir ajuda. */
 export type AiRunErrorCode = 'refused' | 'rejected_output' | 'provider_failed'
 
