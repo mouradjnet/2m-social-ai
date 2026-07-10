@@ -4,6 +4,7 @@ import { Link, useParams } from 'react-router-dom'
 import { Button } from '@/components/ui/Button'
 import { Card, CardDescription, CardTitle } from '@/components/ui/Card'
 import { Input } from '@/components/ui/Input'
+import { Shell } from '@/components/ui/Shell'
 import { Stepper, type Step } from '@/components/ui/Stepper'
 import { Textarea } from '@/components/ui/Textarea'
 import { ApiError, api } from '@/lib/api'
@@ -196,8 +197,4 @@ export function BrandProfilePage() {
       </div>
     </Shell>
   )
-}
-
-function Shell({ children }: { children: React.ReactNode }) {
-  return <main className="mx-auto max-w-(--container-shell) px-12 py-16">{children}</main>
 }

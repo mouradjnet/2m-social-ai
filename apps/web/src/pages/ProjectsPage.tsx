@@ -4,6 +4,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/Button'
 import { Card, CardDescription, CardTitle } from '@/components/ui/Card'
 import { Input } from '@/components/ui/Input'
+import { Shell } from '@/components/ui/Shell'
 import { api, clearToken } from '@/lib/api'
 import type { Me, Project } from '@/lib/types'
 
@@ -138,11 +139,5 @@ export function ProjectsPage() {
         </p>
       )}
     </Shell>
-  )
-}
-
-function Shell({ children }: { children: React.ReactNode }) {
-  return (
-    <main className="mx-auto max-w-(--container-shell) px-12 py-16">{children}</main>
   )
 }
