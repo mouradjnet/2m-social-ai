@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Ai\Exceptions\LlmFailedException;
 use App\Ai\Exceptions\LlmRefusedException;
 use App\Ai\Providers\LlmProvider;
 use App\Ai\Providers\LlmRequest;
@@ -47,6 +48,16 @@ class StrategyGenerationTest extends TestCase
     private function generate(Project $project): TestResponse
     {
         return $this->postJson("/api/v1/projects/{$project->id}/strategies:generate");
+    }
+
+    /**
+     * Liga um provider fake no container, no lugar do MockProvider.
+     * O closure devolve a MESMA instancia — testes que contam chamadas dependem
+     * disso (ver test_saida_fora_das_regras_e_rejeitada_depois_de_duas_tentativas).
+     */
+    private function bindProvider(LlmProvider $provider): void
+    {
+        $this->app->bind(LlmProvider::class, fn () => $provider);
     }
 
     public function test_geracao_devolve_202_e_grava_a_estrategia_como_rascunho(): void
@@ -329,5 +340,53 @@ class StrategyGenerationTest extends TestCase
         $this->getJson("/api/v1/ai-runs/{$run->id}")
             ->assertOk()
             ->assertJsonPath('error_code', 'refused');
+    }
+
+    public function test_recusa_do_modelo_grava_error_code_refused(): void
+    {
+        $this->bindProvider(new class implements LlmProvider
+        {
+            public function generate(LlmRequest $request): LlmResponse
+            {
+                throw new LlmRefusedException;
+            }
+        });
+
+        $workspace = Workspace::factory()->create();
+        $editor = $this->memberOf($workspace, WorkspaceRole::Editor);
+        $project = Project::factory()->create(['workspace_id' => $workspace->id]);
+
+        Sanctum::actingAs($editor);
+
+        $response = $this->generate($project)->assertStatus(202);
+        $run = AiRun::withoutGlobalScopes()->findOrFail($response->json('ai_run_id'));
+
+        $this->assertSame('failed', $run->status);
+        $this->assertSame('refused', $run->error_code);
+    }
+
+    public function test_falha_do_provedor_grava_error_code_provider_failed(): void
+    {
+        $this->bindProvider(new class implements LlmProvider
+        {
+            public function generate(LlmRequest $request): LlmResponse
+            {
+                throw new LlmFailedException('a rede caiu');
+            }
+        });
+
+        $workspace = Workspace::factory()->create();
+        $editor = $this->memberOf($workspace, WorkspaceRole::Editor);
+        $project = Project::factory()->create(['workspace_id' => $workspace->id]);
+
+        Sanctum::actingAs($editor);
+
+        $response = $this->generate($project)->assertStatus(202);
+        $run = AiRun::withoutGlobalScopes()->findOrFail($response->json('ai_run_id'));
+
+        $this->assertSame('failed', $run->status);
+        $this->assertSame('provider_failed', $run->error_code);
+        // A mensagem crua do provedor nunca vaza para o usuario.
+        $this->assertStringNotContainsString('a rede caiu', $run->error);
     }
 }

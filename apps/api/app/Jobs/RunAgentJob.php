@@ -39,6 +39,7 @@ class RunAgentJob implements ShouldQueue
             $run->update([
                 'status' => 'failed',
                 'error' => $this->userFacingMessage($e),
+                'error_code' => $this->errorCodeFor($e),
                 'latency_ms' => $this->elapsedMs($startedAt),
             ]);
 
@@ -95,6 +96,20 @@ class RunAgentJob implements ShouldQueue
         }
 
         throw new OutputRejectedException('inalcancavel');
+    }
+
+    /**
+     * Irmao de userFacingMessage(). Fazem `match` na mesma coisa de proposito:
+     * um responde a um humano, o outro a uma maquina. A mensagem vai mudar de
+     * redacao; o codigo nunca pode mudar.
+     */
+    private function errorCodeFor(Throwable $e): string
+    {
+        return match (true) {
+            $e instanceof LlmRefusedException => 'refused',
+            $e instanceof OutputRejectedException => 'rejected_output',
+            default => 'provider_failed',
+        };
     }
 
     private function userFacingMessage(Throwable $e): string
