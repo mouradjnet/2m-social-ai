@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\V1\AiRunController;
 use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\BrandProfileController;
+use App\Http\Controllers\Api\V1\CopyController;
 use App\Http\Controllers\Api\V1\ProjectController;
 use App\Http\Controllers\Api\V1\StrategyController;
 use App\Http\Controllers\Api\V1\WorkspaceController;
@@ -38,6 +39,7 @@ Route::prefix('v1')->group(function () {
         // Geracao nao bloqueia: 202 + polling em /ai-runs/{aiRun} (ADR-07).
         Route::get('projects/{project}/strategies', [StrategyController::class, 'index']);
         Route::post('projects/{project}/strategies:generate', [StrategyController::class, 'generate']);
+        Route::post('projects/{project}/copy:generate', [CopyController::class, 'generate']);
         Route::patch('strategies/{strategy}', [StrategyController::class, 'update']);
 
         Route::get('ai-runs/{aiRun}', [AiRunController::class, 'show']);

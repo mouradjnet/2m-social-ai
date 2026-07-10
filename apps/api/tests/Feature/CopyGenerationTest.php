@@ -3,12 +3,67 @@
 namespace Tests\Feature;
 
 use App\Ai\Agents\CopywriterAgent;
+use App\Ai\Exceptions\LlmRefusedException;
 use App\Ai\Providers\LlmProvider;
 use App\Ai\Providers\LlmRequest;
+use App\Ai\Providers\LlmResponse;
+use App\Enums\WorkspaceRole;
+use App\Models\AiRun;
+use App\Models\Content;
+use App\Models\Project;
+use App\Models\Strategy;
+use App\Models\User;
+use App\Models\Workspace;
+use App\Models\WorkspaceMember;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Testing\TestResponse;
+use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
 class CopyGenerationTest extends TestCase
 {
+    use RefreshDatabase;
+
+    private function memberOf(Workspace $workspace, WorkspaceRole $role): User
+    {
+        $user = User::factory()->create();
+
+        WorkspaceMember::create([
+            'workspace_id' => $workspace->id,
+            'user_id' => $user->id,
+            'role' => $role,
+            'joined_at' => now(),
+        ]);
+
+        return $user;
+    }
+
+    private function withActiveStrategy(Project $project): Strategy
+    {
+        return Strategy::create([
+            'workspace_id' => $project->workspace_id,
+            'project_id' => $project->id,
+            'title' => 'Estrategia ativa',
+            'summary' => 's',
+            'editorial_line' => 'e',
+            'pillars' => [
+                ['name' => 'Educacao', 'weight' => 50, 'description' => 'd'],
+                ['name' => 'Prova social', 'weight' => 50, 'description' => 'd'],
+            ],
+            'status' => 'active',
+        ]);
+    }
+
+    private function generate(Project $project): TestResponse
+    {
+        return $this->postJson("/api/v1/projects/{$project->id}/copy:generate");
+    }
+
+    private function bindProvider(LlmProvider $provider): void
+    {
+        $this->app->bind(LlmProvider::class, fn () => $provider);
+    }
+
     public function test_o_mockprovider_devolve_cinco_pecas_para_o_schema_do_copywriter(): void
     {
         $agent = new CopywriterAgent;
@@ -24,5 +79,190 @@ class CopyGenerationTest extends TestCase
         $this->assertCount(5, $response->output['pieces']);
         // A saida do mock satisfaz o validate do agente.
         $agent->validate($response->output);
+    }
+
+    public function test_gera_202_e_grava_cinco_pecas_em_contents(): void
+    {
+        $workspace = Workspace::factory()->create();
+        $editor = $this->memberOf($workspace, WorkspaceRole::Editor);
+        $project = Project::factory()->create(['workspace_id' => $workspace->id]);
+        $this->withActiveStrategy($project);
+
+        Sanctum::actingAs($editor);
+
+        $response = $this->generate($project)->assertStatus(202);
+        $run = AiRun::withoutGlobalScopes()->findOrFail($response->json('ai_run_id'));
+
+        $this->assertSame('succeeded', $run->status);
+        $this->assertSame('copywriter', $run->agent);
+
+        $pecas = Content::withoutGlobalScopes()->where('project_id', $project->id)->get();
+        $this->assertCount(5, $pecas);
+        foreach ($pecas as $peca) {
+            $this->assertSame('idea', $peca->status);
+            $this->assertSame('ai', $peca->source);
+            $this->assertSame($run->id, $peca->origin_ai_run_id);
+            $this->assertSame($editor->id, $peca->created_by);
+        }
+    }
+
+    public function test_lote_invalido_nao_grava_nenhuma_peca(): void
+    {
+        // Provider que devolve 4 pecas: falha no validate do agente.
+        $this->bindProvider(new class implements LlmProvider
+        {
+            public function generate(LlmRequest $request): LlmResponse
+            {
+                $peca = [
+                    'title' => 't', 'caption' => 'c', 'cta' => 'x',
+                    'hashtags' => [], 'format' => 'post', 'channel' => 'instagram', 'pillar' => 'p',
+                ];
+
+                return new LlmResponse(
+                    output: ['pieces' => [$peca, $peca, $peca, $peca]],
+                    model: 'claude-opus-4-8',
+                    inputTokens: 10,
+                    outputTokens: 10,
+                );
+            }
+        });
+
+        $workspace = Workspace::factory()->create();
+        $editor = $this->memberOf($workspace, WorkspaceRole::Editor);
+        $project = Project::factory()->create(['workspace_id' => $workspace->id]);
+        $this->withActiveStrategy($project);
+
+        Sanctum::actingAs($editor);
+
+        $response = $this->generate($project)->assertStatus(202);
+        $run = AiRun::withoutGlobalScopes()->findOrFail($response->json('ai_run_id'));
+
+        $this->assertSame('failed', $run->status);
+        $this->assertSame('rejected_output', $run->error_code);
+        // Transacao: nenhuma peca meio-gravada.
+        $this->assertSame(0, Content::withoutGlobalScopes()->count());
+    }
+
+    public function test_sem_estrategia_ativa_devolve_422_e_nao_enfileira(): void
+    {
+        $workspace = Workspace::factory()->create();
+        $editor = $this->memberOf($workspace, WorkspaceRole::Editor);
+        $project = Project::factory()->create(['workspace_id' => $workspace->id]);
+
+        Sanctum::actingAs($editor);
+
+        $this->generate($project)->assertStatus(422);
+        $this->assertSame(0, AiRun::withoutGlobalScopes()->count());
+    }
+
+    public function test_estrategia_draft_nao_habilita_copy(): void
+    {
+        $workspace = Workspace::factory()->create();
+        $editor = $this->memberOf($workspace, WorkspaceRole::Editor);
+        $project = Project::factory()->create(['workspace_id' => $workspace->id]);
+        Strategy::create([
+            'workspace_id' => $workspace->id, 'project_id' => $project->id,
+            'title' => 'rascunho', 'summary' => 's', 'editorial_line' => 'e',
+            'pillars' => [], 'status' => 'draft',
+        ]);
+
+        Sanctum::actingAs($editor);
+
+        $this->generate($project)->assertStatus(422);
+    }
+
+    public function test_copy_em_andamento_devolve_409(): void
+    {
+        $workspace = Workspace::factory()->create();
+        $editor = $this->memberOf($workspace, WorkspaceRole::Editor);
+        $project = Project::factory()->create(['workspace_id' => $workspace->id]);
+        $this->withActiveStrategy($project);
+
+        AiRun::create([
+            'workspace_id' => $workspace->id, 'project_id' => $project->id,
+            'agent' => 'copywriter', 'provider' => 'mock', 'model' => 'claude-opus-4-8',
+            'status' => 'running', 'input' => [], 'created_by' => $editor->id,
+        ]);
+
+        Sanctum::actingAs($editor);
+
+        $this->generate($project)->assertStatus(409);
+    }
+
+    public function test_estrategia_em_andamento_nao_bloqueia_copy(): void
+    {
+        $workspace = Workspace::factory()->create();
+        $editor = $this->memberOf($workspace, WorkspaceRole::Editor);
+        $project = Project::factory()->create(['workspace_id' => $workspace->id]);
+        $this->withActiveStrategy($project);
+
+        // Um strategist rodando nao impede o copy (indice por-agente + emAndamento por agente).
+        AiRun::create([
+            'workspace_id' => $workspace->id, 'project_id' => $project->id,
+            'agent' => 'strategist', 'provider' => 'mock', 'model' => 'claude-opus-4-8',
+            'status' => 'running', 'input' => [], 'created_by' => $editor->id,
+        ]);
+
+        Sanctum::actingAs($editor);
+
+        $this->generate($project)->assertStatus(202);
+    }
+
+    public function test_orcamento_estourado_devolve_402(): void
+    {
+        $workspace = Workspace::factory()->create();
+        $editor = $this->memberOf($workspace, WorkspaceRole::Editor);
+        $project = Project::factory()->create(['workspace_id' => $workspace->id]);
+        $this->withActiveStrategy($project);
+
+        AiRun::create([
+            'workspace_id' => $workspace->id, 'project_id' => $project->id,
+            'agent' => 'strategist', 'provider' => 'mock', 'model' => 'claude-opus-4-8',
+            'status' => 'succeeded', 'input' => [],
+            'cost_cents' => config('ai.workspace_monthly_budget_cents'),
+            'created_by' => $editor->id,
+        ]);
+
+        Sanctum::actingAs($editor);
+
+        $this->generate($project)->assertStatus(402);
+    }
+
+    public function test_projeto_de_outro_workspace_devolve_404(): void
+    {
+        $mine = Workspace::factory()->create();
+        $theirs = Workspace::factory()->create();
+        $intruder = $this->memberOf($mine, WorkspaceRole::Owner);
+        $target = Project::factory()->create(['workspace_id' => $theirs->id]);
+        $this->withActiveStrategy($target);
+
+        Sanctum::actingAs($intruder);
+
+        $this->generate($target)->assertNotFound();
+    }
+
+    public function test_recusa_do_modelo_nao_grava_pecas(): void
+    {
+        $this->bindProvider(new class implements LlmProvider
+        {
+            public function generate(LlmRequest $request): LlmResponse
+            {
+                throw new LlmRefusedException;
+            }
+        });
+
+        $workspace = Workspace::factory()->create();
+        $editor = $this->memberOf($workspace, WorkspaceRole::Editor);
+        $project = Project::factory()->create(['workspace_id' => $workspace->id]);
+        $this->withActiveStrategy($project);
+
+        Sanctum::actingAs($editor);
+
+        $response = $this->generate($project)->assertStatus(202);
+        $run = AiRun::withoutGlobalScopes()->findOrFail($response->json('ai_run_id'));
+
+        $this->assertSame('failed', $run->status);
+        $this->assertSame('refused', $run->error_code);
+        $this->assertSame(0, Content::withoutGlobalScopes()->count());
     }
 }
