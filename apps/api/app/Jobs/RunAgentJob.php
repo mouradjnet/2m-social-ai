@@ -14,6 +14,7 @@ use App\Models\Project;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Throwable;
 
 class RunAgentJob implements ShouldQueue
@@ -36,10 +37,26 @@ class RunAgentJob implements ShouldQueue
         try {
             $output = $this->generateAndValidate($provider, $agent, $project);
         } catch (Throwable $e) {
+            $errorCode = $this->errorCodeFor($e);
+
+            // O usuario recebe uma frase amigavel; o operador precisa da causa.
+            // Sem isto, uma falha de TLS chega ao banco como "tente novamente" e
+            // nada mais — sem classe, sem mensagem, sem stack.
+            //
+            // Contexto e so id e classificacao: o prompt carrega o perfil da
+            // marca, e log nao e lugar de dado do cliente.
+            Log::error('Falha na execucao de agente de IA.', [
+                'ai_run_id' => $run->id,
+                'agent' => $run->agent,
+                'provider' => $run->provider,
+                'error_code' => $errorCode,
+                'exception' => $e,
+            ]);
+
             $run->update([
                 'status' => 'failed',
                 'error' => $this->userFacingMessage($e),
-                'error_code' => $this->errorCodeFor($e),
+                'error_code' => $errorCode,
                 'latency_ms' => $this->elapsedMs($startedAt),
             ]);
 

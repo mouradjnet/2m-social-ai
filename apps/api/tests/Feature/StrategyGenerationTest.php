@@ -17,6 +17,7 @@ use App\Models\Workspace;
 use App\Models\WorkspaceMember;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Testing\TestResponse;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
@@ -503,6 +504,60 @@ class StrategyGenerationTest extends TestCase
         $this->expectException(UniqueConstraintViolationException::class);
 
         $this->runEmAndamento($workspace, $project, $editor, 'queued');
+    }
+
+    /**
+     * O usuario recebe uma frase amigavel; o operador precisa da causa.
+     *
+     * Sem este log, uma falha de TLS em producao chega ao banco como "Falha ao
+     * gerar. Tente novamente em alguns instantes." e nada mais — sem classe, sem
+     * mensagem, sem stack. Aconteceu de verdade: um `cURL error 60` so foi
+     * diagnosticado reproduzindo a chamada a mao.
+     */
+    public function test_falha_registra_a_excecao_e_o_contexto_no_log(): void
+    {
+        Log::spy();
+
+        $this->bindProvider(new class implements LlmProvider
+        {
+            public function generate(LlmRequest $request): LlmResponse
+            {
+                throw new LlmFailedException('cURL error 60: unable to get local issuer certificate');
+            }
+        });
+
+        $workspace = Workspace::factory()->create();
+        $editor = $this->memberOf($workspace, WorkspaceRole::Editor);
+        $project = Project::factory()->create(['workspace_id' => $workspace->id]);
+
+        Sanctum::actingAs($editor);
+
+        $runId = $this->generate($project)->assertStatus(202)->json('ai_run_id');
+
+        Log::shouldHaveReceived('error')
+            ->once()
+            ->withArgs(function (string $message, array $context) use ($runId) {
+                return $context['ai_run_id'] === $runId
+                    && $context['agent'] === 'strategist'
+                    && $context['error_code'] === 'provider_failed'
+                    && $context['exception'] instanceof LlmFailedException
+                    && str_contains($context['exception']->getMessage(), 'cURL error 60');
+            });
+    }
+
+    public function test_execucao_bem_sucedida_nao_registra_erro(): void
+    {
+        Log::spy();
+
+        $workspace = Workspace::factory()->create();
+        $editor = $this->memberOf($workspace, WorkspaceRole::Editor);
+        $project = Project::factory()->create(['workspace_id' => $workspace->id]);
+
+        Sanctum::actingAs($editor);
+
+        $this->generate($project)->assertStatus(202);
+
+        Log::shouldNotHaveReceived('error');
     }
 
     public function test_saida_fora_das_regras_e_rejeitada_depois_de_duas_tentativas(): void
