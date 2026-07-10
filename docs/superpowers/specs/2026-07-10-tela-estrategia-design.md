@@ -75,8 +75,9 @@ Então persistimos o que o job já sabe.
 ## Fatia 3b — `error_code` em `ai_runs` (backend)
 
 **Migration.** `enum('error_code', ['refused', 'rejected_output', 'provider_failed'])
-->nullable()->after('error')`. Segue o padrão de `agent` e `status`, já `enum` na
-mesma tabela. Fica `null` no sucesso — o código só é escrito no `catch`, então
+->nullable()`. Segue o padrão de `agent` e `status`, já `enum` na mesma tabela.
+Sem `->after()`: é modificador exclusivo do MySQL, e o grammar do Postgres o
+ignora. A coluna vai para o fim da tabela, o que não tem consequência. Fica `null` no sucesso — o código só é escrito no `catch`, então
 `null` significa "não falhou", nunca "falhou por motivo desconhecido".
 
 **Job.** Um método irmão do `userFacingMessage()`:
@@ -219,9 +220,9 @@ Tocados: `lib/types.ts` (`Strategy`, `Pillar`, `AiRun`, `AiRunErrorCode`),
 `main.tsx` (rota `/projects/:projectId/strategy`), e as três páginas existentes
 que passam a importar o `Shell` extraído.
 
-**Limpeza adjacente aprovada:** o `Shell` está copiado em `LoginPage`,
-`ProjectsPage` e `BrandProfilePage`. Esta tela seria a quarta cópia. Extrair para
-`components/ui/Shell.tsx` e trocar as três chamadas.
+**Limpeza adjacente aprovada:** o `Shell` está copiado em `ProjectsPage` e
+`BrandProfilePage` (a `LoginPage` não usa). Esta tela seria a terceira cópia.
+Extrair para `components/ui/Shell.tsx` e trocar as duas chamadas.
 
 ## Testes
 
