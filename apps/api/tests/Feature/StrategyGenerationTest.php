@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Ai\Budget;
 use App\Ai\Exceptions\LlmFailedException;
 use App\Ai\Exceptions\LlmRefusedException;
 use App\Ai\Providers\LlmProvider;
@@ -14,6 +15,7 @@ use App\Models\Strategy;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Models\WorkspaceMember;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Testing\TestResponse;
 use Laravel\Sanctum\Sanctum;
@@ -388,6 +390,119 @@ class StrategyGenerationTest extends TestCase
         $this->assertSame('provider_failed', $run->error_code);
         // A mensagem crua do provedor nunca vaza para o usuario.
         $this->assertStringNotContainsString('a rede caiu', $run->error);
+    }
+
+    /** Cria uma execucao parada no estado dado, sem passar pelo job. */
+    private function runEmAndamento(Workspace $workspace, Project $project, User $user, string $status): AiRun
+    {
+        return AiRun::create([
+            'workspace_id' => $workspace->id,
+            'project_id' => $project->id,
+            'agent' => 'strategist',
+            'provider' => 'mock',
+            'model' => 'claude-opus-4-8',
+            'status' => $status,
+            'input' => [],
+            'created_by' => $user->id,
+        ]);
+    }
+
+    public function test_geracao_concorrente_devolve_409_e_nao_cria_execucao(): void
+    {
+        $workspace = Workspace::factory()->create();
+        $editor = $this->memberOf($workspace, WorkspaceRole::Editor);
+        $project = Project::factory()->create(['workspace_id' => $workspace->id]);
+
+        $this->runEmAndamento($workspace, $project, $editor, 'running');
+
+        Sanctum::actingAs($editor);
+
+        $this->generate($project)->assertStatus(409);
+
+        // A execucao em andamento continua sendo a unica.
+        $this->assertSame(1, AiRun::withoutGlobalScopes()->count());
+        $this->assertSame(0, Strategy::withoutGlobalScopes()->count());
+    }
+
+    public function test_execucao_apenas_enfileirada_tambem_bloqueia(): void
+    {
+        $workspace = Workspace::factory()->create();
+        $editor = $this->memberOf($workspace, WorkspaceRole::Editor);
+        $project = Project::factory()->create(['workspace_id' => $workspace->id]);
+
+        $this->runEmAndamento($workspace, $project, $editor, 'queued');
+
+        Sanctum::actingAs($editor);
+
+        $this->generate($project)->assertStatus(409);
+        $this->assertSame(1, AiRun::withoutGlobalScopes()->count());
+    }
+
+    /**
+     * A ordem importa: uma execucao em andamento ainda nao gravou `cost_cents`,
+     * entao o Budget nao a enxerga. Se o 402 viesse primeiro, o usuario receberia
+     * "orcamento esgotado" quando o problema real e que ja existe uma geracao
+     * rodando — e resolveria esperando o mes virar, em vez de esperar 10 segundos.
+     */
+    public function test_409_vem_antes_do_402_quando_as_duas_condicoes_valem(): void
+    {
+        $workspace = Workspace::factory()->create();
+        $editor = $this->memberOf($workspace, WorkspaceRole::Editor);
+        $project = Project::factory()->create(['workspace_id' => $workspace->id]);
+
+        $run = $this->runEmAndamento($workspace, $project, $editor, 'running');
+        $run->update(['cost_cents' => config('ai.workspace_monthly_budget_cents')]);
+
+        Sanctum::actingAs($editor);
+
+        $this->assertTrue(Budget::exceeded($workspace->refresh()));
+
+        $this->generate($project)->assertStatus(409);
+    }
+
+    public function test_execucao_terminada_nao_bloqueia_uma_nova(): void
+    {
+        $workspace = Workspace::factory()->create();
+        $editor = $this->memberOf($workspace, WorkspaceRole::Editor);
+        $project = Project::factory()->create(['workspace_id' => $workspace->id]);
+
+        $this->runEmAndamento($workspace, $project, $editor, 'succeeded');
+        $this->runEmAndamento($workspace, $project, $editor, 'failed');
+
+        Sanctum::actingAs($editor);
+
+        $this->generate($project)->assertStatus(202);
+    }
+
+    public function test_execucao_em_andamento_de_outro_projeto_nao_bloqueia(): void
+    {
+        $workspace = Workspace::factory()->create();
+        $editor = $this->memberOf($workspace, WorkspaceRole::Editor);
+        $meu = Project::factory()->create(['workspace_id' => $workspace->id]);
+        $outro = Project::factory()->create(['workspace_id' => $workspace->id]);
+
+        $this->runEmAndamento($workspace, $outro, $editor, 'running');
+
+        Sanctum::actingAs($editor);
+
+        $this->generate($meu)->assertStatus(202);
+    }
+
+    /**
+     * O 409 do controller e uma checagem antes do insert: duas requisicoes
+     * simultaneas passariam as duas. O indice parcial unico e a garantia real.
+     */
+    public function test_o_banco_impede_duas_execucoes_ativas_no_mesmo_projeto(): void
+    {
+        $workspace = Workspace::factory()->create();
+        $editor = $this->memberOf($workspace, WorkspaceRole::Editor);
+        $project = Project::factory()->create(['workspace_id' => $workspace->id]);
+
+        $this->runEmAndamento($workspace, $project, $editor, 'running');
+
+        $this->expectException(UniqueConstraintViolationException::class);
+
+        $this->runEmAndamento($workspace, $project, $editor, 'queued');
     }
 
     public function test_saida_fora_das_regras_e_rejeitada_depois_de_duas_tentativas(): void
