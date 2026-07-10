@@ -97,3 +97,92 @@ test('caminho feliz: gera, faz polling e mostra a estratégia', async () => {
   // succeeded limpa o ?run: a execucao nao interessa mais.
   await waitFor(() => expect(currentSearch()).toBe(''))
 })
+
+test('recusa mostra a mensagem e NÃO oferece tentar de novo', async () => {
+  server.use(
+    strategies(),
+    http.get('/api/v1/ai-runs/42', () =>
+      HttpResponse.json(
+        run({
+          status: 'failed',
+          error: 'O modelo recusou esta requisicao.',
+          error_code: 'refused',
+        }),
+      ),
+    ),
+  )
+
+  renderWithProviders(<StrategyPage />, {
+    path: ROUTE.path,
+    entry: '/projects/1/strategy?run=42',
+  })
+
+  expect(await screen.findByText('O modelo recusou esta requisicao.')).toBeInTheDocument()
+
+  // A assercao que justifica o error_code: insistir aqui e dano.
+  expect(screen.queryByRole('button', { name: /tentar de novo/i })).not.toBeInTheDocument()
+  expect(screen.getByRole('button', { name: /dispensar/i })).toBeInTheDocument()
+})
+
+test('falha transiente oferece tentar de novo, e o clique dispara um POST novo', async () => {
+  const user = setup()
+  let posts = 0
+
+  server.use(
+    strategies(),
+    http.post('/api/v1/projects/1/strategies:generate', () => {
+      posts++
+
+      return HttpResponse.json({ ai_run_id: 99 }, { status: 202 })
+    }),
+    http.get('/api/v1/ai-runs/42', () =>
+      HttpResponse.json(
+        run({
+          status: 'failed',
+          error: 'Falha ao gerar. Tente novamente em alguns instantes.',
+          error_code: 'provider_failed',
+        }),
+      ),
+    ),
+    http.get('/api/v1/ai-runs/99', () => HttpResponse.json(run({ id: 99, status: 'running' }))),
+  )
+
+  renderWithProviders(<StrategyPage />, {
+    path: ROUTE.path,
+    entry: '/projects/1/strategy?run=42',
+  })
+
+  await user.click(await screen.findByRole('button', { name: /tentar de novo/i }))
+
+  await waitFor(() => expect(posts).toBe(1))
+  expect(await screen.findByText(/gerando/i)).toBeInTheDocument()
+})
+
+test('402 mostra o orçamento e não inicia polling', async () => {
+  const user = setup()
+
+  server.use(
+    strategies(),
+    http.post('/api/v1/projects/1/strategies:generate', () =>
+      HttpResponse.json(
+        {
+          message: 'Orcamento mensal de IA esgotado para este espaco de trabalho.',
+          spent_cents: 5000,
+          limit_cents: 5000,
+        },
+        { status: 402 },
+      ),
+    ),
+    // Nao registramos /ai-runs/*: se a tela fizer polling, o MSW estoura com
+    // onUnhandledRequest: 'error' e o teste quebra. E o ponto.
+  )
+
+  renderWithProviders(<StrategyPage />, ROUTE)
+
+  await user.click(await screen.findByRole('button', { name: /gerar estratégia/i }))
+
+  expect(await screen.findByText(/orçamento mensal de ia esgotado/i)).toBeInTheDocument()
+  expect(screen.getByText(/US\$ 50\.00 de US\$ 50\.00/)).toBeInTheDocument()
+  expect(currentSearch()).toBe('')
+  expect(screen.queryByText(/gerando/i)).not.toBeInTheDocument()
+})
