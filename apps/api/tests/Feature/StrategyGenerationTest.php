@@ -610,4 +610,38 @@ class StrategyGenerationTest extends TestCase
         // Nada foi persistido: a estrategia so nasce depois do validate().
         $this->assertSame(0, Strategy::withoutGlobalScopes()->count());
     }
+
+    public function test_dois_agentes_diferentes_coexistem_no_mesmo_projeto(): void
+    {
+        $workspace = Workspace::factory()->create();
+        $editor = $this->memberOf($workspace, WorkspaceRole::Editor);
+        $project = Project::factory()->create(['workspace_id' => $workspace->id]);
+
+        // Uma execucao de strategist rodando...
+        AiRun::create([
+            'workspace_id' => $workspace->id,
+            'project_id' => $project->id,
+            'agent' => 'strategist',
+            'provider' => 'mock',
+            'model' => 'claude-opus-4-8',
+            'status' => 'running',
+            'input' => [],
+            'created_by' => $editor->id,
+        ]);
+
+        // ...nao impede uma de copywriter no mesmo projeto (indice por-agente).
+        $copy = AiRun::create([
+            'workspace_id' => $workspace->id,
+            'project_id' => $project->id,
+            'agent' => 'copywriter',
+            'provider' => 'mock',
+            'model' => 'claude-opus-4-8',
+            'status' => 'running',
+            'input' => [],
+            'created_by' => $editor->id,
+        ]);
+
+        $this->assertSame(2, AiRun::withoutGlobalScopes()->where('project_id', $project->id)->count());
+        $this->assertSame('copywriter', $copy->agent);
+    }
 }
