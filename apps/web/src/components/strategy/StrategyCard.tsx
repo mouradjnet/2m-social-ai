@@ -6,6 +6,9 @@ import type { Strategy } from '@/lib/types'
 interface Props {
   strategy: Strategy
   pending: boolean
+  /** Ha uma geracao em voo. Um segundo clique criaria outra execucao, e o
+   *  Budget so checa antes de enfileirar — cobraria duas vezes. */
+  generating: boolean
   onApprove: () => void
   onArchive: () => void
   onRegenerate: () => void
@@ -17,7 +20,14 @@ const CHIPS: Record<Strategy['status'], string> = {
   archived: 'Arquivada',
 }
 
-export function StrategyCard({ strategy, pending, onApprove, onArchive, onRegenerate }: Props) {
+export function StrategyCard({
+  strategy,
+  pending,
+  generating,
+  onApprove,
+  onArchive,
+  onRegenerate,
+}: Props) {
   return (
     <Card>
       <div className="flex items-start justify-between gap-4">
@@ -52,7 +62,7 @@ export function StrategyCard({ strategy, pending, onApprove, onArchive, onRegene
             </Button>
           </>
         ) : (
-          <Button variant="secondary" onClick={onRegenerate}>
+          <Button variant="secondary" disabled={generating} onClick={onRegenerate}>
             Gerar nova
           </Button>
         )}

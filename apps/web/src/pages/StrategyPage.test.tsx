@@ -269,3 +269,38 @@ test('aprovar o rascunho troca o chip para Ativa', async () => {
   expect(screen.getByRole('button', { name: /gerar nova/i })).toBeInTheDocument()
   expect(screen.queryByRole('button', { name: /aprovar estratégia/i })).not.toBeInTheDocument()
 })
+
+/**
+ * Encontrado dirigindo o browser contra o servidor real: com uma estrategia
+ * ativa na tela, "Gerar nova" continuava habilitado durante a geracao. Dois
+ * cliques criavam duas execucoes e cobravam duas vezes do orcamento — o Budget
+ * so checa ANTES de enfileirar, e nao impede duas geracoes concorrentes.
+ */
+test('gerar duas vezes seguidas dispara um POST só', async () => {
+  const user = setup()
+  let posts = 0
+
+  server.use(
+    strategies({ ...ESTRATEGIA, status: 'active' }),
+    http.post('/api/v1/projects/1/strategies:generate', () => {
+      posts++
+
+      return HttpResponse.json({ ai_run_id: 42 }, { status: 202 })
+    }),
+    http.get('/api/v1/ai-runs/42', () => HttpResponse.json(run({ status: 'running' }))),
+  )
+
+  renderWithProviders(<StrategyPage />, ROUTE)
+
+  await user.click(await screen.findByRole('button', { name: /gerar nova/i }))
+
+  // A geracao esta em voo. O botao nao pode aceitar um segundo clique.
+  expect(await screen.findByText(/gerando/i)).toBeInTheDocument()
+
+  const gerarNova = screen.getByRole('button', { name: /gerar nova/i })
+  expect(gerarNova).toBeDisabled()
+
+  await user.click(gerarNova)
+
+  await waitFor(() => expect(posts).toBe(1))
+})

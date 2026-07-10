@@ -52,6 +52,7 @@ export function StrategyPage() {
           <StrategyCard
             strategy={current}
             pending={setStatus.isPending}
+            generating={state.kind === 'starting' || state.kind === 'running'}
             onApprove={() => setStatus.mutate({ id: current.id, status: 'active' })}
             onArchive={() => setStatus.mutate({ id: current.id, status: 'archived' })}
             onRegenerate={generate}
