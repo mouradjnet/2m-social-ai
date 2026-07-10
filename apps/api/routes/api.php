@@ -1,7 +1,9 @@
 <?php
 
 use App\Http\Controllers\Api\V1\AuthController;
+use App\Http\Controllers\Api\V1\BrandProfileController;
 use App\Http\Controllers\Api\V1\ProjectController;
+use App\Http\Controllers\Api\V1\WorkspaceController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->group(function () {
@@ -11,6 +13,8 @@ Route::prefix('v1')->group(function () {
     Route::middleware('auth:sanctum')->group(function () {
         Route::post('auth/logout', [AuthController::class, 'logout']);
         Route::get('me', [AuthController::class, 'me']);
+
+        Route::post('workspaces', [WorkspaceController::class, 'store']);
 
         // Escopo de tenant explicito na rota (ADR-02).
         Route::prefix('workspaces/{workspace}')->group(function () {
@@ -23,6 +27,10 @@ Route::prefix('v1')->group(function () {
 
         // Depois de criado, o projeto e acessado pelo proprio id: o
         // WorkspaceMemberScope resolve o tenant e devolve 404 se for de outro.
+        // O papel e checado pela ProjectPolicy.
         Route::get('projects/{project}', [ProjectController::class, 'show']);
+
+        Route::get('projects/{project}/brand-profile', [BrandProfileController::class, 'show']);
+        Route::patch('projects/{project}/brand-profile', [BrandProfileController::class, 'update']);
     });
 });

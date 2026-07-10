@@ -91,18 +91,24 @@ Vite 8 + React 19 + TypeScript 6 + Tailwind 4 em `apps/web`.
 
 ---
 
-## Fase 2 — Fatia vertical: Auth → Projeto → Perfil da Marca
+## Fase 2 — Fatia vertical: Auth → Projeto → Perfil da Marca ✅ concluída em 2026-07-09
 
-A primeira fatia que um usuário consegue atravessar.
+A primeira fatia que um usuário consegue atravessar. **Sem IA nenhuma:** ela existe para provar que o esqueleto de tenancy, autorização e persistência aguenta peso.
 
-- registro, login, criação de workspace
-- CRUD de projetos
-- wizard de 4 passos do Perfil da Marca com `PATCH` parcial e `completion`
-- Dashboard com estado vazio honesto ("Nenhum projeto ainda")
+**Backend**
+- `POST /workspaces` — workspace e a associação do dono nascem na mesma transação; um workspace sem membros seria inacessível até para quem o criou.
+- `GET` e `PATCH /projects/{project}/brand-profile` — merge parcial, com `completion` calculado no servidor.
+- `ProjectPolicy` — rotas que recebem só o projeto (sem `{workspace}` na URL) checam o papel aqui; o `WorkspaceMemberScope` já garantiu o tenant.
+- `Domain\BrandProfile\Completion` — **quem decide o que está completo é o servidor.** Se a regra vivesse no cliente, duas telas discordariam sobre o mesmo perfil.
 
-**Sem IA nenhuma nesta fase.** Ela existe para provar que o esqueleto de tenancy, autorização e persistência aguenta peso.
+**Frontend**
+- TanStack Query + React Router, guarda de rota por token.
+- Wizard de 4 passos com formulário **não-controlado** por passo (`key={step.id}`): o rascunho nunca briga com o dado que volta do servidor.
+- Cada passo envia **apenas os seus campos** — é o que torna o `PATCH` parcial verdadeiro.
 
-**Verificação (no browser, não só em teste):** criar conta → criar projeto → completar os 4 passos do wizard → recarregar a página → os dados persistem e o stepper mostra 100%.
+**Verificação executada:** 22 testes verdes no backend. E o fluxo completo percorrido no browser por um humano — criar conta, criar workspace, criar projeto, preencher os 4 passos. Numa **aba nova com carregamento limpo**, o perfil volta preenchido do servidor, o Stepper mostra os 4 passos concluídos e o cabeçalho diz "Perfil 100% completo".
+
+> Pegadinha registrada: o `ResourceResponse` do Laravel devolve **201 sozinho** quando o model tem `wasRecentlyCreated`. Como o perfil da marca é criado vazio sob demanda, o `GET` respondia 201 na primeira vez. Quem cria recurso é o `POST`; o controller agora força 200.
 
 ---
 

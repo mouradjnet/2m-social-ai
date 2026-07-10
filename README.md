@@ -2,8 +2,8 @@
 
 Plataforma SaaS de planejamento estratégico de conteúdo com Inteligência Artificial.
 
-> **Estado atual: Fases 0 e 1 concluídas e verificadas.**
-> Backend em `apps/api` (Laravel 13, 20 tabelas, Sanctum, isolamento de tenant testado) e frontend em `apps/web` (Vite/React/Tailwind com os tokens do design). Próximo: Fase 2 — a fatia vertical Auth → Projeto → Perfil da Marca.
+> **Estado atual: Fases 0, 1 e 2 concluídas e verificadas.**
+> A fatia vertical Auth → Projeto → Perfil da Marca funciona de ponta a ponta no browser. Próximo: Fase 3 — o primeiro agente de IA (Estrategista).
 
 ## Documentos
 
@@ -70,5 +70,5 @@ Tokens do design no bloco `@theme` de `src/index.css` (Tailwind v4 é CSS-first)
 
 ## Próximo passo
 
-**Fase 2** — fatia vertical Auth → Projeto → Perfil da Marca, de ponta a ponta.
-Critério: criar conta, criar projeto, completar os 4 passos do wizard, recarregar a página e os dados persistirem.
+**Fase 3** — o primeiro agente de IA real (Estrategista), com `LlmProvider`, `ai_runs` e polling.
+Critério: com `AI_PROVIDER=mock` a suíte inteira roda verde sem chave de API; com a chave real, gerar uma estratégia e ver `cost_cents` preenchido em `ai_runs`.
