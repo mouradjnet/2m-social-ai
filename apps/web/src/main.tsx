@@ -5,6 +5,7 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { BrandProfilePage } from '@/pages/BrandProfilePage'
 import { LoginPage } from '@/pages/LoginPage'
 import { ProjectsPage } from '@/pages/ProjectsPage'
+import { StrategyPage } from '@/pages/StrategyPage'
 import { getToken } from '@/lib/api'
 import './index.css'
 
@@ -45,6 +46,14 @@ createRoot(document.getElementById('root')!).render(
             element={
               <RequireAuth>
                 <BrandProfilePage />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/projects/:projectId/strategy"
+            element={
+              <RequireAuth>
+                <StrategyPage />
               </RequireAuth>
             }
           />

@@ -137,6 +137,13 @@ export function BrandProfilePage() {
         identidade principal da sua marca. Perfil {completion.percent}% completo.
       </p>
 
+      <Link
+        to={`/projects/${projectId}/strategy`}
+        className="text-body-sm text-primary mt-4 inline-block hover:underline"
+      >
+        Ir para a Estratégia editorial →
+      </Link>
+
       <div className="mt-12 flex gap-16">
         <div className="w-64 shrink-0">
           <Stepper
