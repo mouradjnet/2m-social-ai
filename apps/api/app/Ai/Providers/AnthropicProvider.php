@@ -45,7 +45,10 @@ class AnthropicProvider implements LlmProvider
         }
 
         if ($message->stopReason === 'refusal') {
-            throw new LlmRefusedException($message->stopDetails?->category);
+            // `stop_details` nao existe no Message do anthropic-ai/sdk 0.7.0, e o
+            // trait SdkModel lanca RuntimeException em propriedade nao modelada.
+            // Sem a categoria, entao, ate o SDK expor o campo.
+            throw new LlmRefusedException;
         }
 
         if ($message->stopReason === 'max_tokens') {

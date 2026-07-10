@@ -31,7 +31,10 @@ return [
     'agents' => [
         'strategist' => [
             'model' => env('AI_MODEL_STRATEGIST', env('AI_MODEL_DEFAULT', 'claude-opus-4-8')),
-            'effort' => 'xhigh',
+            // `high` e o default do Opus 4.8; `xhigh` e para coding e trabalho
+            // agentico. Subir daqui exige max_tokens >= 64000 e streaming, senao
+            // o raciocinio consome o orcamento e a resposta trunca.
+            'effort' => 'high',
             'max_tokens' => 16000,
         ],
     ],

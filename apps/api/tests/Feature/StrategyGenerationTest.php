@@ -1,0 +1,288 @@
+<?php
+
+namespace Tests\Feature;
+
+use App\Ai\Exceptions\LlmRefusedException;
+use App\Ai\Providers\LlmProvider;
+use App\Ai\Providers\LlmRequest;
+use App\Ai\Providers\LlmResponse;
+use App\Enums\WorkspaceRole;
+use App\Models\AiRun;
+use App\Models\Project;
+use App\Models\Strategy;
+use App\Models\User;
+use App\Models\Workspace;
+use App\Models\WorkspaceMember;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Testing\TestResponse;
+use Laravel\Sanctum\Sanctum;
+use Tests\TestCase;
+
+/**
+ * Criterio de aceite da Fase 3. A geracao nao bloqueia: devolve 202 e o id da
+ * execucao (ADR-07). Como QUEUE_CONNECTION=sync no phpunit.xml, o RunAgentJob
+ * roda dentro da propria requisicao — as assercoes sobre `ai_runs` valem logo
+ * apos o POST.
+ *
+ * AI_PROVIDER=mock: nenhum teste aqui chama a API real.
+ */
+class StrategyGenerationTest extends TestCase
+{
+    use RefreshDatabase;
+
+    private function memberOf(Workspace $workspace, WorkspaceRole $role): User
+    {
+        $user = User::factory()->create();
+
+        WorkspaceMember::create([
+            'workspace_id' => $workspace->id,
+            'user_id' => $user->id,
+            'role' => $role,
+            'joined_at' => now(),
+        ]);
+
+        return $user;
+    }
+
+    private function generate(Project $project): TestResponse
+    {
+        return $this->postJson("/api/v1/projects/{$project->id}/strategies:generate");
+    }
+
+    public function test_geracao_devolve_202_e_grava_a_estrategia_como_rascunho(): void
+    {
+        $workspace = Workspace::factory()->create();
+        $editor = $this->memberOf($workspace, WorkspaceRole::Editor);
+        $project = Project::factory()->create(['workspace_id' => $workspace->id]);
+
+        Sanctum::actingAs($editor);
+
+        $response = $this->generate($project)->assertStatus(202);
+
+        $run = AiRun::withoutGlobalScopes()->findOrFail($response->json('ai_run_id'));
+
+        $this->assertSame('succeeded', $run->status);
+        $this->assertSame('strategist', $run->agent);
+        $this->assertSame('mock', $run->provider);
+        $this->assertNull($run->error);
+
+        // MockProvider devolve 1400 tokens de entrada e 900 de saida.
+        $this->assertSame(1400, $run->input_tokens);
+        $this->assertSame(900, $run->output_tokens);
+        $this->assertSame(3, $run->cost_cents);
+        $this->assertNotNull($run->latency_ms);
+
+        $strategy = Strategy::withoutGlobalScopes()->where('project_id', $project->id)->sole();
+
+        $this->assertSame('draft', $strategy->status);
+        $this->assertSame($run->id, $strategy->ai_run_id);
+        $this->assertSame($workspace->id, $strategy->workspace_id);
+        $this->assertSame(100, array_sum(array_column($strategy->pillars, 'weight')));
+    }
+
+    /**
+     * Regressao do caminho de recusa: o usuario precisa ver que o modelo recusou,
+     * nao a mensagem generica de "tente novamente" — que o faria repetir um
+     * prompt fadado a ser recusado de novo.
+     */
+    public function test_recusa_do_modelo_chega_ao_ai_run_como_mensagem_de_recusa(): void
+    {
+        $this->app->bind(LlmProvider::class, fn () => new class implements LlmProvider
+        {
+            public function generate(LlmRequest $request): LlmResponse
+            {
+                throw new LlmRefusedException;
+            }
+        });
+
+        $workspace = Workspace::factory()->create();
+        $editor = $this->memberOf($workspace, WorkspaceRole::Editor);
+        $project = Project::factory()->create(['workspace_id' => $workspace->id]);
+
+        Sanctum::actingAs($editor);
+
+        $response = $this->generate($project)->assertStatus(202);
+
+        $run = AiRun::withoutGlobalScopes()->findOrFail($response->json('ai_run_id'));
+
+        $this->assertSame('failed', $run->status);
+        $this->assertSame('O modelo recusou esta requisicao.', $run->error);
+        $this->assertStringNotContainsString('Tente novamente', $run->error);
+
+        $this->assertSame(0, Strategy::withoutGlobalScopes()->count());
+    }
+
+    public function test_orcamento_mensal_estourado_devolve_402_e_nao_enfileira(): void
+    {
+        $workspace = Workspace::factory()->create();
+        $editor = $this->memberOf($workspace, WorkspaceRole::Editor);
+        $project = Project::factory()->create(['workspace_id' => $workspace->id]);
+
+        AiRun::create([
+            'workspace_id' => $workspace->id,
+            'project_id' => $project->id,
+            'agent' => 'strategist',
+            'provider' => 'mock',
+            'model' => 'claude-opus-4-8',
+            'status' => 'succeeded',
+            'input' => ['project_id' => $project->id],
+            'cost_cents' => config('ai.workspace_monthly_budget_cents'),
+            'created_by' => $editor->id,
+        ]);
+
+        Sanctum::actingAs($editor);
+
+        $this->generate($project)
+            ->assertStatus(402)
+            ->assertJsonPath('limit_cents', config('ai.workspace_monthly_budget_cents'));
+
+        // A execucao antiga continua sendo a unica: nada novo foi enfileirado.
+        $this->assertSame(1, AiRun::withoutGlobalScopes()->count());
+        $this->assertSame(0, Strategy::withoutGlobalScopes()->count());
+    }
+
+    public function test_gasto_do_mes_passado_nao_conta_para_o_orcamento(): void
+    {
+        $workspace = Workspace::factory()->create();
+        $editor = $this->memberOf($workspace, WorkspaceRole::Editor);
+        $project = Project::factory()->create(['workspace_id' => $workspace->id]);
+
+        $antiga = AiRun::create([
+            'workspace_id' => $workspace->id,
+            'project_id' => $project->id,
+            'agent' => 'strategist',
+            'provider' => 'mock',
+            'model' => 'claude-opus-4-8',
+            'status' => 'succeeded',
+            'input' => [],
+            'cost_cents' => config('ai.workspace_monthly_budget_cents') * 10,
+            'created_by' => $editor->id,
+        ]);
+
+        $antiga->forceFill(['created_at' => now()->subMonth()->startOfMonth()])->saveQuietly();
+
+        Sanctum::actingAs($editor);
+
+        $this->generate($project)->assertStatus(202);
+    }
+
+    public function test_orcamento_de_outro_workspace_nao_bloqueia_este(): void
+    {
+        $mine = Workspace::factory()->create();
+        $theirs = Workspace::factory()->create();
+
+        $editor = $this->memberOf($mine, WorkspaceRole::Editor);
+        $stranger = $this->memberOf($theirs, WorkspaceRole::Owner);
+        $project = Project::factory()->create(['workspace_id' => $mine->id]);
+
+        AiRun::create([
+            'workspace_id' => $theirs->id,
+            'agent' => 'strategist',
+            'provider' => 'mock',
+            'model' => 'claude-opus-4-8',
+            'status' => 'succeeded',
+            'input' => [],
+            'cost_cents' => config('ai.workspace_monthly_budget_cents') * 10,
+            'created_by' => $stranger->id,
+        ]);
+
+        Sanctum::actingAs($editor);
+
+        $this->generate($project)->assertStatus(202);
+    }
+
+    public function test_viewer_nao_pode_gerar_estrategia(): void
+    {
+        $workspace = Workspace::factory()->create();
+        $viewer = $this->memberOf($workspace, WorkspaceRole::Viewer);
+        $project = Project::factory()->create(['workspace_id' => $workspace->id]);
+
+        Sanctum::actingAs($viewer);
+
+        $this->generate($project)->assertForbidden();
+
+        $this->assertSame(0, AiRun::withoutGlobalScopes()->count());
+    }
+
+    public function test_projeto_de_outro_workspace_devolve_404(): void
+    {
+        $mine = Workspace::factory()->create();
+        $theirs = Workspace::factory()->create();
+
+        $intruder = $this->memberOf($mine, WorkspaceRole::Owner);
+        $target = Project::factory()->create(['workspace_id' => $theirs->id]);
+
+        Sanctum::actingAs($intruder);
+
+        $this->generate($target)->assertNotFound();
+    }
+
+    public function test_polling_do_ai_run_de_outro_workspace_devolve_404(): void
+    {
+        $mine = Workspace::factory()->create();
+        $theirs = Workspace::factory()->create();
+
+        $intruder = $this->memberOf($mine, WorkspaceRole::Owner);
+        $stranger = $this->memberOf($theirs, WorkspaceRole::Owner);
+        $project = Project::factory()->create(['workspace_id' => $theirs->id]);
+
+        $run = AiRun::create([
+            'workspace_id' => $theirs->id,
+            'project_id' => $project->id,
+            'agent' => 'strategist',
+            'provider' => 'mock',
+            'model' => 'claude-opus-4-8',
+            'status' => 'succeeded',
+            'input' => [],
+            'created_by' => $stranger->id,
+        ]);
+
+        Sanctum::actingAs($intruder);
+
+        $this->getJson("/api/v1/ai-runs/{$run->id}")->assertNotFound();
+    }
+
+    public function test_polling_do_proprio_ai_run_devolve_o_estado(): void
+    {
+        $workspace = Workspace::factory()->create();
+        $editor = $this->memberOf($workspace, WorkspaceRole::Editor);
+        $project = Project::factory()->create(['workspace_id' => $workspace->id]);
+
+        Sanctum::actingAs($editor);
+
+        $runId = $this->generate($project)->assertStatus(202)->json('ai_run_id');
+
+        $this->getJson("/api/v1/ai-runs/{$runId}")
+            ->assertOk()
+            ->assertJsonPath('status', 'succeeded')
+            ->assertJsonPath('agent', 'strategist')
+            ->assertJsonPath('cost_cents', 3)
+            ->assertJsonPath('error', null);
+    }
+
+    public function test_listagem_nao_vaza_estrategia_de_outro_workspace(): void
+    {
+        $mine = Workspace::factory()->create();
+        $theirs = Workspace::factory()->create();
+
+        $editor = $this->memberOf($mine, WorkspaceRole::Editor);
+        $meuProjeto = Project::factory()->create(['workspace_id' => $mine->id]);
+        $projetoAlheio = Project::factory()->create(['workspace_id' => $theirs->id]);
+
+        Sanctum::actingAs($editor);
+        $this->generate($meuProjeto)->assertStatus(202);
+
+        Strategy::withoutGlobalScopes()->create([
+            'workspace_id' => $theirs->id,
+            'project_id' => $projetoAlheio->id,
+            'title' => 'Alheia',
+            'pillars' => [],
+            'status' => 'draft',
+        ]);
+
+        $this->getJson("/api/v1/projects/{$meuProjeto->id}/strategies")
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonMissing(['title' => 'Alheia']);
+    }
+}
