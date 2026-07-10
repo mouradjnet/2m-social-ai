@@ -1,0 +1,13 @@
+# Dependencias
+node_modules/
+
+# Editores
+.idea/
+.vscode/
+*.swp
+
+# Sistema
+.DS_Store
+Thumbs.db
+
+# apps/api tem o .gitignore proprio do Laravel (vendor/, .env, storage/)
