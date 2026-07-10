@@ -1,5 +1,5 @@
 import { Button } from '@/components/ui/Button'
-import type { GenerationState } from '@/hooks/useStrategyGeneration'
+import type { GenerationState } from '@/hooks/useGeneration'
 
 interface Props {
   state: GenerationState

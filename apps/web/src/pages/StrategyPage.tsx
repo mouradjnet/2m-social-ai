@@ -4,14 +4,18 @@ import { GenerationStatus } from '@/components/strategy/GenerationStatus'
 import { StrategyCard } from '@/components/strategy/StrategyCard'
 import { Button } from '@/components/ui/Button'
 import { Shell } from '@/components/ui/Shell'
-import { useStrategyGeneration } from '@/hooks/useStrategyGeneration'
+import { useGeneration } from '@/hooks/useGeneration'
 import { api } from '@/lib/api'
 import type { Strategy } from '@/lib/types'
 
 export function StrategyPage() {
   const { projectId } = useParams()
   const queryClient = useQueryClient()
-  const { state, generate, retry, dismiss } = useStrategyGeneration(projectId!)
+  const { state, generate, retry, dismiss } = useGeneration({
+    projectId: projectId!,
+    endpoint: 'strategies:generate',
+    invalidateKey: ['strategies', projectId],
+  })
 
   const strategies = useQuery({
     queryKey: ['strategies', projectId],

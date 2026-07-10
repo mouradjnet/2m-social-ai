@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useSearchParams } from 'react-router-dom'
 import { ApiError, api } from '@/lib/api'
@@ -24,18 +24,33 @@ interface MessageBody {
   message: string
 }
 
+interface Config {
+  projectId: string
+  /** 'strategies:generate' | 'copy:generate' */
+  endpoint: string
+  /** A query a invalidar quando a execucao tem sucesso. */
+  invalidateKey: unknown[]
+}
+
 /**
  * O unico lugar que sabe que existem URL, intervalo de polling e mutacao.
+ * Serve os dois agentes: o que muda e o endpoint e a query a invalidar.
  *
  * O ai_run_id vive na query string, nao em useState: se vivesse na memoria,
  * recarregar a pagina no meio da geracao perderia o acompanhamento, e uma
  * recusa nunca mostraria o porque — o usuario clicaria em Gerar de novo e
  * levaria outra recusa.
  */
-export function useStrategyGeneration(projectId: string) {
+export function useGeneration({ projectId, endpoint, invalidateKey }: Config) {
   const queryClient = useQueryClient()
   const [params, setParams] = useSearchParams()
   const runId = params.get('run')
+
+  // invalidateKey e um array literal recriado a cada render pelo chamador. Uma
+  // ref evita que ele entre nas deps do efeito (identidade nova toda render) sem
+  // precisar de JSON.stringify nem de disable de lint.
+  const invalidateRef = useRef(invalidateKey)
+  invalidateRef.current = invalidateKey
 
   const runQuery = useQuery({
     queryKey: ['ai-run', runId],
@@ -49,7 +64,7 @@ export function useStrategyGeneration(projectId: string) {
 
   const generation = useMutation({
     mutationFn: () =>
-      api<{ ai_run_id: number }>(`/projects/${projectId}/strategies:generate`, {
+      api<{ ai_run_id: number }>(`/projects/${projectId}/${endpoint}`, {
         method: 'POST',
       }),
     onSuccess: ({ ai_run_id }) => setParams({ run: String(ai_run_id) }, { replace: true }),
@@ -61,9 +76,9 @@ export function useStrategyGeneration(projectId: string) {
   // reagir ao sucesso da execucao. Nao e descuido.
   useEffect(() => {
     if (!succeeded) return
-    queryClient.invalidateQueries({ queryKey: ['strategies', projectId] })
+    queryClient.invalidateQueries({ queryKey: invalidateRef.current })
     setParams({}, { replace: true })
-  }, [succeeded, projectId, queryClient, setParams])
+  }, [succeeded, queryClient, setParams])
 
   const state = deriveState(
     runId,
@@ -91,7 +106,10 @@ export function useStrategyGeneration(projectId: string) {
   }
 }
 
-/** A ordem e a regra: o 402 acontece SEM criar execucao, entao vem primeiro. */
+/** A ordem e a regra: os erros de mutacao (422/402/409) acontecem SEM criar
+ *  execucao. 422 (sem estrategia ativa, so no copy) e a pre-condicao mais
+ *  especifica; 402 orcamento; 409 concorrencia. Nao-retentaveis: quem precisa
+ *  agir e o usuario (aprovar estrategia) ou a outra geracao (terminar). */
 function deriveState(
   runId: string | null,
   run: AiRun | undefined,
@@ -99,14 +117,18 @@ function deriveState(
   generationError: unknown,
   generationPending: boolean,
 ): GenerationState {
+  if (generationError instanceof ApiError && generationError.status === 422) {
+    const body = generationError.body as MessageBody
+
+    return { kind: 'failed', message: body.message, retryable: false }
+  }
+
   if (generationError instanceof ApiError && generationError.status === 402) {
     const body = generationError.body as BudgetBody
 
     return { kind: 'budget', spentCents: body.spent_cents, limitCents: body.limit_cents }
   }
 
-  // Ja existe uma geracao em andamento — tipicamente uma segunda aba. Insistir
-  // nao adianta: quem precisa terminar e a outra. Nunca `retryable`.
   if (generationError instanceof ApiError && generationError.status === 409) {
     const body = generationError.body as MessageBody
 
