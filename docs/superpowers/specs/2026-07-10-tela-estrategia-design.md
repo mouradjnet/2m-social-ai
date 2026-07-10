@@ -164,12 +164,15 @@ para sempre quando a fila está parada.
 A ordem importa:
 
 1. Mutação falhou com `ApiError` 402 → `budget` (`spent_cents`, `limit_cents`).
-2. Há `?run` e a query dele deu 404 → `lost`. O `queryClient` em `main.tsx` já
+2. Mutação falhou com `ApiError` 409 → `failed`, **nunca** `retryable`: já existe
+   uma geração em andamento neste projeto, e insistir não adianta — quem precisa
+   terminar é a outra. Acontece com duas abas abertas no mesmo projeto.
+3. Há `?run` e a query dele deu 404 → `lost`. O `queryClient` em `main.tsx` já
    não repete 404.
-3. `run.status === 'failed'` → `failed`, com `retryable` derivado do `error_code`.
-4. `run.status` em `queued`/`running` → `running`.
-5. Mutação em voo → `starting`.
-6. Senão → `idle`.
+4. `run.status === 'failed'` → `failed`, com `retryable` derivado do `error_code`.
+5. `run.status` em `queued`/`running` → `running`.
+6. Mutação em voo → `starting`.
+7. Senão → `idle`.
 
 O 402 vem primeiro porque acontece **sem criar execução**: não há `?run` para
 consultar. É o único erro que a tela conhece pelo corpo da resposta, e não pela
@@ -205,12 +208,26 @@ Nada de piscar para vazio.
 **Mas o botão `Gerar nova` fica desabilitado durante a geração.** Isto não estava
 no design original e custou caro: ao dirigir o browser contra o servidor real,
 dois cliques rápidos criaram duas execuções, duas estratégias e cobraram duas
-vezes do orçamento. O `Budget` só verifica **antes** de enfileirar; nada impede
-duas gerações concorrentes no mesmo projeto. A defesa é o `disabled`, e o teste
-que a segura clica duas vezes e exige um único POST.
+vezes do orçamento. A defesa é o `disabled`, e o teste que a segura clica duas
+vezes e exige um único POST.
 
 Nenhum dos nove testes originais pegava isso — todos clicavam uma vez. Foi o
 browser que encontrou.
+
+**O `disabled` protege o clique, não a API.** Dois `curl` simultâneos ainda
+criariam duas execuções. Então o servidor passou a devolver **409** quando já
+existe uma execução `queued` ou `running` no projeto, garantido por um índice
+parcial único sobre `(project_id) where status in ('queued','running')` — a
+única camada capaz de serializar a corrida entre a checagem e o `INSERT`.
+
+O 409 vem **antes** do 402: uma execução em andamento ainda não gravou
+`cost_cents`, então o `Budget` não a enxerga, e o usuário leria "orçamento
+esgotado" quando bastava esperar dez segundos.
+
+Uma nota de Postgres, descoberta ao falsificar a checagem explícita do
+controller: um `INSERT` que viola constraint **dentro de uma transação** aborta
+a transação inteira (`SQLSTATE 25P02`). O `generate()` não abre transação, então
+o `catch` funciona — mas quem vier envolvê-lo numa vai precisar de um `SAVEPOINT`.
 
 ### Duas regras que não são duplicadas no cliente
 
