@@ -244,3 +244,28 @@ test('execução parada há mais de dois minutos avisa que está demorando', asy
 
   expect(await screen.findByText(/está demorando mais que o normal/i)).toBeInTheDocument()
 })
+
+test('aprovar o rascunho troca o chip para Ativa', async () => {
+  const user = setup()
+  let atual: Strategy = ESTRATEGIA
+
+  server.use(
+    http.get('/api/v1/projects/1/strategies', () => HttpResponse.json({ data: [atual] })),
+    http.patch('/api/v1/strategies/7', async ({ request }) => {
+      const body = (await request.json()) as { status: Strategy['status'] }
+      atual = { ...atual, status: body.status }
+
+      return HttpResponse.json({ data: atual })
+    }),
+  )
+
+  renderWithProviders(<StrategyPage />, ROUTE)
+
+  expect(await screen.findByText('Rascunho')).toBeInTheDocument()
+
+  await user.click(screen.getByRole('button', { name: /aprovar estratégia/i }))
+
+  expect(await screen.findByText('Ativa')).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: /gerar nova/i })).toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: /aprovar estratégia/i })).not.toBeInTheDocument()
+})
