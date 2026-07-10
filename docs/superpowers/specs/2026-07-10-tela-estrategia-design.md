@@ -245,7 +245,13 @@ Infra: `vitest` + `jsdom` + Testing Library (`react`, `user-event`, `jest-dom`) 
 `msw` v2. Um `vitest.config.ts`, um `src/test/setup.ts`, um `src/test/server.ts`.
 Script `"test": "vitest run"`.
 
-**Duas armadilhas conhecidas.** O TanStack Query precisa de um `QueryClient` novo
+**Uma terceira armadilha, descoberta ao executar:** o `findBy*` desiste em
+**1000 ms** por padrão, mas o `refetchInterval` é de **1500 ms**. O segundo poll
+nunca acontecia, e o caminho feliz falhava com o `?run` ainda na URL e nenhuma
+estratégia na tela — parecendo bug do hook, quando era a espera curta demais.
+Resolvido com `configure({ asyncUtilTimeout: 5000 })` em `src/test/setup.ts`.
+
+**Duas armadilhas conhecidas de antemão.** O TanStack Query precisa de um `QueryClient` novo
 por teste, com `retry: false` — um cliente compartilhado vaza cache entre testes,
 e o retry padrão transforma um 404 esperado em três segundos de espera. E o
 polling com timers reais faria cada teste levar segundos: a combinação que
