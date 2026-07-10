@@ -21,6 +21,8 @@ class AiRunController extends Controller
             'output' => $aiRun->output,
             // Mensagem legivel, nunca stack trace.
             'error' => $aiRun->error,
+            // Classificacao da falha: a UI decide por ela, nunca pela prosa.
+            'error_code' => $aiRun->error_code,
             'cost_cents' => $aiRun->cost_cents,
             'latency_ms' => $aiRun->latency_ms,
             'created_at' => $aiRun->created_at,

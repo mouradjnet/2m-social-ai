@@ -285,4 +285,49 @@ class StrategyGenerationTest extends TestCase
             ->assertJsonCount(1, 'data')
             ->assertJsonMissing(['title' => 'Alheia']);
     }
+
+    public function test_execucao_bem_sucedida_nao_tem_error_code(): void
+    {
+        $workspace = Workspace::factory()->create();
+        $editor = $this->memberOf($workspace, WorkspaceRole::Editor);
+        $project = Project::factory()->create(['workspace_id' => $workspace->id]);
+
+        Sanctum::actingAs($editor);
+
+        $response = $this->generate($project)->assertStatus(202);
+        $run = AiRun::withoutGlobalScopes()->findOrFail($response->json('ai_run_id'));
+
+        $this->assertSame('succeeded', $run->status);
+
+        // assertDatabaseHas, e nao assertNull($run->error_code): o Eloquent
+        // devolve null para atributo inexistente, sem erro. Este assert toca a
+        // coluna no SQL, entao falha de verdade enquanto ela nao existir.
+        $this->assertDatabaseHas('ai_runs', ['id' => $run->id, 'error_code' => null]);
+    }
+
+    public function test_polling_expoe_o_error_code(): void
+    {
+        $workspace = Workspace::factory()->create();
+        $editor = $this->memberOf($workspace, WorkspaceRole::Editor);
+        $project = Project::factory()->create(['workspace_id' => $workspace->id]);
+
+        $run = AiRun::create([
+            'workspace_id' => $workspace->id,
+            'project_id' => $project->id,
+            'agent' => 'strategist',
+            'provider' => 'mock',
+            'model' => 'claude-opus-4-8',
+            'status' => 'failed',
+            'input' => [],
+            'error' => 'O modelo recusou esta requisicao.',
+            'error_code' => 'refused',
+            'created_by' => $editor->id,
+        ]);
+
+        Sanctum::actingAs($editor);
+
+        $this->getJson("/api/v1/ai-runs/{$run->id}")
+            ->assertOk()
+            ->assertJsonPath('error_code', 'refused');
+    }
 }

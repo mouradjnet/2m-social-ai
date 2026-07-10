@@ -13,7 +13,8 @@ class AiRun extends Model
     protected $fillable = [
         'workspace_id', 'project_id', 'agent', 'provider', 'model', 'status',
         'input', 'output', 'input_tokens', 'output_tokens', 'cache_read_tokens',
-        'cache_write_tokens', 'cost_cents', 'latency_ms', 'error', 'created_by',
+        'cache_write_tokens', 'cost_cents', 'latency_ms', 'error', 'error_code',
+        'created_by',
     ];
 
     protected function casts(): array
