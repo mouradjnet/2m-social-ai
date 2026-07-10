@@ -50,3 +50,36 @@ export interface BrandProfileResponse {
   data: BrandProfileData
   completion: BrandProfileCompletion
 }
+
+export interface Pillar {
+  name: string
+  weight: number
+  description: string
+}
+
+export interface Strategy {
+  id: number
+  workspace_id: number
+  project_id: number
+  title: string
+  summary: string | null
+  editorial_line: string | null
+  pillars: Pillar[]
+  status: 'draft' | 'active' | 'archived'
+  ai_run_id: number | null
+}
+
+/** Classificacao da falha. `provider_failed` e o unico onde insistir ajuda. */
+export type AiRunErrorCode = 'refused' | 'rejected_output' | 'provider_failed'
+
+export interface AiRun {
+  id: number
+  agent: string
+  status: 'queued' | 'running' | 'succeeded' | 'failed'
+  output: unknown
+  error: string | null
+  error_code: AiRunErrorCode | null
+  cost_cents: number | null
+  latency_ms: number | null
+  created_at: string
+}
