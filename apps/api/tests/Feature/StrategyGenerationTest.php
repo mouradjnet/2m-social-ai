@@ -389,4 +389,55 @@ class StrategyGenerationTest extends TestCase
         // A mensagem crua do provedor nunca vaza para o usuario.
         $this->assertStringNotContainsString('a rede caiu', $run->error);
     }
+
+    public function test_saida_fora_das_regras_e_rejeitada_depois_de_duas_tentativas(): void
+    {
+        // Pilares somando 99: passa no JSON Schema, falha no validate() do agente.
+        $provider = new class implements LlmProvider
+        {
+            public int $chamadas = 0;
+
+            public function generate(LlmRequest $request): LlmResponse
+            {
+                $this->chamadas++;
+
+                return new LlmResponse(
+                    output: [
+                        'title' => 't',
+                        'summary' => 's',
+                        'editorial_line' => 'e',
+                        'pillars' => [
+                            ['name' => 'a', 'weight' => 40, 'description' => 'd'],
+                            ['name' => 'b', 'weight' => 35, 'description' => 'd'],
+                            ['name' => 'c', 'weight' => 24, 'description' => 'd'],
+                        ],
+                    ],
+                    model: 'claude-opus-4-8',
+                    inputTokens: 10,
+                    outputTokens: 10,
+                );
+            }
+        };
+
+        $this->bindProvider($provider);
+
+        $workspace = Workspace::factory()->create();
+        $editor = $this->memberOf($workspace, WorkspaceRole::Editor);
+        $project = Project::factory()->create(['workspace_id' => $workspace->id]);
+
+        Sanctum::actingAs($editor);
+
+        $response = $this->generate($project)->assertStatus(202);
+        $run = AiRun::withoutGlobalScopes()->findOrFail($response->json('ai_run_id'));
+
+        $this->assertSame('failed', $run->status);
+        $this->assertSame('rejected_output', $run->error_code);
+        $this->assertStringContainsString('A soma dos pesos deve ser 100', $run->error);
+
+        // O job tenta uma segunda vez antes de desistir.
+        $this->assertSame(2, $provider->chamadas);
+
+        // Nada foi persistido: a estrategia so nasce depois do validate().
+        $this->assertSame(0, Strategy::withoutGlobalScopes()->count());
+    }
 }
