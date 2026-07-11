@@ -56,12 +56,21 @@ export function ContentPage() {
 
   return (
     <Shell>
-      <Link
-        to={`/projects/${projectId}/strategy`}
-        className="text-body-sm text-on-surface-variant hover:text-primary"
-      >
-        ← Estratégia
-      </Link>
+      <div className="flex items-center justify-between gap-4">
+        <Link
+          to={`/projects/${projectId}/strategy`}
+          className="text-body-sm text-on-surface-variant hover:text-primary"
+        >
+          ← Estratégia
+        </Link>
+
+        <Link
+          to={`/projects/${projectId}/calendar`}
+          className="text-body-sm text-on-surface-variant hover:text-primary"
+        >
+          Ver calendário →
+        </Link>
+      </div>
 
       <div className="mt-4 flex items-center justify-between gap-4">
         <h1 className="text-display-lg text-on-surface">Conteúdo</h1>
