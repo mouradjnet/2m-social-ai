@@ -35,7 +35,7 @@ class RunAgentJob implements ShouldQueue
         $startedAt = microtime(true);
 
         try {
-            $output = $this->generateAndValidate($provider, $agent, $project);
+            $output = $this->generateAndValidate($provider, $agent, $project, $run->input ?? []);
         } catch (Throwable $e) {
             $errorCode = $this->errorCodeFor($e);
 
@@ -84,10 +84,10 @@ class RunAgentJob implements ShouldQueue
      * dominio. Recusa por seguranca nao se repete: o mesmo prompt sera recusado
      * de novo.
      */
-    private function generateAndValidate(LlmProvider $provider, Agent $agent, Project $project): array
+    private function generateAndValidate(LlmProvider $provider, Agent $agent, Project $project, array $input): array
     {
         $config = config("ai.agents.{$agent->name()}");
-        $context = AgentContext::forProject($project);
+        $context = AgentContext::forProject($project, $input);
 
         $request = new LlmRequest(
             model: $config['model'],
@@ -102,7 +102,7 @@ class RunAgentJob implements ShouldQueue
             $response = $provider->generate($request);
 
             try {
-                $agent->validate($response->output);
+                $agent->validate($response->output, $context);
 
                 return ['data' => $response->output, 'response' => $response];
             } catch (OutputRejectedException $e) {

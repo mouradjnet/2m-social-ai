@@ -14,6 +14,7 @@ class AgentRegistry
     private const AGENTS = [
         'strategist' => StrategistAgent::class,
         'copywriter' => CopywriterAgent::class,
+        'social_media' => SocialMediaAgent::class,
     ];
 
     public function get(string $name): Agent

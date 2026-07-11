@@ -90,7 +90,7 @@ class StrategistAgent implements Agent
         TXT;
     }
 
-    public function validate(array $output): void
+    public function validate(array $output, ?AgentContext $context = null): void
     {
         $pillars = $output['pillars'] ?? [];
         $count = count($pillars);

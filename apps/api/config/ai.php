@@ -43,6 +43,14 @@ return [
             'max_tokens' => 16000,
             'batch_size' => 5,
         ],
+        // Distribuir pecas ja escritas por um calendario e a tarefa mais barata dos
+        // tres: nao escreve texto, so decide quando. Dai o effort `medium`.
+        'social_media' => [
+            'model' => env('AI_MODEL_SOCIAL_MEDIA', env('AI_MODEL_DEFAULT', 'claude-opus-4-8')),
+            'effort' => 'medium',
+            'max_tokens' => 16000,
+            'default_days' => 14,
+        ],
     ],
 
     'workspace_monthly_budget_cents' => (int) env('AI_WORKSPACE_MONTHLY_BUDGET_CENTS', 5000),

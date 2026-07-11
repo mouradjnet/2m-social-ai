@@ -181,8 +181,65 @@ class ContentTransitionTest extends TestCase
 
         Sanctum::actingAs($editor);
 
-        // 'scheduled' e o proximo, mas nao esta no FLOW desta fatia.
+        // Agendar e do social_media, nao do humano: exige uma data, e este PATCH so
+        // carrega status. Quem clica em "Avancar" numa peca aprovada nao tem como
+        // dizer *quando*.
         $this->patchJson("/api/v1/contents/{$content->id}", ['status' => 'scheduled'])
+            ->assertStatus(422);
+    }
+
+    public function test_desagendar_volta_para_approved_e_limpa_a_data(): void
+    {
+        $workspace = Workspace::factory()->create();
+        $editor = $this->memberOf($workspace, WorkspaceRole::Editor);
+        $project = Project::factory()->create(['workspace_id' => $workspace->id]);
+        $content = $this->content($project, 'scheduled');
+        $content->update(['scheduled_for' => now()->addDays(3)]);
+
+        Sanctum::actingAs($editor);
+
+        $this->patchJson("/api/v1/contents/{$content->id}", ['status' => 'approved'])
+            ->assertOk()
+            ->assertJsonPath('data.status', 'approved')
+            ->assertJsonPath('data.scheduled_for', null);
+
+        // Sem isto a peca voltaria para Aprovado carregando uma data fantasma.
+        $this->assertNull($content->fresh()->scheduled_for);
+        $this->assertDatabaseHas('content_revisions', [
+            'content_id' => $content->id,
+            'from_status' => 'scheduled',
+            'to_status' => 'approved',
+        ]);
+    }
+
+    public function test_arquivar_uma_peca_agendada_e_valido(): void
+    {
+        $workspace = Workspace::factory()->create();
+        $editor = $this->memberOf($workspace, WorkspaceRole::Editor);
+        $project = Project::factory()->create(['workspace_id' => $workspace->id]);
+        $content = $this->content($project, 'scheduled');
+
+        Sanctum::actingAs($editor);
+
+        $this->patchJson("/api/v1/contents/{$content->id}", ['status' => 'archived'])
+            ->assertOk()
+            ->assertJsonPath('data.status', 'archived');
+    }
+
+    public function test_de_scheduled_so_da_para_desagendar_ou_arquivar(): void
+    {
+        $workspace = Workspace::factory()->create();
+        $editor = $this->memberOf($workspace, WorkspaceRole::Editor);
+        $project = Project::factory()->create(['workspace_id' => $workspace->id]);
+        $content = $this->content($project, 'scheduled');
+
+        Sanctum::actingAs($editor);
+
+        // `published` exige exportar/publicar, que nao existe.
+        $this->patchJson("/api/v1/contents/{$content->id}", ['status' => 'published'])
+            ->assertStatus(422);
+
+        $this->patchJson("/api/v1/contents/{$content->id}", ['status' => 'review'])
             ->assertStatus(422);
     }
 

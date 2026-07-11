@@ -113,7 +113,7 @@ class CopywriterAgent implements Agent
         TXT;
     }
 
-    public function validate(array $output): void
+    public function validate(array $output, ?AgentContext $context = null): void
     {
         $pieces = $output['pieces'] ?? [];
         $count = count($pieces);

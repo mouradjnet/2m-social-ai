@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\V1\BrandProfileController;
 use App\Http\Controllers\Api\V1\ContentController;
 use App\Http\Controllers\Api\V1\CopyController;
 use App\Http\Controllers\Api\V1\ProjectController;
+use App\Http\Controllers\Api\V1\ScheduleController;
 use App\Http\Controllers\Api\V1\StrategyController;
 use App\Http\Controllers\Api\V1\WorkspaceController;
 use Illuminate\Support\Facades\Route;
@@ -41,6 +42,7 @@ Route::prefix('v1')->group(function () {
         Route::get('projects/{project}/strategies', [StrategyController::class, 'index']);
         Route::post('projects/{project}/strategies:generate', [StrategyController::class, 'generate']);
         Route::post('projects/{project}/copy:generate', [CopyController::class, 'generate']);
+        Route::post('projects/{project}/schedule:generate', [ScheduleController::class, 'generate']);
         Route::get('projects/{project}/contents', [ContentController::class, 'index']);
         Route::patch('contents/{content}', [ContentController::class, 'update']);
         Route::patch('strategies/{strategy}', [StrategyController::class, 'update']);

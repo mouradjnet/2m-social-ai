@@ -19,7 +19,11 @@ class Content extends Model
 
     protected function casts(): array
     {
-        return ['hashtags' => 'array'];
+        return [
+            'hashtags' => 'array',
+            'scheduled_for' => 'datetime',
+            'published_at' => 'datetime',
+        ];
     }
 
     public function project(): BelongsTo
