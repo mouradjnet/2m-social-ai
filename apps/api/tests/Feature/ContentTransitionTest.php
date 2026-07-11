@@ -226,6 +226,76 @@ class ContentTransitionTest extends TestCase
             ->assertJsonPath('data.status', 'archived');
     }
 
+    public function test_remarcar_muda_a_data_e_grava_a_revisao_em_changes(): void
+    {
+        $workspace = Workspace::factory()->create();
+        $editor = $this->memberOf($workspace, WorkspaceRole::Editor);
+        $project = Project::factory()->create(['workspace_id' => $workspace->id]);
+        $content = $this->content($project, 'scheduled');
+        $content->update(['scheduled_for' => '2026-08-03 10:00:00']);
+
+        Sanctum::actingAs($editor);
+
+        $this->patchJson("/api/v1/contents/{$content->id}", ['scheduled_for' => '2026-08-07T18:30:00'])
+            ->assertOk()
+            ->assertJsonPath('data.status', 'scheduled');
+
+        $this->assertSame('2026-08-07 18:30:00', $content->fresh()->scheduled_for->toDateTimeString());
+
+        // Remarcar nao e transicao: o status nao mudou, e quem conta o que houve e
+        // `changes` — a coluna que existia desde a primeira migration e nunca fora usada.
+        $revisao = ContentRevision::where('content_id', $content->id)->latest('id')->first();
+        $this->assertNull($revisao->from_status);
+        $this->assertNull($revisao->to_status);
+        $this->assertSame('2026-08-07 18:30:00', $revisao->changes['scheduled_for']['to']);
+        $this->assertStringStartsWith('2026-08-03', $revisao->changes['scheduled_for']['from']);
+    }
+
+    public function test_remarcar_peca_que_nao_esta_agendada_devolve_422(): void
+    {
+        $workspace = Workspace::factory()->create();
+        $editor = $this->memberOf($workspace, WorkspaceRole::Editor);
+        $project = Project::factory()->create(['workspace_id' => $workspace->id]);
+        $content = $this->content($project, 'idea');
+
+        Sanctum::actingAs($editor);
+
+        $this->patchJson("/api/v1/contents/{$content->id}", ['scheduled_for' => '2026-08-07T18:30:00'])
+            ->assertStatus(422);
+
+        $this->assertNull($content->fresh()->scheduled_for);
+        $this->assertSame(0, ContentRevision::query()->count());
+    }
+
+    public function test_status_e_scheduled_for_juntos_devolve_422(): void
+    {
+        $workspace = Workspace::factory()->create();
+        $editor = $this->memberOf($workspace, WorkspaceRole::Editor);
+        $project = Project::factory()->create(['workspace_id' => $workspace->id]);
+        $content = $this->content($project, 'scheduled');
+
+        Sanctum::actingAs($editor);
+
+        // Mover no fluxo e remarcar sao gestos diferentes; juntos, a revisao nao
+        // saberia contar o que aconteceu.
+        $this->patchJson("/api/v1/contents/{$content->id}", [
+            'status' => 'approved',
+            'scheduled_for' => '2026-08-07T18:30:00',
+        ])->assertStatus(422);
+    }
+
+    public function test_patch_vazio_devolve_422(): void
+    {
+        $workspace = Workspace::factory()->create();
+        $editor = $this->memberOf($workspace, WorkspaceRole::Editor);
+        $project = Project::factory()->create(['workspace_id' => $workspace->id]);
+        $content = $this->content($project, 'scheduled');
+
+        Sanctum::actingAs($editor);
+
+        $this->patchJson("/api/v1/contents/{$content->id}", [])->assertStatus(422);
+    }
+
     public function test_de_scheduled_so_da_para_desagendar_ou_arquivar(): void
     {
         $workspace = Workspace::factory()->create();

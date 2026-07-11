@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Content;
 use App\Models\ContentRevision;
 use App\Models\Project;
+use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -31,11 +32,23 @@ class ContentController extends Controller
         ]);
     }
 
+    /**
+     * Dois gestos, um endpoint: mover no fluxo (`status`) ou remarcar (`scheduled_for`).
+     * Um por requisicao — juntos, a revisao nao saberia contar o que aconteceu.
+     */
     public function update(Request $request, Content $content): JsonResponse
     {
         Gate::authorize('update', $content->project);
 
-        $data = $request->validate(['status' => ['required', 'string']]);
+        $data = $request->validate([
+            'status' => ['required_without:scheduled_for', 'prohibits:scheduled_for', 'string'],
+            'scheduled_for' => ['required_without:status', 'date'],
+        ]);
+
+        if (isset($data['scheduled_for'])) {
+            return $this->reschedule($content, $data['scheduled_for']);
+        }
+
         $from = $content->status;
         $to = $data['status'];
 
@@ -57,6 +70,37 @@ class ContentController extends Controller
                 'user_id' => request()->user()->id,
                 'from_status' => $from,
                 'to_status' => $to,
+            ]);
+        });
+
+        return response()->json(['data' => $content->refresh()]);
+    }
+
+    /**
+     * Remarcar so faz sentido para quem tem data: uma peca em `idea` nao tem o que
+     * mudar. A revisao sai sem status (ambos nulos) e com `changes` contando a
+     * mudanca — o historico registra data, nao so coluna.
+     */
+    private function reschedule(Content $content, string $quando): JsonResponse
+    {
+        if ($content->status !== 'scheduled') {
+            return response()->json([
+                'message' => 'So uma peca agendada pode ser remarcada.',
+            ], 422);
+        }
+
+        $de = $content->scheduled_for;
+        $para = CarbonImmutable::parse($quando);
+
+        DB::transaction(function () use ($content, $de, $para) {
+            $content->update(['scheduled_for' => $para]);
+            ContentRevision::create([
+                'content_id' => $content->id,
+                'user_id' => request()->user()->id,
+                'changes' => ['scheduled_for' => [
+                    'from' => $de?->toDateTimeString(),
+                    'to' => $para->toDateTimeString(),
+                ]],
             ]);
         });
 
