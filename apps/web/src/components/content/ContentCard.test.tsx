@@ -15,6 +15,7 @@ function content(overrides: Partial<Content> = {}): Content {
     format: 'reel',
     channel: 'instagram',
     status: 'idea',
+    scheduled_for: null,
     source: 'ai',
     origin_ai_run_id: 7,
     ...overrides,

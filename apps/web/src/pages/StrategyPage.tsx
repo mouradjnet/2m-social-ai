@@ -69,7 +69,7 @@ export function StrategyPage() {
             onRegenerate={generate}
           />
         ) : (
-          state.kind === 'idle' && <Button onClick={generate}>Gerar estratégia</Button>
+          state.kind === 'idle' && <Button onClick={() => generate()}>Gerar estratégia</Button>
         )}
       </div>
     </Shell>

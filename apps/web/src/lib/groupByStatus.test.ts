@@ -13,6 +13,7 @@ function content(id: number, status: Content['status']): Content {
     format: 'post',
     channel: 'instagram',
     status,
+    scheduled_for: null,
     source: 'ai',
     origin_ai_run_id: 7,
   }
@@ -23,17 +24,19 @@ test('agrupa as pecas nas colunas por status', () => {
     content(1, 'idea'),
     content(2, 'idea'),
     content(3, 'review'),
+    content(4, 'scheduled'),
   ])
 
   expect(groups.idea).toHaveLength(2)
   expect(groups.review).toHaveLength(1)
+  expect(groups.scheduled).toHaveLength(1)
   expect(groups.production).toEqual([])
   expect(groups.approved).toEqual([])
   expect(groups.archived).toEqual([])
 })
 
-test('as colunas visiveis sao as cinco do fluxo + arquivado, nesta ordem', () => {
-  expect(COLUMNS).toEqual(['idea', 'production', 'review', 'approved', 'archived'])
+test('as colunas visiveis vao de ideia a agendado, mais arquivado, nesta ordem', () => {
+  expect(COLUMNS).toEqual(['idea', 'production', 'review', 'approved', 'scheduled', 'archived'])
 })
 
 test('um status oculto (published) nao aparece em nenhuma coluna', () => {

@@ -100,6 +100,8 @@ export interface Content {
   format: ContentFormat
   channel: ContentChannel
   status: ContentStatus
+  /** ISO 8601. Quem preenche e o agente social_media; desagendar volta a null. */
+  scheduled_for: string | null
   source: 'manual' | 'ai' | 'research'
   origin_ai_run_id: number | null
 }

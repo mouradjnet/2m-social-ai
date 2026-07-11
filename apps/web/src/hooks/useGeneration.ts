@@ -26,10 +26,20 @@ interface MessageBody {
 
 interface Config {
   projectId: string
-  /** 'strategies:generate' | 'copy:generate' */
+  /** O endpoint padrao: 'strategies:generate' | 'copy:generate' */
   endpoint: string
   /** A query a invalidar quando a execucao tem sucesso. */
   invalidateKey: unknown[]
+}
+
+/**
+ * Uma pagina pode gerar por mais de um agente (a de Conteudo escreve e agenda), mas
+ * o ai_run_id mora na query string: duas instancias do hook brigariam pelo mesmo
+ * `?run=`. Por isso o endpoint e o corpo sao escolhidos na chamada, nao no hook.
+ */
+interface GenerateOptions {
+  endpoint?: string
+  body?: unknown
 }
 
 /**
@@ -62,10 +72,14 @@ export function useGeneration({ projectId, endpoint, invalidateKey }: Config) {
     },
   })
 
+  // O retry precisa reenviar a MESMA geracao — mesmo endpoint, mesma janela.
+  const lastRef = useRef<GenerateOptions>({})
+
   const generation = useMutation({
-    mutationFn: () =>
-      api<{ ai_run_id: number }>(`/projects/${projectId}/${endpoint}`, {
+    mutationFn: (options: GenerateOptions) =>
+      api<{ ai_run_id: number }>(`/projects/${projectId}/${options.endpoint ?? endpoint}`, {
         method: 'POST',
+        ...(options.body === undefined ? {} : { body: JSON.stringify(options.body) }),
       }),
     onSuccess: ({ ai_run_id }) => setParams({ run: String(ai_run_id) }, { replace: true }),
   })
@@ -90,14 +104,15 @@ export function useGeneration({ projectId, endpoint, invalidateKey }: Config) {
 
   return {
     state,
-    generate: () => {
+    generate: (options: GenerateOptions = {}) => {
+      lastRef.current = options
       generation.reset()
-      generation.mutate()
+      generation.mutate(options)
     },
     retry: () => {
       setParams({}, { replace: true })
       generation.reset()
-      generation.mutate()
+      generation.mutate(lastRef.current)
     },
     dismiss: () => {
       generation.reset()

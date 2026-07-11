@@ -1,11 +1,17 @@
 import type { Content, ContentStatus } from '@/lib/types'
 
 /**
- * As colunas visiveis do quadro. `scheduled` e `published` ficam de fora: exigem
- * agendar e exportar, que nao existem nesta fatia. Uma peca nesses estados
- * simplesmente nao aparece em nenhuma coluna.
+ * As colunas visiveis do quadro. `published` fica de fora: exige publicar, que nao
+ * existe. Uma peca nesse estado simplesmente nao aparece em nenhuma coluna.
  */
-export const COLUMNS = ['idea', 'production', 'review', 'approved', 'archived'] as const
+export const COLUMNS = [
+  'idea',
+  'production',
+  'review',
+  'approved',
+  'scheduled',
+  'archived',
+] as const
 
 export type Column = (typeof COLUMNS)[number]
 

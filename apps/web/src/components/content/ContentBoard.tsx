@@ -13,10 +13,12 @@ const TITLES: Record<Column, string> = {
   production: 'Produção',
   review: 'Revisão',
   approved: 'Aprovado',
+  scheduled: 'Agendado',
   archived: 'Arquivado',
 }
 
-// A ordem do fluxo, para calcular o proximo/anterior status ao mover.
+// A ordem do fluxo, para calcular o proximo/anterior status ao mover. `scheduled`
+// nao esta aqui: quem agenda e o agente. Voltar de agendado e caso a parte.
 const FLOW: Content['status'][] = ['idea', 'production', 'review', 'approved']
 
 export function ContentBoard({ groups, pending, onMove }: Props) {
@@ -31,6 +33,8 @@ export function ContentBoard({ groups, pending, onMove }: Props) {
           <div className="mt-3 flex flex-col gap-3">
             {groups[col].map((content) => {
               const i = FLOW.indexOf(content.status)
+              // Desagendar e o "voltar" de uma peca agendada: ela nao esta no FLOW.
+              const back = content.status === 'scheduled' ? 'approved' : FLOW[i - 1]
 
               return (
                 <ContentCard
@@ -38,7 +42,7 @@ export function ContentBoard({ groups, pending, onMove }: Props) {
                   content={content}
                   pending={pending}
                   onAdvance={() => i >= 0 && i < FLOW.length - 1 && onMove(content.id, FLOW[i + 1])}
-                  onBack={() => i > 0 && onMove(content.id, FLOW[i - 1])}
+                  onBack={() => back && onMove(content.id, back)}
                   onArchive={() => onMove(content.id, 'archived')}
                 />
               )
