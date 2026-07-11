@@ -49,6 +49,13 @@ export function StrategyPage() {
         vão sustentar o planejamento dos próximos meses.
       </p>
 
+      <Link
+        to={`/projects/${projectId}/content`}
+        className="text-body-sm text-primary mt-4 inline-block hover:underline"
+      >
+        Ver conteúdo →
+      </Link>
+
       <GenerationStatus state={state} onRetry={retry} onDismiss={dismiss} />
 
       <div className="mt-8">
