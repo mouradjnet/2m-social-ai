@@ -72,12 +72,21 @@ export function ContentPage() {
           ← Estratégia
         </Link>
 
-        <Link
-          to={`/projects/${projectId}/calendar`}
-          className="text-body-sm text-on-surface-variant hover:text-primary"
-        >
-          Ver calendário →
-        </Link>
+        <div className="flex gap-4">
+          <Link
+            to={`/projects/${projectId}/insights`}
+            className="text-body-sm text-on-surface-variant hover:text-primary"
+          >
+            Ver insights →
+          </Link>
+
+          <Link
+            to={`/projects/${projectId}/calendar`}
+            className="text-body-sm text-on-surface-variant hover:text-primary"
+          >
+            Ver calendário →
+          </Link>
+        </div>
       </div>
 
       <div className="mt-4 flex items-center justify-between gap-4">

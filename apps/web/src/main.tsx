@@ -7,6 +7,7 @@ import { LoginPage } from '@/pages/LoginPage'
 import { ProjectsPage } from '@/pages/ProjectsPage'
 import { CalendarPage } from '@/pages/CalendarPage'
 import { ContentPage } from '@/pages/ContentPage'
+import { InsightsPage } from '@/pages/InsightsPage'
 import { StrategyPage } from '@/pages/StrategyPage'
 import { getToken } from '@/lib/api'
 import './index.css'
@@ -72,6 +73,14 @@ createRoot(document.getElementById('root')!).render(
             element={
               <RequireAuth>
                 <CalendarPage />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/projects/:projectId/insights"
+            element={
+              <RequireAuth>
+                <InsightsPage />
               </RequireAuth>
             }
           />

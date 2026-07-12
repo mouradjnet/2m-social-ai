@@ -139,6 +139,56 @@ export interface Content {
   origin_ai_run_id: number | null
 }
 
+export interface PillarAdherence {
+  nome: string
+  peso_pedido: number
+  peso_real: number
+  pecas: number
+  /** Em pontos percentuais. Positivo = entregou mais do que a estrategia pediu. */
+  desvio: number
+}
+
+/** Os numeros do projeto, calculados pelo servidor. Nunca por um LLM. */
+export interface ProjectMetrics {
+  volume: { total: number; por_status: Record<string, number> }
+  aderencia: {
+    pilares: PillarAdherence[]
+    pecas_com_pilar: number
+    sem_pilar: number
+  } | null
+  cadencia: { agendadas_30_dias: number; dias_com_peca: number; maior_lacuna_dias: number }
+  qualidade: {
+    revisadas: number
+    aprovadas: number
+    reprovadas: number
+    violacoes: number
+    regras_mais_violadas: Array<{ regra: string; vezes: number }>
+  }
+  mix: { por_canal: Record<string, number>; por_formato: Record<string, number> }
+}
+
+export interface Insight {
+  title: string
+  detail: string
+  action: string
+}
+
+export interface AnalyticsReport {
+  id: number
+  score: number
+  summary: string
+  insights: Insight[]
+  /** O snapshot dos numeros que geraram esta leitura. */
+  metrics: ProjectMetrics
+  created_at: string
+}
+
+export interface AnalyticsResponse {
+  data: AnalyticsReport | null
+  /** Os numeros de agora — a tela mostra o calendario antes de a IA opinar. */
+  metrics: ProjectMetrics
+}
+
 /** Classificacao da falha. `provider_failed` e o unico onde insistir ajuda. */
 export type AiRunErrorCode = 'refused' | 'rejected_output' | 'provider_failed'
 
