@@ -12,6 +12,7 @@ use App\Ai\Providers\LlmResponse;
 use App\Enums\WorkspaceRole;
 use App\Models\AiRun;
 use App\Models\Content;
+use App\Models\ContentReview;
 use App\Models\Project;
 use App\Models\Strategy;
 use App\Models\User;
@@ -218,6 +219,96 @@ class CopyGenerationTest extends TestCase
                 'format' => 'post', 'channel' => 'instagram', 'pillar' => 'Educacao',
             ]),
         ], $context);
+    }
+
+    /**
+     * O bug de producao: o reviewer reprovou "Depoimento fabricado" (a persona interna
+     * vendida como cliente real) e, no lote seguinte, o copywriter escreveu o MESMO
+     * erro com outro titulo. O guard de titulo nao pega — o erro e do conteudo.
+     */
+    public function test_o_contexto_leva_as_violacoes_que_o_reviewer_ja_reprovou(): void
+    {
+        $workspace = Workspace::factory()->create();
+        $project = Project::factory()->create(['workspace_id' => $workspace->id]);
+        $peca = $this->peca($project, 'Peca reprovada', 'Educacao');
+
+        ContentReview::create([
+            'content_id' => $peca->id,
+            'ai_run_id' => $this->reviewRun($project)->id,
+            'verdict' => 'fail',
+            'summary' => 's',
+            'violations' => [[
+                'rule' => 'Depoimento fabricado',
+                'excerpt' => 'O Ricardo chegou desconfiado...',
+                'suggestion' => 'Use um caso real, com consentimento.',
+            ]],
+        ]);
+
+        $context = AgentContext::forProject($project, ['with_past_violations' => true]);
+
+        // Vai a regra e a correcao. O `excerpt` NAO vai: e o erro por extenso, e
+        // mandar o texto errado convida o modelo a imita-lo.
+        $this->assertSame([[
+            'rule' => 'Depoimento fabricado',
+            'suggestion' => 'Use um caso real, com consentimento.',
+        ]], $context->pastViolations);
+
+        $this->assertArrayHasKey('past_violations', $context->toArray());
+    }
+
+    /** Uma regra violada por 3 pecas entra uma vez: o prompt nao precisa da repeticao. */
+    public function test_a_mesma_regra_violada_varias_vezes_entra_uma_vez_so(): void
+    {
+        $workspace = Workspace::factory()->create();
+        $project = Project::factory()->create(['workspace_id' => $workspace->id]);
+
+        foreach (['A', 'B'] as $titulo) {
+            ContentReview::create([
+                'content_id' => $this->peca($project, $titulo, 'Educacao')->id,
+                'ai_run_id' => $this->reviewRun($project)->id,
+                'verdict' => 'fail',
+                'summary' => 's',
+                'violations' => [['rule' => 'Promessa exagerada', 'suggestion' => 'Seja concreto.']],
+            ]);
+        }
+
+        $context = AgentContext::forProject($project, ['with_past_violations' => true]);
+
+        $this->assertCount(1, $context->pastViolations);
+    }
+
+    /** Veredito `pass` nao tem o que ensinar: so as reprovacoes viram memoria. */
+    public function test_review_aprovada_nao_vira_violacao(): void
+    {
+        $workspace = Workspace::factory()->create();
+        $project = Project::factory()->create(['workspace_id' => $workspace->id]);
+
+        ContentReview::create([
+            'content_id' => $this->peca($project, 'Peca aprovada', 'Educacao')->id,
+            'ai_run_id' => $this->reviewRun($project)->id,
+            'verdict' => 'pass',
+            'summary' => 's',
+            'violations' => [],
+        ]);
+
+        $context = AgentContext::forProject($project, ['with_past_violations' => true]);
+
+        $this->assertSame([], $context->pastViolations);
+    }
+
+    /** `content_reviews.ai_run_id` e NOT NULL: toda review nasce de uma execucao. */
+    private function reviewRun(Project $project): AiRun
+    {
+        return AiRun::create([
+            'workspace_id' => $project->workspace_id,
+            'project_id' => $project->id,
+            'agent' => 'reviewer',
+            'provider' => 'mock',
+            'model' => 'x',
+            'status' => 'succeeded',
+            'input' => [],
+            'created_by' => User::factory()->create()->id,
+        ]);
     }
 
     private function peca(Project $project, string $title, string $pillar, string $status = 'idea'): Content

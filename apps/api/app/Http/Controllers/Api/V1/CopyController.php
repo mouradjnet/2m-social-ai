@@ -76,6 +76,9 @@ class CopyController extends Controller
                     'project_id' => $project->id,
                     'strategy_id' => $strategy->id,
                     'with_existing_contents' => true,
+                    // O que o reviewer ja reprovou. Sem isso o copywriter reincide no
+                    // erro conceitual — o guard de titulo nao pega, o titulo e outro.
+                    'with_past_violations' => true,
                     'pillar' => $pillar,
                 ], fn ($v) => $v !== null),
                 'created_by' => request()->user()->id,

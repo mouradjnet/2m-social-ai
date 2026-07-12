@@ -2,6 +2,7 @@
 
 namespace App\Ai\Agents;
 
+use App\Models\ContentReview;
 use App\Models\Project;
 
 /**
@@ -52,6 +53,14 @@ readonly class AgentContext
          * 15% de um lote de 5 da 0,75, que vira zero peca — e ficava zerado para sempre.
          */
         public ?string $targetPillar = null,
+        /**
+         * As regras que o reviewer JA reprovou neste projeto, com a sugestao dele.
+         * Sem isso o copywriter reincide: em producao ele reescreveu o depoimento
+         * fabricado (a persona interna vendida como cliente real) depois de o
+         * reviewer ter reprovado exatamente isso. O guard de titulo nao pega — o
+         * erro e conceitual, e o titulo era outro.
+         */
+        public ?array $pastViolations = null,
     ) {}
 
     /**
@@ -102,6 +111,9 @@ readonly class AgentContext
                 ? self::existingContents($project)
                 : null,
             targetPillar: $input['pillar'] ?? null,
+            pastViolations: ($input['with_past_violations'] ?? false)
+                ? self::pastViolations($project)
+                : null,
         );
     }
 
@@ -137,7 +149,44 @@ readonly class AgentContext
             $data['target_pillar'] = $this->targetPillar;
         }
 
+        if ($this->pastViolations !== null) {
+            $data['past_violations'] = $this->pastViolations;
+        }
+
         return $data;
+    }
+
+    /**
+     * As regras ja reprovadas pelo reviewer neste projeto, uma vez cada. Vai a `rule`
+     * e a `suggestion` — o `excerpt` fica de fora de proposito: e o texto da peca
+     * velha, e mandar o erro por extenso convida o modelo a imita-lo.
+     */
+    private static function pastViolations(Project $project): array
+    {
+        $reviews = ContentReview::query()
+            ->whereIn('content_id', $project->contents()->select('id'))
+            ->where('verdict', 'fail')
+            ->orderBy('id')
+            ->get(['violations']);
+
+        $porRegra = [];
+
+        foreach ($reviews as $review) {
+            foreach ($review->violations ?? [] as $violacao) {
+                $regra = $violacao['rule'] ?? null;
+
+                if ($regra === null || isset($porRegra[$regra])) {
+                    continue;
+                }
+
+                $porRegra[$regra] = [
+                    'rule' => $regra,
+                    'suggestion' => $violacao['suggestion'] ?? null,
+                ];
+            }
+        }
+
+        return array_values($porRegra);
     }
 
     /**

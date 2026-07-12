@@ -76,6 +76,9 @@ class CopywriterAgent implements Agent
         - `existing_contents` e o que a marca JA tem. Nao repita esses temas nem
           reescreva o mesmo assunto com outro titulo: o lote precisa ACRESCENTAR ao
           calendario, nao duplica-lo. Se um angulo obvio ja foi usado, ache outro.
+        - `past_violations` sao regras que o revisor JA reprovou neste projeto, com a
+          correcao dele. Nao cometa esses erros de novo — nem com outro titulo, nem
+          com outra roupagem. Trocar o titulo nao conserta um erro que e do conteudo.
         - Se `target_pillar` vier no contexto, TODAS as pecas saem desse pilar (o
           humano esta cobrindo um buraco). Sem ele, distribua as pecas pelos pilares
           da estrategia conforme os pesos: um pilar de peso maior recebe mais pecas.
