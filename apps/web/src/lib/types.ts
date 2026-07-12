@@ -107,6 +107,16 @@ export interface ContentReview {
   created_at: string
 }
 
+/** Sugestao do agente seo. `applied_at` diz se ela ja virou a peca. */
+export interface ContentSeo {
+  id: number
+  title: string
+  keywords: string[]
+  hashtags: string[]
+  applied_at: string | null
+  created_at: string
+}
+
 export interface Content {
   id: number
   project_id: number
@@ -123,6 +133,8 @@ export interface Content {
   image_prompt: string | null
   /** A ultima revisao (as reviews sao append-only). Null se nunca foi revisada. */
   latest_review: ContentReview | null
+  /** A ultima sugestao de SEO. Null se o agente nunca rodou nesta peca. */
+  latest_seo: ContentSeo | null
   source: 'manual' | 'ai' | 'research'
   origin_ai_run_id: number | null
 }

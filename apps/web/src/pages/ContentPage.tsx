@@ -44,6 +44,12 @@ export function ContentPage() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['contents', projectId] }),
   })
 
+  // A IA propoe, o humano aplica: o titulo so muda por este clique.
+  const applySeo = useMutation({
+    mutationFn: (id: number) => api(`/contents/${id}/seo:apply`, { method: 'POST' }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['contents', projectId] }),
+  })
+
   if (contents.isPending) return <Shell>Carregando…</Shell>
   if (contents.isError) return <Shell>Projeto não encontrado.</Shell>
 
@@ -113,6 +119,14 @@ export function ContentPage() {
 
         <Button
           variant="secondary"
+          disabled={generating || emProducao === 0}
+          onClick={() => generate({ endpoint: 'seo:generate' })}
+        >
+          Otimizar SEO ({emProducao})
+        </Button>
+
+        <Button
+          variant="secondary"
           disabled={generating || emRevisao === 0}
           onClick={() => generate({ endpoint: 'review:generate' })}
         >
@@ -130,8 +144,9 @@ export function ContentPage() {
         ) : (
           <ContentBoard
             groups={groupByStatus(pieces)}
-            pending={move.isPending}
+            pending={move.isPending || applySeo.isPending}
             onMove={(id, status) => move.mutate({ id, status })}
+            onApplySeo={(id) => applySeo.mutate(id)}
           />
         )}
       </div>

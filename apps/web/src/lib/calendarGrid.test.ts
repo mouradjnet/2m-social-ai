@@ -16,6 +16,7 @@ function scheduled(id: number, iso: string): Content {
     scheduled_for: iso,
     image_prompt: null,
     latest_review: null,
+    latest_seo: null,
     source: 'ai',
     origin_ai_run_id: null,
   }

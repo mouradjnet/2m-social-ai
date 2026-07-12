@@ -16,6 +16,7 @@ function content(id: number, status: Content['status']): Content {
     scheduled_for: null,
     image_prompt: null,
     latest_review: null,
+    latest_seo: null,
     source: 'ai',
     origin_ai_run_id: 7,
   }

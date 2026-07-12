@@ -6,6 +6,7 @@ interface Props {
   groups: Record<Column, Content[]>
   pending: boolean
   onMove: (id: number, status: Content['status']) => void
+  onApplySeo: (id: number) => void
 }
 
 const TITLES: Record<Column, string> = {
@@ -21,7 +22,7 @@ const TITLES: Record<Column, string> = {
 // nao esta aqui: quem agenda e o agente. Voltar de agendado e caso a parte.
 const FLOW: Content['status'][] = ['idea', 'production', 'review', 'approved']
 
-export function ContentBoard({ groups, pending, onMove }: Props) {
+export function ContentBoard({ groups, pending, onMove, onApplySeo }: Props) {
   return (
     <div className="flex gap-4 overflow-x-auto">
       {COLUMNS.map((col) => (
@@ -44,6 +45,7 @@ export function ContentBoard({ groups, pending, onMove }: Props) {
                   onAdvance={() => i >= 0 && i < FLOW.length - 1 && onMove(content.id, FLOW[i + 1])}
                   onBack={() => back && onMove(content.id, back)}
                   onArchive={() => onMove(content.id, 'archived')}
+                  onApplySeo={() => onApplySeo(content.id)}
                 />
               )
             })}

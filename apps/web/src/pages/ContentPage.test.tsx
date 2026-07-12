@@ -23,6 +23,7 @@ function content(id: number, status: Content['status'], scheduledFor: string | n
     scheduled_for: scheduledFor,
     image_prompt: null,
     latest_review: null,
+    latest_seo: null,
     source: 'ai',
     origin_ai_run_id: 7,
   }
@@ -180,6 +181,60 @@ test('sem peça em produção o botão de gerar imagens fica desabilitado', asyn
   renderWithProviders(<ContentPage />, ROUTE)
 
   expect(await screen.findByRole('button', { name: /gerar imagens \(0\)/i })).toBeDisabled()
+})
+
+test('otimizar SEO: manda POST para seo:generate', async () => {
+  const user = setup()
+  let chamado = false
+
+  server.use(
+    http.get('/api/v1/projects/1/contents', () =>
+      HttpResponse.json({ data: [content(1, 'production')] }),
+    ),
+    http.post('/api/v1/projects/1/seo:generate', () => {
+      chamado = true
+      return HttpResponse.json({ ai_run_id: 42 }, { status: 202 })
+    }),
+    http.get('/api/v1/ai-runs/42', () => HttpResponse.json(run({ status: 'running' }))),
+    // Sem handler dos outros endpoints: se a tela chamar o errado, o MSW estoura.
+  )
+
+  renderWithProviders(<ContentPage />, ROUTE)
+
+  await user.click(await screen.findByRole('button', { name: /otimizar seo \(1\)/i }))
+
+  await waitFor(() => expect(chamado).toBe(true))
+})
+
+test('aplicar SEO: manda POST para seo:apply da peça', async () => {
+  const user = setup()
+  let chamado = false
+
+  const comSeo = {
+    ...content(1, 'production'),
+    latest_seo: {
+      id: 1,
+      title: 'Titulo otimizado',
+      keywords: ['busca'],
+      hashtags: ['#tag'],
+      applied_at: null,
+      created_at: new Date().toISOString(),
+    },
+  }
+
+  server.use(
+    http.get('/api/v1/projects/1/contents', () => HttpResponse.json({ data: [comSeo] })),
+    http.post('/api/v1/contents/1/seo:apply', () => {
+      chamado = true
+      return HttpResponse.json({ data: comSeo })
+    }),
+  )
+
+  renderWithProviders(<ContentPage />, ROUTE)
+
+  await user.click(await screen.findByRole('button', { name: /aplicar seo/i }))
+
+  await waitFor(() => expect(chamado).toBe(true))
 })
 
 test('revisar: manda POST para review:generate', async () => {

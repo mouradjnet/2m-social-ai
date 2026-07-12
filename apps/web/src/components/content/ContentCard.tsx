@@ -11,6 +11,7 @@ interface Props {
   onAdvance: () => void
   onBack: () => void
   onArchive: () => void
+  onApplySeo: () => void
 }
 
 const CHIPS: Record<ContentStatus, string> = {
@@ -36,9 +37,17 @@ function formatWhen(iso: string): string {
   return `${dia} às ${hora}`
 }
 
-export function ContentCard({ content, pending, onAdvance, onBack, onArchive }: Props) {
+export function ContentCard({
+  content,
+  pending,
+  onAdvance,
+  onBack,
+  onArchive,
+  onApplySeo,
+}: Props) {
   const [copiado, setCopiado] = useState(false)
   const review = content.latest_review
+  const seo = content.latest_seo
   const i = FLOW.indexOf(content.status)
 
   const copiar = async () => {
@@ -79,6 +88,39 @@ export function ContentCard({ content, pending, onAdvance, onBack, onArchive }: 
 
       {content.scheduled_for && (
         <p className="text-label-sm text-on-surface mt-2">📅 {formatWhen(content.scheduled_for)}</p>
+      )}
+
+      {seo && (
+        <div className="border-outline-variant mt-3 rounded border p-2">
+          <p className="text-label-sm text-on-surface-variant">
+            {seo.applied_at ? 'SEO aplicado' : 'Sugestão de SEO'}
+          </p>
+
+          <p className="text-body-sm text-on-surface mt-1">{seo.title}</p>
+
+          {seo.keywords.length > 0 && (
+            <p className="text-body-sm text-on-surface-variant mt-1">
+              🔎 {seo.keywords.join(', ')}
+            </p>
+          )}
+
+          {seo.hashtags.length > 0 && (
+            <p className="text-body-sm text-primary mt-1">{seo.hashtags.join(' ')}</p>
+          )}
+
+          {/* Aplicada, a sugestao JA e a peca: nao ha o que aplicar de novo. */}
+          {!seo.applied_at && (
+            <Button
+              size="sm"
+              variant="secondary"
+              className="mt-2"
+              disabled={pending}
+              onClick={onApplySeo}
+            >
+              Aplicar SEO
+            </Button>
+          )}
+        </div>
       )}
 
       {content.image_prompt && (

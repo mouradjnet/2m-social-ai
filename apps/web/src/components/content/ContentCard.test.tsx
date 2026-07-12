@@ -18,13 +18,20 @@ function content(overrides: Partial<Content> = {}): Content {
     scheduled_for: null,
     image_prompt: null,
     latest_review: null,
+    latest_seo: null,
     source: 'ai',
     origin_ai_run_id: 7,
     ...overrides,
   }
 }
 
-const noop = { onAdvance: vi.fn(), onBack: vi.fn(), onArchive: vi.fn(), pending: false }
+const noop = {
+  onAdvance: vi.fn(),
+  onBack: vi.fn(),
+  onArchive: vi.fn(),
+  onApplySeo: vi.fn(),
+  pending: false,
+}
 
 test('mostra formato, canal, titulo e o chip Gerado por IA', () => {
   render(<ContentCard content={content()} {...noop} />)
@@ -134,4 +141,36 @@ test('peca sem image_prompt nao mostra o botao copiar', () => {
   render(<ContentCard content={content()} {...noop} />)
 
   expect(screen.queryByRole('button', { name: /copiar/i })).not.toBeInTheDocument()
+})
+
+const seo = {
+  id: 1,
+  title: 'Titulo que responde a uma busca',
+  keywords: ['dentista', 'clareamento'],
+  hashtags: ['#odonto'],
+  applied_at: null,
+  created_at: new Date().toISOString(),
+}
+
+test('sugestao de SEO mostra titulo, keywords e o botao aplicar', async () => {
+  const user = userEvent.setup()
+  const onApplySeo = vi.fn()
+
+  render(<ContentCard content={content({ latest_seo: seo })} {...noop} onApplySeo={onApplySeo} />)
+
+  expect(screen.getByText(/sugestão de seo/i)).toBeInTheDocument()
+  expect(screen.getByText(seo.title)).toBeInTheDocument()
+  expect(screen.getByText(/dentista, clareamento/)).toBeInTheDocument()
+
+  await user.click(screen.getByRole('button', { name: /aplicar seo/i }))
+  expect(onApplySeo).toHaveBeenCalledOnce()
+})
+
+test('sugestao ja aplicada nao oferece aplicar de novo', () => {
+  const aplicada = { ...seo, applied_at: new Date().toISOString() }
+
+  render(<ContentCard content={content({ latest_seo: aplicada })} {...noop} />)
+
+  expect(screen.getByText(/seo aplicado/i)).toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: /aplicar seo/i })).not.toBeInTheDocument()
 })

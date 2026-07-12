@@ -30,6 +30,7 @@ function content(id: number, scheduledFor: string | null, status: Content['statu
     scheduled_for: scheduledFor,
     image_prompt: null,
     latest_review: null,
+    latest_seo: null,
     source: 'ai',
     origin_ai_run_id: null,
   }
