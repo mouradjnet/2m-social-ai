@@ -17,7 +17,11 @@ readonly class AgentContext
         public array $brandProfile,
         /** A estrategia `active` do projeto, congelada. Null se nao houver. */
         public ?array $activeStrategy = null,
-        /** `{starts_on, days}`, vindo do input da execucao. Null fora do social_media. */
+        /**
+         * `{starts_on, days, timezone}`. `starts_on`/`days` vem do input da execucao;
+         * o `timezone` e o do projeto, e diz em que fuso as horas da janela — e as que
+         * o agente devolver — sao lidas. Null fora do social_media.
+         */
         public ?array $scheduleWindow = null,
         /** As pecas `approved`, o lote a distribuir. Null quando nao ha janela. */
         public ?array $approvedContents = null,
@@ -55,7 +59,11 @@ readonly class AgentContext
             ->first();
 
         $window = isset($input['starts_on'], $input['days'])
-            ? ['starts_on' => $input['starts_on'], 'days' => (int) $input['days']]
+            ? [
+                'starts_on' => $input['starts_on'],
+                'days' => (int) $input['days'],
+                'timezone' => $project->timezone,
+            ]
             : null;
 
         return new self(

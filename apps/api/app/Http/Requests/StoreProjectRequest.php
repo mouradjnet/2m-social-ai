@@ -19,6 +19,9 @@ class StoreProjectRequest extends FormRequest
             'name' => ['required', 'string', 'max:120'],
             'company' => ['nullable', 'string', 'max:160'],
             'segment' => ['nullable', 'string', 'max:80'],
+            // Omitido = America/Sao_Paulo (default da coluna). E o fuso em que o
+            // social_media agenda: o horario do publico da marca.
+            'timezone' => ['sometimes', 'timezone'],
             'description' => ['nullable', 'string'],
             'owner_user_id' => ['nullable', 'integer', 'exists:users,id'],
             'status' => ['nullable', Rule::in(['active', 'paused', 'archived'])],

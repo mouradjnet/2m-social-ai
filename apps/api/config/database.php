@@ -97,6 +97,12 @@ return [
             'prefix_indexes' => true,
             'search_path' => 'public',
             'sslmode' => env('DB_SSLMODE', 'prefer'),
+
+            // `scheduled_for` e `timestamptz` e o Laravel manda a data SEM offset.
+            // O Postgres entao le a string no fuso da SESSAO — que e o do servidor.
+            // Sem fixar isso, o mesmo codigo grava instantes diferentes conforme a
+            // maquina (o Postgres local roda em America/Cayenne; o do Render, em UTC).
+            'timezone' => 'UTC',
         ],
 
         'sqlsrv' => [

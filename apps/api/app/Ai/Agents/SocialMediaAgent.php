@@ -45,7 +45,7 @@ class SocialMediaAgent implements Agent
                             'content_id' => ['type' => 'integer'],
                             'scheduled_for' => [
                                 'type' => 'string',
-                                'description' => 'Data e hora no formato AAAA-MM-DDTHH:MM:SS.',
+                                'description' => 'Data e hora LOCAL (fuso schedule_window.timezone), formato AAAA-MM-DDTHH:MM:SS, sem Z e sem offset.',
                             ],
                             'reason' => ['type' => 'string'],
                         ],
@@ -74,6 +74,9 @@ class SocialMediaAgent implements Agent
           livre, e nao amontoe tudo no comeco.
         - Escolha o horario pelo canal e pelo formato — o horario em que aquele
           publico esta na rede.
+        - As horas sao LOCAIS, no fuso `schedule_window.timezone` (o fuso do publico
+          da marca). Escreva `scheduled_for` sem `Z` e sem offset: "2026-07-16T08:30:00"
+          significa 08:30 da manha para quem le. Quem converte para UTC e o sistema.
         - Respeite a linha editorial e os pilares da estrategia ativa ao decidir a
           ordem: o que abre a janela e o que sustenta a mensagem.
         - `reason` explica a escolha em uma frase curta, em portugues do Brasil.
@@ -133,7 +136,7 @@ class SocialMediaAgent implements Agent
             }
 
             $vistas[] = $id;
-            $quando = self::parse($entrada['scheduled_for'] ?? '');
+            $quando = self::parse($entrada['scheduled_for'] ?? '', self::timezone($context->scheduleWindow));
 
             if ($quando->lt($inicio) || $quando->gte($fim)) {
                 throw new OutputRejectedException(
@@ -152,7 +155,9 @@ class SocialMediaAgent implements Agent
                 ->findOrFail($entrada['content_id']);
 
             $content->update([
-                'scheduled_for' => self::parse($entrada['scheduled_for']),
+                // `->utc()` e explicito de proposito: o banco guarda instante em UTC,
+                // e deixar o Carbon com o offset local aqui gravaria a hora crua.
+                'scheduled_for' => self::parse($entrada['scheduled_for'], $project->timezone)->utc(),
                 'status' => 'scheduled',
             ]);
 
@@ -167,20 +172,33 @@ class SocialMediaAgent implements Agent
         }
     }
 
-    /** A janela comeca no inicio de `starts_on` e o ultimo dia entra inteiro. */
+    /**
+     * A janela comeca a meia-noite LOCAL de `starts_on` e o ultimo dia entra inteiro.
+     * Sem o fuso, "o dia 16" comecaria a meia-noite UTC — 21:00 do dia 15 em Sao Paulo.
+     */
     private static function limites(array $window): array
     {
-        $inicio = CarbonImmutable::parse($window['starts_on'])->startOfDay();
+        $inicio = CarbonImmutable::parse($window['starts_on'], self::timezone($window))->startOfDay();
 
         return [$inicio, $inicio->addDays((int) $window['days'])];
     }
 
-    private static function parse(string $quando): CarbonImmutable
+    /**
+     * A hora que o modelo escreve e LOCAL. Interpretar "08:30" como UTC era o bug:
+     * a peca ia ao ar as 05:30 da manha em Sao Paulo. Uma string com `Z` ou offset
+     * ja diz o fuso dela, e o Carbon respeita — o default so vale para a hora nua.
+     */
+    private static function parse(string $quando, string $timezone): CarbonImmutable
     {
         try {
-            return CarbonImmutable::parse($quando);
+            return CarbonImmutable::parse($quando, $timezone);
         } catch (Exception) {
             throw new OutputRejectedException("Data invalida: {$quando}.");
         }
+    }
+
+    private static function timezone(array $window): string
+    {
+        return $window['timezone'] ?? 'UTC';
     }
 }

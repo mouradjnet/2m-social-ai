@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Ai\Agents\SocialMediaAgent;
 use App\Enums\WorkspaceRole;
 use App\Models\AiRun;
 use App\Models\Content;
@@ -94,6 +95,73 @@ class ScheduleGenerationTest extends TestCase
         $this->assertCount(2, $revisoes);
         $this->assertSame('approved', $revisoes[0]->from_status);
         $this->assertSame('scheduled', $revisoes[0]->to_status);
+    }
+
+    /**
+     * O agente escreve a hora do PUBLICO ("08:30 da manha"). O banco guarda instante
+     * em UTC. Sem a conversao, 08:30 virava 08:30Z = 05:30 em Sao Paulo — a peca ia
+     * ao ar de madrugada. Aconteceu em producao com a IA real; o mock nunca pegaria,
+     * porque devolve data com offset explicito.
+     */
+    public function test_a_hora_do_agente_e_local_e_gravada_em_utc(): void
+    {
+        [, $project] = $this->scene();
+        $project->update(['timezone' => 'America/Sao_Paulo']);
+        $content = $this->content($project);
+
+        $this->persistSchedule($project, $content, '2026-08-05T08:30:00');
+
+        // 08:30 em Sao Paulo (-03) = 11:30 UTC.
+        $this->assertSame(
+            '2026-08-05 11:30:00',
+            $content->refresh()->scheduled_for->utc()->toDateTimeString(),
+        );
+    }
+
+    /** O fuso vem da coluna do projeto, nao de uma constante escondida no agente. */
+    public function test_projeto_em_outro_fuso_grava_outro_instante(): void
+    {
+        [, $project] = $this->scene();
+        $project->update(['timezone' => 'America/Manaus']);
+        $content = $this->content($project);
+
+        $this->persistSchedule($project, $content, '2026-08-05T08:30:00');
+
+        // 08:30 em Manaus (-04) = 12:30 UTC.
+        $this->assertSame(
+            '2026-08-05 12:30:00',
+            $content->refresh()->scheduled_for->utc()->toDateTimeString(),
+        );
+    }
+
+    public function test_o_fuso_default_do_projeto_e_sao_paulo(): void
+    {
+        [, $project] = $this->scene();
+
+        $this->assertSame('America/Sao_Paulo', $project->refresh()->timezone);
+    }
+
+    /** Chama o agente direto: o MockProvider nao deixa escolher a hora da saida. */
+    private function persistSchedule(Project $project, Content $content, string $quando): void
+    {
+        $run = AiRun::create([
+            'workspace_id' => $project->workspace_id,
+            'project_id' => $project->id,
+            'agent' => 'social_media',
+            'provider' => 'mock',
+            'model' => 'x',
+            'status' => 'succeeded',
+            'input' => [],
+            'created_by' => $project->workspace->members()->first()->user_id,
+        ]);
+
+        (new SocialMediaAgent)->persist($project, [
+            'schedule' => [[
+                'content_id' => $content->id,
+                'scheduled_for' => $quando,
+                'reason' => 'r',
+            ]],
+        ], $run);
     }
 
     public function test_a_janela_tem_default_quando_o_corpo_vem_vazio(): void

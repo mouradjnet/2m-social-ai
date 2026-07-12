@@ -18,8 +18,17 @@ class Project extends Model
     use HasFactory;
 
     protected $fillable = [
-        'workspace_id', 'name', 'company', 'segment', 'description',
+        'workspace_id', 'name', 'company', 'segment', 'timezone', 'description',
         'owner_user_id', 'status', 'image_path', 'color',
+    ];
+
+    /**
+     * O mesmo default da coluna, tambem no model: o default do banco so aparece
+     * depois de um refresh, e um projeto recem-criado usado na mesma requisicao
+     * chegaria ao SocialMediaAgent com `timezone` nulo.
+     */
+    protected $attributes = [
+        'timezone' => 'America/Sao_Paulo',
     ];
 
     public function workspace(): BelongsTo

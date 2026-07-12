@@ -88,7 +88,11 @@ class AgentContextTest extends TestCase
 
         $context = AgentContext::forProject($project, ['starts_on' => '2026-08-01', 'days' => 14]);
 
-        $this->assertSame(['starts_on' => '2026-08-01', 'days' => 14], $context->scheduleWindow);
+        // A janela leva o fuso do projeto: e nele que o agente escreve as horas.
+        $this->assertSame(
+            ['starts_on' => '2026-08-01', 'days' => 14, 'timezone' => 'America/Sao_Paulo'],
+            $context->scheduleWindow,
+        );
         $this->assertCount(1, $context->approvedContents);
         $this->assertSame($aprovada->id, $context->approvedContents[0]['id']);
 
