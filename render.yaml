@@ -1,24 +1,28 @@
-# Infra declarada no repo (Render Blueprint). Tres pecas:
+# MODO FREE — sem cartao.
 #
-#   web    — o Laravel, que serve a API E a SPA (um dominio so, sem CORS)
-#   worker — o MESMO container, rodando queue:work. Sem ele, o usuario clica em
-#            "Gerar", o job entra na fila e NADA nunca volta.
-#   db     — Postgres 16. Nao e negociavel: o modelo usa jsonb em quase toda tabela.
+# O plano free do Render NAO TEM background worker, e sem worker o produto nao
+# funciona: toda geracao de IA e um job, e o usuario ficaria olhando um spinner
+# eterno. Entao aqui e UM servico so, e o container roda o servidor E a fila, sob
+# supervisao (docker/supervisord.conf).
 #
-# As env vars estao ESCRITAS DUAS VEZES de proposito: o Render nao documenta suporte
-# a ancora YAML (&x / *x), e um blueprint que nao carrega nao avisa direito o porque.
-# Duplicacao verbosa e chata; blueprint quebrado e pior.
+# O preco disso, honestamente:
+#   - o servico DORME apos 15 min sem trafego; o primeiro acesso depois demora ~1min,
+#     e um job enfileirado so anda quando alguem acorda o servico;
+#   - o Postgres free do Render EXPIRA em 30 dias, e depois e apagado.
 #
-# As chaves (APP_KEY, ANTHROPIC_API_KEY) NAO estao aqui: `sync: false` faz o Render
-# perguntar por elas na primeira subida, e elas ficam so no painel.
+# Serve para validar e para mostrar. Para um cliente de verdade, use o
+# `render.production.yaml` (web + worker + Postgres pagos, cada um US$7): la nada
+# dorme, nada expira, e a fila e um processo proprio.
 
 services:
   - type: web
     name: 2m-social-ai
     runtime: docker
     dockerfilePath: ./Dockerfile
-    plan: starter
+    plan: free
     healthCheckPath: /up
+    # Supervisor no lugar do frankenphp: dois processos, um container.
+    dockerCommand: supervisord -c /etc/supervisor/conf.d/app.conf
     envVars:
       - key: APP_NAME
         value: 2M Social AI
@@ -29,8 +33,7 @@ services:
       # `php artisan key:generate --show`
       - key: APP_KEY
         sync: false
-      # A URL publica so existe depois do primeiro deploy: preencher no painel
-      # (https://2m-social-ai.onrender.com, ou o dominio proprio).
+      # A URL publica so existe depois do primeiro deploy: preencher no painel.
       - key: APP_URL
         sync: false
 
@@ -52,52 +55,8 @@ services:
         value: database
 
       # A IA roda de verdade. Cada geracao custa: estrategia ~4 centavos, lote de
-      # copy ~6. O teto mensal por workspace e a defesa.
-      - key: AI_PROVIDER
-        value: anthropic
-      - key: ANTHROPIC_API_KEY
-        sync: false
-      - key: AI_WORKSPACE_MONTHLY_BUDGET_CENTS
-        value: 5000
-
-      - key: LOG_CHANNEL
-        value: stderr
-
-  - type: worker
-    name: 2m-social-ai-worker
-    runtime: docker
-    dockerfilePath: ./Dockerfile
-    plan: starter
-    # `--tries=1`: o RunAgentJob ja trata as proprias falhas (marca o ai_run como
-    # failed com o error_code). Retentar o job inteiro chamaria — e cobraria — a
-    # API da Anthropic de novo.
-    dockerCommand: php artisan queue:work --tries=1 --timeout=180
-    envVars:
-      - key: APP_NAME
-        value: 2M Social AI
-      - key: APP_ENV
-        value: production
-      - key: APP_DEBUG
-        value: false
-      - key: APP_KEY
-        sync: false
-      - key: APP_URL
-        sync: false
-
-      - key: DB_CONNECTION
-        value: pgsql
-      - key: DB_URL
-        fromDatabase:
-          name: 2m-social-ai-db
-          property: connectionString
-
-      - key: QUEUE_CONNECTION
-        value: database
-      - key: CACHE_STORE
-        value: database
-      - key: SESSION_DRIVER
-        value: database
-
+      # copy ~6. O teto mensal por workspace e a defesa. Para validar a infra sem
+      # gastar, troque para `mock` no painel — nenhum codigo muda.
       - key: AI_PROVIDER
         value: anthropic
       - key: ANTHROPIC_API_KEY
@@ -110,5 +69,5 @@ services:
 
 databases:
   - name: 2m-social-ai-db
-    plan: basic-256mb
+    plan: free
     postgresMajorVersion: "16"

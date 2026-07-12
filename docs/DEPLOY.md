@@ -1,20 +1,26 @@
 # Deploy
 
-**Onde:** Render, pelo blueprint `render.yaml` (a infra está declarada no repo — não em cliques num painel).
+**Onde:** Render, por blueprint (a infra está declarada no repo — não em cliques num painel).
 
 **A forma:** o Laravel serve a API **e** a SPA no mesmo domínio. Um único origin, sem CORS, e o `fetch('/api/v1/...')` do frontend continua relativo. O build do Vite entra em `public/` na imagem (ver `Dockerfile`), e o catch-all de `routes/web.php` devolve o `index.html` nos deep links.
 
-## As três peças
+**O worker não é opcional.** Toda geração de IA é um job (202 + polling, ADR-07). Sem worker, o usuário clica em "Gerar", o job entra na fila e **nada nunca volta** — a tela fica girando para sempre. **Postgres também não é negociável:** o modelo usa `jsonb` em quase toda tabela.
 
-| Serviço | O quê |
-|---|---|
-| `2m-social-ai` (web) | FrankenPHP servindo a API + a SPA |
-| `2m-social-ai-worker` | **O mesmo container**, rodando `queue:work` |
-| `2m-social-ai-db` | Postgres 16 |
+## Dois blueprints, porque o free do Render não tem worker
 
-**O worker não é opcional.** Toda geração de IA é um job (202 + polling, ADR-07). Sem worker, o usuário clica em "Gerar", o job entra na fila e **nada nunca volta** — a tela fica girando para sempre.
+| Arquivo | Serviços | Quando |
+|---|---|---|
+| **`render.yaml`** | **1 web (free) + Postgres (free)** — o container roda FrankenPHP **e** `queue:work` sob supervisor | **Sem cartão.** Validar, mostrar |
+| `render.production.yaml` | web + worker + Postgres, `starter` (US$7 cada) | Cliente de verdade |
 
-**Postgres não é negociável:** o modelo usa `jsonb` em quase toda tabela.
+O plano free do Render **não oferece background worker**. Como o produto não funciona sem fila, o modo free roda os dois processos no mesmo container (`docker/supervisord.conf`). **É a mesma imagem** — o que muda é só o comando.
+
+**O preço do free, honestamente:**
+
+- o serviço **dorme** após ~15 min sem tráfego (o primeiro acesso depois demora ~1 min), e um job enfileirado **só anda quando alguém acorda o serviço**;
+- o **Postgres free expira em 30 dias** e depois é apagado.
+
+Para o modo pago, aponte o Blueprint para `render.production.yaml` (ou renomeie-o para `render.yaml`): lá nada dorme, nada expira, e a fila é um processo próprio.
 
 ## Subir a primeira vez
 
@@ -28,7 +34,7 @@
 
 2. No Render: **New → Blueprint**, aponte para `mouradjnet/2m-social-ai`, branch `main`. Ele lê o `render.yaml` e monta os três serviços.
 
-3. O Render vai pedir as variáveis marcadas como `sync: false` — **nos dois serviços** (web e worker), com os mesmos valores:
+3. O Render vai pedir as variáveis marcadas como `sync: false` (no modo pago, **nos dois serviços**, com os mesmos valores):
 
    | Variável | Valor |
    |---|---|
@@ -51,6 +57,7 @@
 - **O banco entra por `DB_URL`, não por `DB_HOST`/`DB_PORT`.** O `fromDatabase` do Render **não expõe** `host` nem `port` — só `connectionString`. O Laravel aceita: `config/database.php` lê `DB_URL` (formato `postgres://…`) antes dos campos separados. Verificado contra o Postgres local.
 - **O blueprint repete as env vars nos dois serviços de propósito.** O Render não documenta suporte a âncora YAML (`&x` / `*x`), e um blueprint que não carrega não explica bem o porquê.
 - **`config:cache` no build não funciona** — em build time não existe `DB_URL` nem `APP_KEY`. Por isso os caches são gerados no `entrypoint.sh`, com o ambiente já injetado.
-- **O worker roda a mesma imagem**, só com outro comando. Não há um segundo Dockerfile para manter em sincronia.
+- **O worker roda a mesma imagem**, só com outro comando. Não há um segundo Dockerfile para manter em sincronia — e é por isso que o modo free (supervisor) e o pago (worker separado) saem da mesma build.
+- **Quem migra é quem serve HTTP.** O `entrypoint.sh` roda `migrate --force` quando o comando é `frankenphp` (modo pago) ou `supervisord` (modo free). O worker separado do modo pago **não** migra: duas migrações simultâneas na primeira subida seriam corrida.
 - **`--tries=1` no worker é de propósito.** O `RunAgentJob` já trata as próprias falhas (marca o `ai_run` como `failed` com o `error_code`). Retentar o job inteiro **chamaria a API da Anthropic de novo** — e cobraria de novo.
 - O `.env` nunca foi versionado, e não há nenhum `sk-ant-` no histórico. Mantenha assim: os segredos vivem só no painel do Render.

@@ -34,6 +34,14 @@ FROM dunglas/frankenphp:1-php8.4
 # opcache/pcntl: performance e o queue:work.
 RUN install-php-extensions pdo_pgsql opcache pcntl intl zip
 
+# supervisor: so o modo FREE o usa (um servico rodando servidor + fila no mesmo
+# container, porque o plano free do Render nao tem background worker). No modo pago
+# o worker e um servico proprio e o supervisor fica ocioso na imagem.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends supervisor \
+    && rm -rf /var/lib/apt/lists/*
+COPY docker/supervisord.conf /etc/supervisor/conf.d/app.conf
+
 WORKDIR /app
 
 COPY apps/api/ ./
