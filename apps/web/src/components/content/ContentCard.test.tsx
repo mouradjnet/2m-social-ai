@@ -16,6 +16,7 @@ function content(overrides: Partial<Content> = {}): Content {
     channel: 'instagram',
     status: 'idea',
     scheduled_for: null,
+    image_prompt: null,
     latest_review: null,
     source: 'ai',
     origin_ai_run_id: 7,
@@ -109,4 +110,28 @@ test('peca nunca revisada nao mostra veredito', () => {
   render(<ContentCard content={content()} {...noop} />)
 
   expect(screen.queryByText(/violações/i)).not.toBeInTheDocument()
+})
+
+test('peca com image_prompt mostra o prompt e copia para a area de transferencia', async () => {
+  const user = userEvent.setup()
+  const writeText = vi.fn().mockResolvedValue(undefined)
+  vi.stubGlobal('navigator', { ...navigator, clipboard: { writeText } })
+
+  const prompt = 'A wide, softly lit workshop scene in emerald tones.'
+  render(<ContentCard content={content({ image_prompt: prompt })} {...noop} />)
+
+  expect(screen.getByText(prompt)).toBeInTheDocument()
+
+  await user.click(screen.getByRole('button', { name: /copiar/i }))
+
+  expect(writeText).toHaveBeenCalledWith(prompt)
+  expect(await screen.findByRole('button', { name: /copiado/i })).toBeInTheDocument()
+
+  vi.unstubAllGlobals()
+})
+
+test('peca sem image_prompt nao mostra o botao copiar', () => {
+  render(<ContentCard content={content()} {...noop} />)
+
+  expect(screen.queryByRole('button', { name: /copiar/i })).not.toBeInTheDocument()
 })

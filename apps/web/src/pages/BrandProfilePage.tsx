@@ -24,6 +24,7 @@ type EditableField =
   | 'competitors'
   | 'required_words'
   | 'forbidden_words'
+  | 'colors'
   | 'website'
   | 'instagram'
   | 'linkedin'
@@ -48,6 +49,13 @@ const STEPS: Array<Step & { fields: Field[]; description?: string }> = [
         label: 'Descrição curta',
         kind: 'textarea',
         placeholder: 'Descreva sua marca em algumas frases…',
+      },
+      {
+        // Opcional: nao entra no `percent`. Quem le e o designer, no prompt de imagem.
+        name: 'colors',
+        label: 'Cores da marca',
+        kind: 'list',
+        hint: 'Um hex por linha, ex: #006c49',
       },
     ],
   },

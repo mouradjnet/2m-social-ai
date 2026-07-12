@@ -1,6 +1,8 @@
+import { useState } from 'react'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { cn } from '@/lib/cn'
+import { copyToClipboard } from '@/lib/copyToClipboard'
 import type { Content, ContentStatus } from '@/lib/types'
 
 interface Props {
@@ -35,8 +37,16 @@ function formatWhen(iso: string): string {
 }
 
 export function ContentCard({ content, pending, onAdvance, onBack, onArchive }: Props) {
+  const [copiado, setCopiado] = useState(false)
   const review = content.latest_review
   const i = FLOW.indexOf(content.status)
+
+  const copiar = async () => {
+    if (await copyToClipboard(content.image_prompt ?? '')) {
+      setCopiado(true)
+      setTimeout(() => setCopiado(false), 2000)
+    }
+  }
   const isArchived = content.status === 'archived'
   const isScheduled = content.status === 'scheduled'
   // De agendado so da para desagendar (volta a Aprovado) ou arquivar. Avancar seria
@@ -69,6 +79,16 @@ export function ContentCard({ content, pending, onAdvance, onBack, onArchive }: 
 
       {content.scheduled_for && (
         <p className="text-label-sm text-on-surface mt-2">📅 {formatWhen(content.scheduled_for)}</p>
+      )}
+
+      {content.image_prompt && (
+        <div className="border-outline-variant mt-3 rounded border p-2">
+          <p className="text-body-sm text-on-surface-variant italic">{content.image_prompt}</p>
+
+          <Button size="sm" variant="ghost" className="mt-1" onClick={copiar}>
+            {copiado ? '✓ Copiado' : 'Copiar prompt'}
+          </Button>
+        </div>
       )}
 
       {review && (

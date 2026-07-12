@@ -37,6 +37,8 @@ export interface BrandProfileData {
   competitors: string[] | null
   required_words: string[] | null
   forbidden_words: string[] | null
+  /** Hex, ex: ['#006c49']. Quem le e o designer, no prompt de imagem. */
+  colors: string[] | null
   website: string | null
   instagram: string | null
   linkedin: string | null
@@ -117,6 +119,8 @@ export interface Content {
   status: ContentStatus
   /** ISO 8601. Quem preenche e o agente social_media; desagendar volta a null. */
   scheduled_for: string | null
+  /** Em ingles: e o texto que se cola no gerador de imagem. Quem escreve e o designer. */
+  image_prompt: string | null
   /** A ultima revisao (as reviews sao append-only). Null se nunca foi revisada. */
   latest_review: ContentReview | null
   source: 'manual' | 'ai' | 'research'
