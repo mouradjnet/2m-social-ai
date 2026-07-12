@@ -24,9 +24,18 @@ const FLOW: Content['status'][] = ['idea', 'production', 'review', 'approved']
 
 export function ContentBoard({ groups, pending, onMove, onApplySeo }: Props) {
   return (
-    <div className="flex gap-4 overflow-x-auto">
+    /*
+     * Seis colunas nao cabem: 6x256 + gaps = ~1400px contra os 1344px uteis do
+     * Shell (90rem - px-12). Rolar e legitimo — o que nao pode e a ultima coluna
+     * sair fatiada pela borda do container, sem respiro, parecendo defeito.
+     *
+     * O `-mx-12 px-12` sangra o padding do Shell: a area de rolagem vai de borda a
+     * borda da janela, e o padding vira o respiro do primeiro e do ultimo cartao.
+     * `scroll-px-12` alinha o snap com esse respiro.
+     */
+    <div className="-mx-12 flex snap-x gap-4 overflow-x-auto scroll-px-12 px-12 pb-2">
       {COLUMNS.map((col) => (
-        <section key={col} className="w-72 shrink-0">
+        <section key={col} className="w-64 shrink-0 snap-start">
           <h2 className="text-label-md text-on-surface">
             {TITLES[col]} ({groups[col].length})
           </h2>
