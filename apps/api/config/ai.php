@@ -51,6 +51,12 @@ return [
             'max_tokens' => 16000,
             'default_days' => 14,
         ],
+        // Julgar texto contra o perfil da marca e trabalho de leitura fina: `high`.
+        'reviewer' => [
+            'model' => env('AI_MODEL_REVIEWER', env('AI_MODEL_DEFAULT', 'claude-opus-4-8')),
+            'effort' => 'high',
+            'max_tokens' => 16000,
+        ],
     ],
 
     'workspace_monthly_budget_cents' => (int) env('AI_WORKSPACE_MONTHLY_BUDGET_CENTS', 5000),

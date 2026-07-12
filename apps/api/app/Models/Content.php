@@ -6,6 +6,7 @@ use App\Models\Scopes\WorkspaceMemberScope;
 use Illuminate\Database\Eloquent\Attributes\ScopedBy;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 #[ScopedBy(WorkspaceMemberScope::class)]
 class Content extends Model
@@ -29,5 +30,15 @@ class Content extends Model
     public function project(): BelongsTo
     {
         return $this->belongsTo(Project::class);
+    }
+
+    /**
+     * As reviews sao append-only: uma peca pode ser revisada varias vezes. O board
+     * mostra a ultima — e a carrega junto do index, para nao pedir uma chamada por
+     * card.
+     */
+    public function latestReview(): HasOne
+    {
+        return $this->hasOne(ContentReview::class)->latestOfMany();
     }
 }

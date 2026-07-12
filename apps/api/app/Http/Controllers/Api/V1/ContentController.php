@@ -28,7 +28,9 @@ class ContentController extends Controller
         Gate::authorize('view', $project);
 
         return response()->json([
-            'data' => $project->contents()->latest()->get(),
+            // A ultima review vem junto: o board mostra o veredito sem uma chamada
+            // por card.
+            'data' => $project->contents()->with('latestReview')->latest()->get(),
         ]);
     }
 

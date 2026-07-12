@@ -83,6 +83,37 @@ class MockProvider implements LlmProvider
             ];
         }
 
+        // Reviewer: schema com a chave `reviews`. Como o social_media, precisa dos ids
+        // reais. Reprova a primeira peca (para a UI de violacao ter o que mostrar em
+        // dev) e aprova o resto — o validate() exige que veredito e lista batam.
+        if (isset($properties['reviews'])) {
+            $pecas = $this->contextOf($request->userMessage)['review_contents'] ?? [];
+
+            return [
+                'reviews' => array_values(array_map(
+                    fn (int $i, array $peca) => $i === 0
+                        ? [
+                            'content_id' => $peca['id'],
+                            'verdict' => 'fail',
+                            'summary' => 'A legenda foge do tom da marca.',
+                            'violations' => [[
+                                'rule' => 'tom de voz',
+                                'excerpt' => 'Legenda da peca',
+                                'suggestion' => 'Falar de resultado concreto antes de falar de produto.',
+                            ]],
+                        ]
+                        : [
+                            'content_id' => $peca['id'],
+                            'verdict' => 'pass',
+                            'summary' => 'Coerente com o perfil da marca.',
+                            'violations' => [],
+                        ],
+                    array_keys($pecas),
+                    $pecas,
+                )),
+            ];
+        }
+
         return [];
     }
 

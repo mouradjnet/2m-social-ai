@@ -21,13 +21,17 @@ readonly class AgentContext
         public ?array $scheduleWindow = null,
         /** As pecas `approved`, o lote a distribuir. Null quando nao ha janela. */
         public ?array $approvedContents = null,
+        /** As pecas em `review`, com o texto inteiro — e ele que esta sendo julgado. */
+        public ?array $reviewContents = null,
     ) {}
 
     /**
-     * `$input` e o `ai_runs.input` da execucao. So o social_media manda janela; as
-     * pecas aprovadas so sao buscadas quando ela vem. Carrega-las sempre poluiria
-     * (e cobraria) o prompt do strategist e do copywriter com um lote que eles nao
-     * usam.
+     * `$input` e o `ai_runs.input` da execucao, e e ele que diz o que carregar: janela
+     * (social_media) ou ids a revisar (reviewer). Carregar tudo sempre poluiria — e
+     * cobraria — o prompt dos agentes que nao usam aquele lote.
+     *
+     * Em ambos os casos o input e registro de INTENCAO: o texto e o status das pecas
+     * sao buscados aqui, no momento da execucao, que e a fonte da verdade.
      */
     public static function forProject(Project $project, array $input = []): self
     {
@@ -54,6 +58,9 @@ readonly class AgentContext
             activeStrategy: $strategy?->only(['title', 'summary', 'editorial_line', 'pillars']),
             scheduleWindow: $window,
             approvedContents: $window === null ? null : self::approvedContents($project),
+            reviewContents: isset($input['content_ids'])
+                ? self::reviewContents($project, $input['content_ids'])
+                : null,
         );
     }
 
@@ -72,6 +79,10 @@ readonly class AgentContext
             $data['approved_contents'] = $this->approvedContents;
         }
 
+        if ($this->reviewContents !== null) {
+            $data['review_contents'] = $this->reviewContents;
+        }
+
         return $data;
     }
 
@@ -83,6 +94,26 @@ readonly class AgentContext
             ->orderBy('id')
             ->get(['id', 'title', 'format', 'channel'])
             ->map->only(['id', 'title', 'format', 'channel'])
+            ->all();
+    }
+
+    /**
+     * As pecas a revisar, com o texto inteiro. O `content_ids` do input e intencao;
+     * o filtro por `review` aqui e a verdade — uma peca que saiu da coluna entre o
+     * POST e a execucao nao e julgada.
+     *
+     * @param  array<int>  $ids
+     */
+    private static function reviewContents(Project $project, array $ids): array
+    {
+        $columns = ['id', 'title', 'caption', 'cta', 'hashtags', 'format', 'channel'];
+
+        return $project->contents()
+            ->where('status', 'review')
+            ->whereIn('id', $ids)
+            ->orderBy('id')
+            ->get($columns)
+            ->map->only($columns)
             ->all();
     }
 }
