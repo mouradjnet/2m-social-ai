@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\V1\AiRunController;
+use App\Http\Controllers\Api\V1\AnalyticsController;
 use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\BrandProfileController;
 use App\Http\Controllers\Api\V1\ContentController;
@@ -49,6 +50,8 @@ Route::prefix('v1')->group(function () {
         Route::post('projects/{project}/review:generate', [ReviewController::class, 'generate']);
         Route::post('projects/{project}/design:generate', [DesignController::class, 'generate']);
         Route::post('projects/{project}/seo:generate', [SeoController::class, 'generate']);
+        Route::get('projects/{project}/analytics', [AnalyticsController::class, 'show']);
+        Route::post('projects/{project}/analytics:generate', [AnalyticsController::class, 'generate']);
         // A IA propoe; aplicar e do humano.
         Route::post('contents/{content}/seo:apply', [SeoController::class, 'apply']);
         Route::get('projects/{project}/contents', [ContentController::class, 'index']);

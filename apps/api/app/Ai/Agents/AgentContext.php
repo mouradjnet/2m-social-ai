@@ -29,6 +29,12 @@ readonly class AgentContext
         public ?array $batchContents = null,
         /** A coluna de onde veio o lote: `review`, `production`, ... */
         public ?string $batchStatus = null,
+        /**
+         * Os numeros do projeto, calculados por Domain\Analytics\Metrics no momento
+         * do POST e congelados no `input` da execucao. NAO sao recalculados aqui: o
+         * relatorio precisa citar exatamente os numeros que ele leu.
+         */
+        public ?array $projectMetrics = null,
     ) {}
 
     /**
@@ -68,6 +74,7 @@ readonly class AgentContext
                 ? self::batchContents($project, $input['content_ids'], $input['batch_status'])
                 : null,
             batchStatus: $input['batch_status'] ?? null,
+            projectMetrics: $input['metrics'] ?? null,
         );
     }
 
@@ -89,6 +96,10 @@ readonly class AgentContext
         if ($this->batchContents !== null) {
             $data['batch_status'] = $this->batchStatus;
             $data['batch_contents'] = $this->batchContents;
+        }
+
+        if ($this->projectMetrics !== null) {
+            $data['metrics'] = $this->projectMetrics;
         }
 
         return $data;

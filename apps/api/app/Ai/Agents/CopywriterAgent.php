@@ -147,6 +147,9 @@ class CopywriterAgent implements Agent
                 'hashtags' => $piece['hashtags'],
                 'format' => $piece['format'],
                 'channel' => $piece['channel'],
+                // O pilar de onde a peca saiu. Sem ele, nao ha como comparar o que a
+                // estrategia pediu com o que foi entregue.
+                'pillar' => $piece['pillar'],
                 // A IA propoe, o humano promove.
                 'status' => 'idea',
                 // Sustenta o chip "Gerado por IA" e a rastreabilidade de custo.

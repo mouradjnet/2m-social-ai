@@ -141,6 +141,30 @@ class MockProvider implements LlmProvider
             ];
         }
 
+        // Analytics: schema com `score` e `insights`. Le o total do proprio <context>
+        // para o relatorio do mock nao contradizer os numeros da tela.
+        if (isset($properties['score'], $properties['insights'])) {
+            $metrics = $this->contextOf($request->userMessage)['metrics'] ?? [];
+            $total = $metrics['volume']['total'] ?? 0;
+
+            return [
+                'score' => 72,
+                'summary' => "O calendario tem {$total} pecas e uma cadencia irregular.",
+                'insights' => [
+                    [
+                        'title' => 'A cadencia tem buracos',
+                        'detail' => 'Ha dias sem nenhuma peca na janela dos proximos 30 dias.',
+                        'action' => 'Aprovar mais pecas e agendar o lote para fechar as lacunas.',
+                    ],
+                    [
+                        'title' => 'Um pilar domina',
+                        'detail' => 'A distribuicao real se afasta dos pesos da estrategia.',
+                        'action' => 'Gerar um lote novo e priorizar os pilares em falta.',
+                    ],
+                ],
+            ];
+        }
+
         return [];
     }
 

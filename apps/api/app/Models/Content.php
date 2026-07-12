@@ -13,7 +13,7 @@ class Content extends Model
 {
     protected $fillable = [
         'workspace_id', 'project_id', 'campaign_id', 'title', 'summary',
-        'caption', 'cta', 'hashtags', 'objective_id', 'format', 'channel',
+        'caption', 'cta', 'hashtags', 'objective_id', 'format', 'channel', 'pillar',
         'image_prompt', 'status', 'assignee_id', 'scheduled_for',
         'source', 'origin_ai_run_id', 'created_by',
     ];
