@@ -19,6 +19,14 @@ class AuthController extends Controller
             'password' => ['required', 'string', 'min:8'],
         ]);
 
+        $allowed = config('registration.allowed_emails');
+
+        if ($allowed !== [] && ! in_array(strtolower($data['email']), $allowed, true)) {
+            throw ValidationException::withMessages([
+                'email' => 'Cadastro fechado. Fale com o administrador.',
+            ]);
+        }
+
         $user = User::create($data);
 
         return response()->json([

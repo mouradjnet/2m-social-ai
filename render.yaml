@@ -70,6 +70,13 @@ services:
       - key: AI_WORKSPACE_MONTHLY_BUDGET_CENTS
         value: 5000
 
+      # O servico e PUBLICO. Sem esta lista o cadastro fica aberto, e cada
+      # workspace novo ganha o proprio teto de orcamento — ou seja, qualquer um
+      # gastando a chave acima. Preencher no painel com os emails que podem
+      # criar conta (virgula separa).
+      - key: REGISTRATION_ALLOWED_EMAILS
+        sync: false
+
       - key: LOG_CHANNEL
         value: stderr
 

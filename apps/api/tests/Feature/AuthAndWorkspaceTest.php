@@ -22,6 +22,32 @@ class AuthAndWorkspaceTest extends TestCase
         $this->assertDatabaseHas('users', ['email' => 'djair@example.com']);
     }
 
+    public function test_allowlist_barra_email_de_fora_da_lista(): void
+    {
+        config(['registration.allowed_emails' => ['dono@example.com']]);
+
+        $this->postJson('/api/v1/auth/register', [
+            'name' => 'Intruso',
+            'email' => 'qualquer@example.com',
+            'password' => 'senha-bem-longa',
+        ])->assertStatus(422)->assertJsonPath('errors.email.0', 'Cadastro fechado. Fale com o administrador.');
+
+        $this->assertDatabaseMissing('users', ['email' => 'qualquer@example.com']);
+    }
+
+    public function test_allowlist_deixa_passar_quem_esta_na_lista_ignorando_caixa(): void
+    {
+        config(['registration.allowed_emails' => ['dono@example.com']]);
+
+        $this->postJson('/api/v1/auth/register', [
+            'name' => 'Dono',
+            'email' => 'DONO@Example.com',
+            'password' => 'senha-bem-longa',
+        ])->assertCreated();
+
+        $this->assertDatabaseHas('users', ['email' => 'DONO@Example.com']);
+    }
+
     public function test_login_com_senha_errada_nao_revela_se_o_email_existe(): void
     {
         User::factory()->create(['email' => 'existe@example.com']);
