@@ -123,7 +123,35 @@ test('gerar: clique dispara POST e mostra o estado de geração', async () => {
 
   await user.click(await screen.findByRole('button', { name: /gerar conteúdo/i }))
 
-  expect(await screen.findByText(/gerando/i)).toBeInTheDocument()
+  // O texto nomeia o AGENTE do run, nao a tela: esta pagina dispara cinco
+  // agentes pelo mesmo hook, e ja disse "Gerando sua estrategia" para todos.
+  // A assercao e no role=status, nao na pagina: o link "← Estrategia" e do menu.
+  const status = await screen.findByRole('status')
+  expect(status).toHaveTextContent(/escrevendo suas peças/i)
+  expect(status).not.toHaveTextContent(/estratégia/i)
+})
+
+test('revisar: o estado de geração fala do reviewer, não do copywriter', async () => {
+  const user = setup()
+
+  server.use(
+    http.get('/api/v1/projects/1/contents', () =>
+      HttpResponse.json({ data: [content(1, 'review')] }),
+    ),
+    http.post('/api/v1/projects/1/review:generate', () =>
+      HttpResponse.json({ ai_run_id: 42 }, { status: 202 }),
+    ),
+    http.get('/api/v1/ai-runs/42', () =>
+      HttpResponse.json(run({ status: 'running', agent: 'reviewer' })),
+    ),
+  )
+
+  renderWithProviders(<ContentPage />, ROUTE)
+
+  await user.click(await screen.findByRole('button', { name: /revisar/i }))
+
+  expect(await screen.findByText(/revisando suas peças/i)).toBeInTheDocument()
+  expect(screen.queryByText(/escrevendo suas peças/i)).not.toBeInTheDocument()
 })
 
 test('agendar: manda a janela para schedule:generate, não para copy:generate', async () => {

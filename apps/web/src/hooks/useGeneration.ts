@@ -10,7 +10,7 @@ export const SLOW_AFTER_MS = 120_000
 export type GenerationState =
   | { kind: 'idle' }
   | { kind: 'starting' }
-  | { kind: 'running'; slow: boolean }
+  | { kind: 'running'; slow: boolean; agent: string }
   | { kind: 'failed'; message: string; retryable: boolean }
   | { kind: 'budget'; spentCents: number; limitCents: number }
   | { kind: 'lost' }
@@ -163,7 +163,14 @@ function deriveState(
   }
 
   if (run?.status === 'queued' || run?.status === 'running') {
-    return { kind: 'running', slow: Date.now() - Date.parse(run.created_at) > SLOW_AFTER_MS }
+    // O agente vem do run, nao de quem clicou: a ContentPage dispara cinco
+    // agentes pelo mesmo hook, e o ai_run_id vive na URL — um label guardado
+    // em memoria mentiria depois de um reload no meio da geracao.
+    return {
+      kind: 'running',
+      slow: Date.now() - Date.parse(run.created_at) > SLOW_AFTER_MS,
+      agent: run.agent,
+    }
   }
 
   if (generationPending || (runId !== null && run === undefined)) {

@@ -11,6 +11,20 @@ function dollars(cents: number): string {
   return `US$ ${(cents / 100).toFixed(2)}`
 }
 
+/** O que cada agente esta fazendo enquanto o usuario espera. Um agente que nao
+ *  esteja aqui cai no generico — errado seria dizer o nome de outro. */
+const FRASES: Record<string, string> = {
+  strategist: 'Gerando sua estratégia…',
+  copywriter: 'Escrevendo suas peças…',
+  social_media: 'Agendando suas peças…',
+  designer: 'Escrevendo os prompts de imagem…',
+  seo: 'Otimizando o SEO das peças…',
+  reviewer: 'Revisando suas peças…',
+  analytics: 'Analisando seu calendário…',
+}
+
+const GENERICO = 'Gerando…'
+
 /** Desenha o estado. Nao sabe que a rede existe. */
 export function GenerationStatus({ state, onRetry, onDismiss }: Props) {
   switch (state.kind) {
@@ -21,7 +35,8 @@ export function GenerationStatus({ state, onRetry, onDismiss }: Props) {
     case 'running':
       return (
         <p className="text-body-md text-on-surface-variant mt-6" role="status">
-          Gerando sua estratégia…
+          {/* Em 'starting' a execucao ainda nao existe: nao ha agente a citar. */}
+          {state.kind === 'running' ? (FRASES[state.agent] ?? GENERICO) : GENERICO}
           {state.kind === 'running' && state.slow && (
             <span className="mt-1 block">Isto está demorando mais que o normal.</span>
           )}
