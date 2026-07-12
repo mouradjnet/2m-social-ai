@@ -17,6 +17,7 @@ class AgentRegistry
         'social_media' => SocialMediaAgent::class,
         'reviewer' => ReviewerAgent::class,
         'designer' => DesignerAgent::class,
+        'seo' => SeoAgent::class,
     ];
 
     public function get(string $name): Agent

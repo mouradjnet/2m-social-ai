@@ -41,4 +41,10 @@ class Content extends Model
     {
         return $this->hasOne(ContentReview::class)->latestOfMany();
     }
+
+    /** A sugestao de SEO mais recente. `applied_at` diz se ela ja virou a peca. */
+    public function latestSeo(): HasOne
+    {
+        return $this->hasOne(ContentSeo::class)->latestOfMany();
+    }
 }

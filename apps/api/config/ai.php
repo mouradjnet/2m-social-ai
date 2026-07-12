@@ -63,6 +63,11 @@ return [
             'effort' => 'medium',
             'max_tokens' => 16000,
         ],
+        'seo' => [
+            'model' => env('AI_MODEL_SEO', env('AI_MODEL_DEFAULT', 'claude-opus-4-8')),
+            'effort' => 'medium',
+            'max_tokens' => 16000,
+        ],
     ],
 
     'workspace_monthly_budget_cents' => (int) env('AI_WORKSPACE_MONTHLY_BUDGET_CENTS', 5000),

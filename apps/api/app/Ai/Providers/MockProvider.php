@@ -127,6 +127,20 @@ class MockProvider implements LlmProvider
             ];
         }
 
+        // Seo: schema com a chave `seo`. Ids reais, como os tres acima.
+        if (isset($properties['seo'])) {
+            $pecas = $this->contextOf($request->userMessage)['batch_contents'] ?? [];
+
+            return [
+                'seo' => array_values(array_map(fn (array $peca) => [
+                    'content_id' => $peca['id'],
+                    'title' => "Como {$peca['title']} resolve o problema do seu cliente",
+                    'keywords' => ['palavra chave', 'termo de busca'],
+                    'hashtags' => ['#marca', '#busca'],
+                ], $pecas)),
+            ];
+        }
+
         return [];
     }
 
