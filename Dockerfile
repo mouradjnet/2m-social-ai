@@ -42,9 +42,18 @@ RUN install-php-extensions pdo_pgsql opcache pcntl intl zip
 # container, porque o plano free do Render nao tem background worker). No modo pago
 # o worker e um servico proprio e o supervisor fica ocioso na imagem.
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends supervisor \
+    && apt-get install -y --no-install-recommends supervisor libcap2-bin \
     && rm -rf /var/lib/apt/lists/*
 COPY docker/supervisord.conf /etc/supervisor/conf.d/app.conf
+
+# O binario do FrankenPHP vem com file capabilities (cap_net_bind_service, para
+# escutar em porta baixa). O container do Render roda com capabilities restritas, e
+# executar um binario que TEM caps nesse ambiente falha com EPERM — o supervisor
+# reportava `couldn't exec frankenphp: EPERM` e `exit status 127`, em loop eterno.
+#
+# Nao precisamos delas: a porta e a $PORT do Render (alta). Removendo as caps, o
+# binario vira um executavel comum e roda.
+RUN setcap -r /usr/local/bin/frankenphp
 
 WORKDIR /app
 
@@ -65,14 +74,10 @@ RUN chown -R www-data:www-data storage bootstrap/cache
 ENV PORT=8080
 EXPOSE 8080
 
-# `--no-dev` ja rodou; aqui so o autoload e os caches de config/rota, que so podem
-# ser gerados depois que o .env de producao existe — dai o entrypoint.
-COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh
-RUN chmod +x /usr/local/bin/entrypoint.sh
+COPY docker/start.sh /usr/local/bin/start.sh
+RUN chmod +x /usr/local/bin/start.sh
 
-ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
-
-# Forma shell (nao exec) de proposito: e o `sh -c` que expande o $PORT. Na forma
-# exec, o FrankenPHP receberia a string literal ":$PORT" e nao escutaria em lugar
-# nenhum util. (Modo pago; no free quem serve e o supervisord — ver render.yaml.)
-CMD frankenphp php-server --root /app/public --listen ":$PORT"
+# UM ponto de entrada, e nenhum ENTRYPOINT: o `dockerCommand` do Render substitui o
+# ENTRYPOINT do Dockerfile, entao a logica que morasse la (caches, migrate) seria
+# pulada em silencio. O papel do container vem da env var ROLE, nao do comando.
+CMD ["/usr/local/bin/start.sh"]

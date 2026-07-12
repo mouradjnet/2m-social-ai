@@ -20,6 +20,11 @@ services:
     plan: starter
     healthCheckPath: /up
     envVars:
+      # O papel vem daqui, nao de um `dockerCommand` (que substituiria o ENTRYPOINT
+      # e pularia caches/migrate) — ver docker/start.sh.
+      - key: ROLE
+        value: web
+
       # So o web migra. O worker (abaixo) NAO define isto: duas migracoes
       # simultaneas na primeira subida seriam corrida.
       - key: RUN_MIGRATIONS
@@ -73,11 +78,12 @@ services:
     runtime: docker
     dockerfilePath: ./Dockerfile
     plan: starter
-    # `--tries=1`: o RunAgentJob ja trata as proprias falhas (marca o ai_run como
-    # failed com o error_code). Retentar o job inteiro chamaria — e cobraria — a
-    # API da Anthropic de novo.
-    dockerCommand: php artisan queue:work --tries=1 --timeout=180
     envVars:
+      # A fila, e so ela. O `--tries=1` esta no start.sh: o RunAgentJob ja trata as
+      # proprias falhas, e retentar o job chamaria — e cobraria — a API de novo.
+      - key: ROLE
+        value: worker
+
       - key: APP_NAME
         value: 2M Social AI
       - key: APP_ENV

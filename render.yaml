@@ -21,10 +21,12 @@ services:
     dockerfilePath: ./Dockerfile
     plan: free
     healthCheckPath: /up
-    # Supervisor no lugar do frankenphp: dois processos, um container.
-    dockerCommand: supervisord -c /etc/supervisor/conf.d/app.conf
+    # Sem `dockerCommand`: ele SUBSTITUI o ENTRYPOINT da imagem, e foi assim que o
+    # primeiro deploy subiu com o banco vazio (caches e migrate nunca rodaram). Quem
+    # manda agora e o ROLE — ver docker/start.sh.
     envVars:
-      # Um servico so: e ele quem migra (ver docker/entrypoint.sh).
+      # Sem ROLE: o default e "servidor + fila no mesmo container" (o free nao tem
+      # background worker).
       - key: RUN_MIGRATIONS
         value: true
 

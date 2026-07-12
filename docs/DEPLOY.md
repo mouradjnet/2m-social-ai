@@ -42,7 +42,7 @@ Para o modo pago, aponte o Blueprint para `render.production.yaml` (ou renomeie-
    | `ANTHROPIC_API_KEY` | a chave real (a mesma do `.env` local) |
    | `APP_URL` | ainda não existe: preencha `https://2m-social-ai.onrender.com` (ajuste se o Render der outro nome) |
 
-4. Aplique. O `entrypoint.sh` roda `config:cache`, `route:cache` e **`migrate --force`** no processo web (só nele — duas migrações simultâneas na primeira subida seriam corrida).
+4. Aplique. O `docker/start.sh` roda `config:cache`, `route:cache` e — se `RUN_MIGRATIONS=true` — **`migrate --force`**; depois assume o papel que `ROLE` mandar.
 
 5. Depois do primeiro deploy, confirme a URL real do serviço e corrija `APP_URL` se ela tiver saído diferente.
 
@@ -56,8 +56,10 @@ Para o modo pago, aponte o Blueprint para `render.production.yaml` (ou renomeie-
 
 - **O banco entra por `DB_URL`, não por `DB_HOST`/`DB_PORT`.** O `fromDatabase` do Render **não expõe** `host` nem `port` — só `connectionString`. O Laravel aceita: `config/database.php` lê `DB_URL` (formato `postgres://…`) antes dos campos separados. Verificado contra o Postgres local.
 - **O blueprint repete as env vars nos dois serviços de propósito.** O Render não documenta suporte a âncora YAML (`&x` / `*x`), e um blueprint que não carrega não explica bem o porquê.
-- **`config:cache` no build não funciona** — em build time não existe `DB_URL` nem `APP_KEY`. Por isso os caches são gerados no `entrypoint.sh`, com o ambiente já injetado.
+- **`config:cache` no build não funciona** — em build time não existe `DB_URL` nem `APP_KEY`. Por isso os caches são gerados no `start.sh`, com o ambiente já injetado.
 - **O worker roda a mesma imagem**, só com outro comando. Não há um segundo Dockerfile para manter em sincronia — e é por isso que o modo free (supervisor) e o pago (worker separado) saem da mesma build.
-- **Quem migra é quem serve HTTP.** O `entrypoint.sh` roda `migrate --force` quando o comando é `frankenphp` (modo pago) ou `supervisord` (modo free). O worker separado do modo pago **não** migra: duas migrações simultâneas na primeira subida seriam corrida.
+- **Nunca use `dockerCommand` no blueprint.** Ele **substitui o ENTRYPOINT** da imagem — foi assim que o primeiro deploy subiu com o banco vazio: `config:cache` e `migrate` nunca rodaram, e o `queue:work` morria em loop com `relation "cache" does not exist`. O papel do container vem da env var **`ROLE`** (`web`, `worker`, ou vazio = servidor+fila juntos), e quem migra é quem tiver **`RUN_MIGRATIONS=true`** — no modo pago, só o web (duas migrações simultâneas seriam corrida).
+- **O FrankenPHP precisa perder as *file capabilities*.** O binário vem com `cap_net_bind_service`; o container do Render roda com capabilities restritas, e executar um binário que as tem falha com **`EPERM`** (`exit status 127`, em loop). O Dockerfile faz `setcap -r` — não precisamos delas, já que a `$PORT` do Render é alta.
+- **O nome do host ganha um prefixo se começar com número.** O serviço `2m-social-ai` virou **`twom-social-ai.onrender.com`**. Confira a URL real no painel e ponha ela em `APP_URL`.
 - **`--tries=1` no worker é de propósito.** O `RunAgentJob` já trata as próprias falhas (marca o `ai_run` como `failed` com o `error_code`). Retentar o job inteiro **chamaria a API da Anthropic de novo** — e cobraria de novo.
 - O `.env` nunca foi versionado, e não há nenhum `sk-ant-` no histórico. Mantenha assim: os segredos vivem só no painel do Render.
