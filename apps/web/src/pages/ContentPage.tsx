@@ -50,6 +50,7 @@ export function ContentPage() {
   const pieces = contents.data.data
   const generating = state.kind === 'starting' || state.kind === 'running'
   const aprovadas = pieces.filter((p) => p.status === 'approved').length
+  const emRevisao = pieces.filter((p) => p.status === 'review').length
 
   const schedule = () =>
     generate({ endpoint: 'schedule:generate', body: { starts_on: startsOn, days } })
@@ -99,6 +100,14 @@ export function ContentPage() {
 
         <Button variant="secondary" disabled={generating || aprovadas === 0} onClick={schedule}>
           Agendar aprovadas ({aprovadas})
+        </Button>
+
+        <Button
+          variant="secondary"
+          disabled={generating || emRevisao === 0}
+          onClick={() => generate({ endpoint: 'review:generate' })}
+        >
+          Revisar ({emRevisao})
         </Button>
       </div>
 

@@ -14,6 +14,7 @@ function content(id: number, status: Content['status']): Content {
     channel: 'instagram',
     status,
     scheduled_for: null,
+    latest_review: null,
     source: 'ai',
     origin_ai_run_id: 7,
   }

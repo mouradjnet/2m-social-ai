@@ -14,6 +14,7 @@ function scheduled(id: number, iso: string): Content {
     channel: 'instagram',
     status: 'scheduled',
     scheduled_for: iso,
+    latest_review: null,
     source: 'ai',
     origin_ai_run_id: null,
   }

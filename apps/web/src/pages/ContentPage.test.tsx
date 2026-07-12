@@ -21,6 +21,7 @@ function content(id: number, status: Content['status'], scheduledFor: string | n
     channel: 'instagram',
     status,
     scheduled_for: scheduledFor,
+    latest_review: null,
     source: 'ai',
     origin_ai_run_id: 7,
   }
@@ -145,6 +146,39 @@ test('agendar: manda a janela para schedule:generate, não para copy:generate', 
 
   await waitFor(() => expect(recebido).toMatchObject({ days: 14 }))
   expect((recebido as { starts_on: string }).starts_on).toMatch(/^\d{4}-\d{2}-\d{2}$/)
+})
+
+test('revisar: manda POST para review:generate', async () => {
+  const user = setup()
+  let chamado = false
+
+  server.use(
+    http.get('/api/v1/projects/1/contents', () =>
+      HttpResponse.json({ data: [content(1, 'review')] }),
+    ),
+    http.post('/api/v1/projects/1/review:generate', () => {
+      chamado = true
+      return HttpResponse.json({ ai_run_id: 42 }, { status: 202 })
+    }),
+    http.get('/api/v1/ai-runs/42', () => HttpResponse.json(run({ status: 'running' }))),
+    // Sem handler dos outros endpoints: se a tela chamar o errado, o MSW estoura.
+  )
+
+  renderWithProviders(<ContentPage />, ROUTE)
+
+  await user.click(await screen.findByRole('button', { name: /revisar \(1\)/i }))
+
+  await waitFor(() => expect(chamado).toBe(true))
+})
+
+test('sem peça em revisão o botão de revisar fica desabilitado', async () => {
+  server.use(
+    http.get('/api/v1/projects/1/contents', () => HttpResponse.json({ data: [content(1, 'idea')] })),
+  )
+
+  renderWithProviders(<ContentPage />, ROUTE)
+
+  expect(await screen.findByRole('button', { name: /revisar \(0\)/i })).toBeDisabled()
 })
 
 test('sem peça aprovada o botão de agendar fica desabilitado', async () => {

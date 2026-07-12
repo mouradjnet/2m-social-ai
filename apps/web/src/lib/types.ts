@@ -90,6 +90,21 @@ export type ContentFormat = 'post' | 'carousel' | 'reel' | 'story' | 'video' | '
 
 export type ContentChannel = 'instagram' | 'facebook' | 'linkedin' | 'tiktok' | 'youtube' | 'blog'
 
+export interface Violation {
+  rule: string
+  excerpt: string
+  suggestion: string
+}
+
+/** Veredito do reviewer. `fail` sempre tem violacao; `pass`, nunca (o servidor exige). */
+export interface ContentReview {
+  id: number
+  verdict: 'pass' | 'fail'
+  summary: string
+  violations: Violation[]
+  created_at: string
+}
+
 export interface Content {
   id: number
   project_id: number
@@ -102,6 +117,8 @@ export interface Content {
   status: ContentStatus
   /** ISO 8601. Quem preenche e o agente social_media; desagendar volta a null. */
   scheduled_for: string | null
+  /** A ultima revisao (as reviews sao append-only). Null se nunca foi revisada. */
+  latest_review: ContentReview | null
   source: 'manual' | 'ai' | 'research'
   origin_ai_run_id: number | null
 }

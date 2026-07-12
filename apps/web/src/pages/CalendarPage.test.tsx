@@ -28,6 +28,7 @@ function content(id: number, scheduledFor: string | null, status: Content['statu
     channel: 'instagram',
     status,
     scheduled_for: scheduledFor,
+    latest_review: null,
     source: 'ai',
     origin_ai_run_id: null,
   }

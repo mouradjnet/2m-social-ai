@@ -1,5 +1,6 @@
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
+import { cn } from '@/lib/cn'
 import type { Content, ContentStatus } from '@/lib/types'
 
 interface Props {
@@ -34,6 +35,7 @@ function formatWhen(iso: string): string {
 }
 
 export function ContentCard({ content, pending, onAdvance, onBack, onArchive }: Props) {
+  const review = content.latest_review
   const i = FLOW.indexOf(content.status)
   const isArchived = content.status === 'archived'
   const isScheduled = content.status === 'scheduled'
@@ -67,6 +69,33 @@ export function ContentCard({ content, pending, onAdvance, onBack, onArchive }: 
 
       {content.scheduled_for && (
         <p className="text-label-sm text-on-surface mt-2">📅 {formatWhen(content.scheduled_for)}</p>
+      )}
+
+      {review && (
+        <div className="mt-3">
+          <span
+            className={cn(
+              'text-label-sm inline-block rounded-full px-2 py-0.5',
+              review.verdict === 'pass'
+                ? 'bg-secondary-container text-secondary'
+                : 'bg-error-container text-error',
+            )}
+          >
+            {review.verdict === 'pass'
+              ? '✓ Sem violações'
+              : `⚠ ${review.violations.length} ${review.violations.length === 1 ? 'violação' : 'violações'}`}
+          </span>
+
+          {/* Quem vai corrigir precisa ver o que esta errado sem clicar. */}
+          <ul className="mt-2 flex flex-col gap-1">
+            {review.violations.map((violation) => (
+              <li key={violation.rule + violation.excerpt} className="text-body-sm text-on-surface">
+                <span className="text-on-surface-variant">{violation.rule}:</span>{' '}
+                {violation.suggestion}
+              </li>
+            ))}
+          </ul>
+        </div>
       )}
 
       {content.source === 'ai' && (

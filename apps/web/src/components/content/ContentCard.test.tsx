@@ -16,6 +16,7 @@ function content(overrides: Partial<Content> = {}): Content {
     channel: 'instagram',
     status: 'idea',
     scheduled_for: null,
+    latest_review: null,
     source: 'ai',
     origin_ai_run_id: 7,
     ...overrides,
@@ -67,4 +68,45 @@ test('Avancar chama onAdvance', async () => {
 
   await user.click(screen.getByRole('button', { name: /avançar/i }))
   expect(onAdvance).toHaveBeenCalledOnce()
+})
+
+test('peca reprovada mostra a contagem e as violacoes com a sugestao', () => {
+  const review = {
+    id: 1,
+    verdict: 'fail' as const,
+    summary: 'A legenda foge do tom.',
+    violations: [
+      { rule: 'tom de voz', excerpt: 'texto ofensor', suggestion: 'reescrever assim' },
+      { rule: 'palavra proibida', excerpt: 'financiamento', suggestion: 'usar crédito' },
+    ],
+    created_at: new Date().toISOString(),
+  }
+
+  render(<ContentCard content={content({ latest_review: review })} {...noop} />)
+
+  expect(screen.getByText(/2 violações/i)).toBeInTheDocument()
+  // Quem vai corrigir precisa ver o que esta errado sem clicar.
+  expect(screen.getByText(/tom de voz/i)).toBeInTheDocument()
+  expect(screen.getByText(/reescrever assim/i)).toBeInTheDocument()
+  expect(screen.getByText(/usar crédito/i)).toBeInTheDocument()
+})
+
+test('peca aprovada na revisao mostra o chip sem violacoes', () => {
+  const review = {
+    id: 1,
+    verdict: 'pass' as const,
+    summary: 'Coerente com a marca.',
+    violations: [],
+    created_at: new Date().toISOString(),
+  }
+
+  render(<ContentCard content={content({ latest_review: review })} {...noop} />)
+
+  expect(screen.getByText(/sem violações/i)).toBeInTheDocument()
+})
+
+test('peca nunca revisada nao mostra veredito', () => {
+  render(<ContentCard content={content()} {...noop} />)
+
+  expect(screen.queryByText(/violações/i)).not.toBeInTheDocument()
 })
