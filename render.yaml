@@ -1,0 +1,80 @@
+# Infra declarada no repo (Render Blueprint). Tres pecas:
+#
+#   web    — o Laravel, que serve a API E a SPA (um dominio so, sem CORS)
+#   worker — o MESMO container, rodando queue:work. Sem ele, o usuario clica em
+#            "Gerar", o job entra na fila e NADA nunca volta.
+#   db     — Postgres 16. Nao e negociavel: o modelo usa jsonb em quase toda tabela.
+#
+# As chaves (APP_KEY, ANTHROPIC_API_KEY) NAO estao aqui: `sync: false` faz o Render
+# perguntar por elas na primeira subida, e elas ficam so no painel.
+
+services:
+  - type: web
+    name: 2m-social-ai
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: starter
+    healthCheckPath: /up
+    envVars: &app_env
+      - key: APP_NAME
+        value: 2M Social AI
+      - key: APP_ENV
+        value: production
+      - key: APP_DEBUG
+        value: false
+      # Gerada uma vez com `php artisan key:generate --show`.
+      - key: APP_KEY
+        sync: false
+      - key: APP_URL
+        fromService:
+          type: web
+          name: 2m-social-ai
+          envVarKey: RENDER_EXTERNAL_URL
+
+      - key: DB_CONNECTION
+        value: pgsql
+      - key: DB_HOST
+        fromDatabase: { name: 2m-social-ai-db, property: host }
+      - key: DB_PORT
+        fromDatabase: { name: 2m-social-ai-db, property: port }
+      - key: DB_DATABASE
+        fromDatabase: { name: 2m-social-ai-db, property: database }
+      - key: DB_USERNAME
+        fromDatabase: { name: 2m-social-ai-db, property: user }
+      - key: DB_PASSWORD
+        fromDatabase: { name: 2m-social-ai-db, property: password }
+
+      # Fila, cache e sessao no banco: sem Redis no MVP (ADR).
+      - key: QUEUE_CONNECTION
+        value: database
+      - key: CACHE_STORE
+        value: database
+      - key: SESSION_DRIVER
+        value: database
+
+      # A IA roda de verdade. Cada geracao custa: estrategia ~4 centavos, lote de
+      # copy ~6. O teto mensal por workspace e a defesa.
+      - key: AI_PROVIDER
+        value: anthropic
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: AI_WORKSPACE_MONTHLY_BUDGET_CENTS
+        value: 5000
+
+      - key: LOG_CHANNEL
+        value: stderr
+
+  - type: worker
+    name: 2m-social-ai-worker
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: starter
+    # `--tries=1`: o RunAgentJob ja trata as proprias falhas (marca o ai_run como
+    # failed com o error_code). Retentar o job inteiro cobraria a API de novo.
+    dockerCommand: php artisan queue:work --tries=1 --timeout=180
+    envVars: *app_env
+
+databases:
+  - name: 2m-social-ai-db
+    plan: basic-256mb
+    postgresMajorVersion: "16"
