@@ -131,6 +131,71 @@ test('gerar: clique dispara POST e mostra o estado de geração', async () => {
   expect(status).not.toHaveTextContent(/estratégia/i)
 })
 
+test('escolher um pilar manda o pilar no corpo do POST', async () => {
+  const user = setup()
+  let recebido: unknown = null
+
+  server.use(
+    http.get('/api/v1/projects/1/contents', () => HttpResponse.json({ data: [] })),
+    http.get('/api/v1/projects/1/strategies', () =>
+      HttpResponse.json({
+        data: [
+          {
+            id: 1,
+            status: 'active',
+            title: 'E',
+            summary: null,
+            editorial_line: null,
+            ai_run_id: null,
+            workspace_id: 1,
+            project_id: 1,
+            pillars: [
+              { name: 'Educação', weight: 60, description: 'd' },
+              { name: 'Por dentro do pátio', weight: 15, description: 'd' },
+            ],
+          },
+        ],
+      }),
+    ),
+    http.post('/api/v1/projects/1/copy:generate', async ({ request }) => {
+      recebido = await request.json()
+      return HttpResponse.json({ ai_run_id: 42 }, { status: 202 })
+    }),
+    http.get('/api/v1/ai-runs/42', () => HttpResponse.json(run({ status: 'running' }))),
+  )
+
+  renderWithProviders(<ContentPage />, ROUTE)
+
+  // O pilar leve e o que a distribuicao por peso nunca sorteia — e o motivo do seletor.
+  await user.selectOptions(
+    await screen.findByRole('combobox', { name: /pilar do lote/i }),
+    'Por dentro do pátio',
+  )
+  await user.click(screen.getByRole('button', { name: /gerar conteúdo/i }))
+
+  await waitFor(() => expect(recebido).toEqual({ pillar: 'Por dentro do pátio' }))
+})
+
+test('sem pilar escolhido, o POST vai sem corpo: o servidor distribui pelos pesos', async () => {
+  const user = setup()
+  let recebido: string | null = null
+
+  server.use(
+    http.get('/api/v1/projects/1/contents', () => HttpResponse.json({ data: [] })),
+    http.post('/api/v1/projects/1/copy:generate', async ({ request }) => {
+      recebido = await request.text()
+      return HttpResponse.json({ ai_run_id: 42 }, { status: 202 })
+    }),
+    http.get('/api/v1/ai-runs/42', () => HttpResponse.json(run({ status: 'running' }))),
+  )
+
+  renderWithProviders(<ContentPage />, ROUTE)
+
+  await user.click(await screen.findByRole('button', { name: /gerar conteúdo/i }))
+
+  await waitFor(() => expect(recebido).toBe(''))
+})
+
 test('revisar: o estado de geração fala do reviewer, não do copywriter', async () => {
   const user = setup()
 

@@ -9,7 +9,7 @@ import { Shell } from '@/components/ui/Shell'
 import { useGeneration } from '@/hooks/useGeneration'
 import { api } from '@/lib/api'
 import { groupByStatus } from '@/lib/groupByStatus'
-import type { Content } from '@/lib/types'
+import type { Content, Strategy } from '@/lib/types'
 
 /** O default do servidor: a janela comeca amanha. */
 function tomorrow(): string {
@@ -24,6 +24,10 @@ export function ContentPage() {
   const queryClient = useQueryClient()
   const [startsOn, setStartsOn] = useState(tomorrow)
   const [days, setDays] = useState(14)
+  // Vazio = distribuir pelos pesos (o default). Escolher um pilar serve para cobrir
+  // um buraco: a distribuicao por peso nunca sorteia um pilar leve (15% de 5 pecas
+  // da 0,75, que vira zero) e ele fica zerado para sempre.
+  const [pillar, setPillar] = useState('')
 
   // Um hook so: o ai_run_id mora no `?run=`, e duas instancias brigariam por ele.
   // Escrever e agendar invalidam a mesma query, entao o endpoint vai na chamada.
@@ -36,6 +40,12 @@ export function ContentPage() {
   const contents = useQuery({
     queryKey: ['contents', projectId],
     queryFn: () => api<{ data: Content[] }>(`/projects/${projectId}/contents`),
+  })
+
+  // Mesma queryKey da StrategyPage: o cache e compartilhado, nao ha requisicao a mais.
+  const strategies = useQuery({
+    queryKey: ['strategies', projectId],
+    queryFn: () => api<{ data: Strategy[] }>(`/projects/${projectId}/strategies`),
   })
 
   const move = useMutation({
@@ -61,6 +71,11 @@ export function ContentPage() {
 
   const schedule = () =>
     generate({ endpoint: 'schedule:generate', body: { starts_on: startsOn, days } })
+
+  const pilares = strategies.data?.data.find((s) => s.status === 'active')?.pillars ?? []
+
+  // Sem pilar escolhido, nao mandamos a chave: o servidor distribui pelos pesos.
+  const gerarConteudo = () => generate(pillar === '' ? {} : { body: { pillar } })
 
   return (
     <Shell>
@@ -91,9 +106,29 @@ export function ContentPage() {
 
       <div className="mt-4 flex items-center justify-between gap-4">
         <h1 className="text-display-lg text-on-surface">Conteúdo</h1>
-        <Button disabled={generating} onClick={() => generate()}>
-          Gerar conteúdo
-        </Button>
+
+        <div className="flex items-center gap-3">
+          {pilares.length > 0 && (
+            <select
+              aria-label="Pilar do lote"
+              className="border-outline text-body-sm text-on-surface rounded-input border bg-transparent px-3 py-2"
+              value={pillar}
+              onChange={(e) => setPillar(e.target.value)}
+              disabled={generating}
+            >
+              <option value="">Todos os pilares</option>
+              {pilares.map((p) => (
+                <option key={p.name} value={p.name}>
+                  {p.name}
+                </option>
+              ))}
+            </select>
+          )}
+
+          <Button disabled={generating} onClick={gerarConteudo}>
+            Gerar conteúdo
+          </Button>
+        </div>
       </div>
 
       <div className="mt-4 flex flex-wrap items-end gap-3">

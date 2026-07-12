@@ -30,6 +30,20 @@ class CopyController extends Controller
             ], 422);
         }
 
+        // Pilar alvo (opcional): o lote inteiro sai dele. Serve para cobrir um pilar
+        // que a distribuicao por peso nunca sorteia — 15% de 5 pecas da 0,75, zero.
+        $pillar = request()->input('pillar');
+        if ($pillar !== null) {
+            $pilares = array_column($strategy->pillars ?? [], 'name');
+
+            if (! in_array($pillar, $pilares, true)) {
+                return response()->json([
+                    'message' => 'Esse pilar nao existe na estrategia ativa.',
+                    'pillars' => $pilares,
+                ], 422);
+            }
+        }
+
         // Uma geracao de copy em andamento por projeto. Filtra por agente: uma
         // estrategia rodando nao bloqueia copy.
         if ($this->copyEmAndamento($project)) {
@@ -55,8 +69,15 @@ class CopyController extends Controller
                 'model' => config('ai.agents.copywriter.model'),
                 'status' => 'queued',
                 // strategy_id e registro de intencao; o AgentContext busca a active
-                // no momento da execucao (a fonte da verdade).
-                'input' => ['project_id' => $project->id, 'strategy_id' => $strategy->id],
+                // no momento da execucao (a fonte da verdade). `with_existing_contents`
+                // manda o contexto carregar o inventario da marca — sem ele o copywriter
+                // reescreve o que ja existe.
+                'input' => array_filter([
+                    'project_id' => $project->id,
+                    'strategy_id' => $strategy->id,
+                    'with_existing_contents' => true,
+                    'pillar' => $pillar,
+                ], fn ($v) => $v !== null),
                 'created_by' => request()->user()->id,
             ]);
         } catch (UniqueConstraintViolationException) {

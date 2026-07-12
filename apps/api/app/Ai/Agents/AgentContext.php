@@ -39,6 +39,19 @@ readonly class AgentContext
          * relatorio precisa citar exatamente os numeros que ele leu.
          */
         public ?array $projectMetrics = null,
+        /**
+         * O que a marca JA tem (titulo + pilar das pecas vivas). Sem isso o copywriter
+         * escreve como se fosse a primeira vez, todas as vezes: em producao ele
+         * regenerou titulo identico ao de uma peca existente e reincidiu num erro que
+         * o reviewer ja tinha reprovado.
+         */
+        public ?array $existingContents = null,
+        /**
+         * O pilar que o lote deve cobrir, quando o humano escolhe um. Null = distribuir
+         * pelos pesos (o default). Existe porque um pilar leve nunca era sorteado:
+         * 15% de um lote de 5 da 0,75, que vira zero peca — e ficava zerado para sempre.
+         */
+        public ?string $targetPillar = null,
     ) {}
 
     /**
@@ -83,6 +96,12 @@ readonly class AgentContext
                 : null,
             batchStatus: $input['batch_status'] ?? null,
             projectMetrics: $input['metrics'] ?? null,
+            // Quem pede o inventario e o input (hoje, so o copywriter): o prompt do
+            // strategist nao paga tokens por uma lista que ele nao usa.
+            existingContents: ($input['with_existing_contents'] ?? false)
+                ? self::existingContents($project)
+                : null,
+            targetPillar: $input['pillar'] ?? null,
         );
     }
 
@@ -110,7 +129,29 @@ readonly class AgentContext
             $data['metrics'] = $this->projectMetrics;
         }
 
+        if ($this->existingContents !== null) {
+            $data['existing_contents'] = $this->existingContents;
+        }
+
+        if ($this->targetPillar !== null) {
+            $data['target_pillar'] = $this->targetPillar;
+        }
+
         return $data;
+    }
+
+    /**
+     * As pecas que ainda contam como conteudo da marca. Arquivadas ficam de fora: uma
+     * peca reprovada e arquivada PODE (e deve) ser reescrita.
+     */
+    private static function existingContents(Project $project): array
+    {
+        return $project->contents()
+            ->where('status', '!=', 'archived')
+            ->orderBy('id')
+            ->get(['title', 'pillar'])
+            ->map->only(['title', 'pillar'])
+            ->all();
     }
 
     /** As aprovadas no momento da execucao — nao no momento do POST. */

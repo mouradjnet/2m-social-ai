@@ -73,9 +73,13 @@ class CopywriterAgent implements Agent
 
         Regras da resposta:
         - Gere exatamente {$size} pecas.
-        - Distribua as pecas pelos pilares da estrategia conforme os pesos: um pilar
-          de peso maior recebe mais pecas. O campo `pillar` de cada peca diz de qual
-          pilar ela saiu.
+        - `existing_contents` e o que a marca JA tem. Nao repita esses temas nem
+          reescreva o mesmo assunto com outro titulo: o lote precisa ACRESCENTAR ao
+          calendario, nao duplica-lo. Se um angulo obvio ja foi usado, ache outro.
+        - Se `target_pillar` vier no contexto, TODAS as pecas saem desse pilar (o
+          humano esta cobrindo um buraco). Sem ele, distribua as pecas pelos pilares
+          da estrategia conforme os pesos: um pilar de peso maior recebe mais pecas.
+          O campo `pillar` de cada peca diz de qual pilar ela saiu.
         - Cada peca escolhe `format` e `channel` coerentes com o pilar e a linha
           editorial. `format` e um de: post, carousel, reel, story, video, article,
           thread. `channel` e um de: instagram, facebook, linkedin, tiktok, youtube,
@@ -122,6 +126,13 @@ class CopywriterAgent implements Agent
             throw new OutputRejectedException("Esperado {$this->batchSize} pecas, recebido {$count}.");
         }
 
+        // Titulos que a marca ja tem. O prompt manda nao repetir; isto CONFERE — em
+        // producao o modelo devolveu um titulo identico ao de uma peca existente.
+        $jaExistem = array_map(
+            fn (string $titulo): string => mb_strtolower(trim($titulo)),
+            array_column($context?->existingContents ?? [], 'title'),
+        );
+
         foreach ($pieces as $piece) {
             $format = $piece['format'] ?? '';
             if (! in_array($format, self::FORMATS, true)) {
@@ -131,6 +142,18 @@ class CopywriterAgent implements Agent
             $channel = $piece['channel'] ?? '';
             if (! in_array($channel, self::CHANNELS, true)) {
                 throw new OutputRejectedException("Canal invalido: {$channel}.");
+            }
+
+            $titulo = (string) ($piece['title'] ?? '');
+            if (in_array(mb_strtolower(trim($titulo)), $jaExistem, true)) {
+                throw new OutputRejectedException("A peca \"{$titulo}\" ja existe no projeto.");
+            }
+
+            $pilar = $piece['pillar'] ?? '';
+            if ($context?->targetPillar !== null && $pilar !== $context->targetPillar) {
+                throw new OutputRejectedException(
+                    "Pedido o pilar \"{$context->targetPillar}\", recebida peca do pilar \"{$pilar}\"."
+                );
             }
         }
     }

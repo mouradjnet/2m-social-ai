@@ -42,20 +42,30 @@ class MockProvider implements LlmProvider
             ];
         }
 
-        // Copywriter: schema com a chave `pieces`.
+        // Copywriter: schema com a chave `pieces`. O titulo carrega um sufixo unico e
+        // o pilar sai do proprio <context>: o validate() agora recusa titulo repetido
+        // e pilar fora do `target_pillar`, e um fixture constante falharia na segunda
+        // geracao do mesmo projeto — em dev, nao em producao.
         if (isset($properties['pieces'])) {
-            $pilares = ['Educacao', 'Prova social', 'Bastidores', 'Educacao', 'Prova social'];
+            $context = $this->contextOf($request->userMessage);
+            $alvo = $context['target_pillar'] ?? null;
+            $daEstrategia = array_column($context['active_strategy']['pillars'] ?? [], 'name');
+            $unico = substr(md5((string) count($context['existing_contents'] ?? [])), 0, 4);
 
             return [
-                'pieces' => array_map(fn (int $i) => [
-                    'title' => "Peca {$i}",
-                    'caption' => "Legenda da peca {$i}, no tom da marca.",
-                    'cta' => 'Fale com a gente no WhatsApp.',
-                    'hashtags' => ['#marca', '#conteudo'],
-                    'format' => 'post',
-                    'channel' => 'instagram',
-                    'pillar' => $pilares[$i],
-                ], range(0, 4)),
+                'pieces' => array_map(function (int $i) use ($alvo, $daEstrategia, $unico) {
+                    $pilar = $alvo ?? ($daEstrategia[$i % max(count($daEstrategia), 1)] ?? 'Pilar');
+
+                    return [
+                        'title' => "Peca {$i} ({$unico})",
+                        'caption' => "Legenda da peca {$i}, no tom da marca.",
+                        'cta' => 'Fale com a gente no WhatsApp.',
+                        'hashtags' => ['#marca', '#conteudo'],
+                        'format' => 'post',
+                        'channel' => 'instagram',
+                        'pillar' => $pilar,
+                    ];
+                }, range(0, 4)),
             ];
         }
 
