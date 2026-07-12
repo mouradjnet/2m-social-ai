@@ -87,7 +87,7 @@ class MockProvider implements LlmProvider
         // reais. Reprova a primeira peca (para a UI de violacao ter o que mostrar em
         // dev) e aprova o resto — o validate() exige que veredito e lista batam.
         if (isset($properties['reviews'])) {
-            $pecas = $this->contextOf($request->userMessage)['review_contents'] ?? [];
+            $pecas = $this->contextOf($request->userMessage)['batch_contents'] ?? [];
 
             return [
                 'reviews' => array_values(array_map(
@@ -111,6 +111,19 @@ class MockProvider implements LlmProvider
                     array_keys($pecas),
                     $pecas,
                 )),
+            ];
+        }
+
+        // Designer: schema com a chave `designs`. Ids reais, como os dois acima.
+        if (isset($properties['designs'])) {
+            $pecas = $this->contextOf($request->userMessage)['batch_contents'] ?? [];
+
+            return [
+                'designs' => array_values(array_map(fn (array $peca) => [
+                    'content_id' => $peca['id'],
+                    'image_prompt' => 'A wide, softly lit workshop scene in emerald tones, '
+                        .'shallow depth of field, no text.',
+                ], $pecas)),
             ];
         }
 

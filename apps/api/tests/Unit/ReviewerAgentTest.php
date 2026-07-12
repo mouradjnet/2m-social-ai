@@ -18,7 +18,7 @@ class ReviewerAgentTest extends TestCase
             projectName: 'X',
             segment: null,
             brandProfile: ['forbidden_words' => ['financiamento']],
-            reviewContents: [
+            batchContents: [
                 ['id' => 7, 'title' => 'a', 'caption' => 'c', 'cta' => 'x', 'hashtags' => [], 'format' => 'post', 'channel' => 'instagram'],
                 ['id' => 9, 'title' => 'b', 'caption' => 'c', 'cta' => 'x', 'hashtags' => [], 'format' => 'reel', 'channel' => 'instagram'],
             ],

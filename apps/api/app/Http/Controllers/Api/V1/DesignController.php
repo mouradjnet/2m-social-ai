@@ -12,32 +12,32 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 
-class ReviewController extends Controller
+class DesignController extends Controller
 {
     /**
-     * Revisa o lote da coluna Revisao. Espelha o ScheduleController: 202 + polling
-     * (ADR-07), guardas em ordem — pre-condicao (422), concorrencia (409), orcamento
-     * (402).
+     * Escreve o prompt de imagem das pecas em producao. Espelha o ReviewController:
+     * 202 + polling (ADR-07), guardas em ordem — pre-condicao (422), concorrencia
+     * (409), orcamento (402).
      */
     public function generate(Request $request, Project $project): JsonResponse
     {
         Gate::authorize('update', $project);
 
         $ids = $project->contents()
-            ->where('status', 'review')
+            ->where('status', 'production')
             ->orderBy('id')
             ->pluck('id')
             ->all();
 
         if ($ids === []) {
             return response()->json([
-                'message' => 'Nao ha peca em revisao para revisar.',
+                'message' => 'Nao ha peca em producao para desenhar.',
             ], 422);
         }
 
-        if ($this->revisaoEmAndamento($project)) {
+        if ($this->designEmAndamento($project)) {
             return response()->json([
-                'message' => 'Ja existe uma revisao em andamento para este projeto.',
+                'message' => 'Ja existe uma geracao de imagens em andamento para este projeto.',
             ], 409);
         }
 
@@ -53,23 +53,22 @@ class ReviewController extends Controller
             $run = AiRun::create([
                 'workspace_id' => $project->workspace_id,
                 'project_id' => $project->id,
-                'agent' => 'reviewer',
+                'agent' => 'designer',
                 'provider' => config('ai.provider'),
-                'model' => config('ai.agents.reviewer.model'),
+                'model' => config('ai.agents.designer.model'),
                 'status' => 'queued',
-                // Registro de intencao. O AgentContext rebusca as pecas na execucao e
-                // filtra por `review` de novo: quem saiu da coluna nesse meio-tempo
-                // nao e julgado.
+                // Intencao. O AgentContext rebusca o lote na execucao e filtra por
+                // `production` de novo.
                 'input' => [
                     'project_id' => $project->id,
                     'content_ids' => $ids,
-                    'batch_status' => 'review',
+                    'batch_status' => 'production',
                 ],
                 'created_by' => $request->user()->id,
             ]);
         } catch (UniqueConstraintViolationException) {
             return response()->json([
-                'message' => 'Ja existe uma revisao em andamento para este projeto.',
+                'message' => 'Ja existe uma geracao de imagens em andamento para este projeto.',
             ], 409);
         }
 
@@ -78,12 +77,12 @@ class ReviewController extends Controller
         return response()->json(['ai_run_id' => $run->id], 202);
     }
 
-    /** So execucoes de reviewer contam; o indice por-agente permite as outras. */
-    private function revisaoEmAndamento(Project $project): bool
+    /** So execucoes de designer contam; o indice por-agente permite as outras. */
+    private function designEmAndamento(Project $project): bool
     {
         return AiRun::withoutGlobalScopes()
             ->where('project_id', $project->id)
-            ->where('agent', 'reviewer')
+            ->where('agent', 'designer')
             ->whereIn('status', ['queued', 'running'])
             ->exists();
     }

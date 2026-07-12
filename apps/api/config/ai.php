@@ -57,6 +57,12 @@ return [
             'effort' => 'high',
             'max_tokens' => 16000,
         ],
+        // Descrever uma cena a partir de um texto pronto: `medium`.
+        'designer' => [
+            'model' => env('AI_MODEL_DESIGNER', env('AI_MODEL_DEFAULT', 'claude-opus-4-8')),
+            'effort' => 'medium',
+            'max_tokens' => 16000,
+        ],
     ],
 
     'workspace_monthly_budget_cents' => (int) env('AI_WORKSPACE_MONTHLY_BUDGET_CENTS', 5000),

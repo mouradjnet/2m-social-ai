@@ -21,8 +21,14 @@ readonly class AgentContext
         public ?array $scheduleWindow = null,
         /** As pecas `approved`, o lote a distribuir. Null quando nao ha janela. */
         public ?array $approvedContents = null,
-        /** As pecas em `review`, com o texto inteiro — e ele que esta sendo julgado. */
-        public ?array $reviewContents = null,
+        /**
+         * O lote de pecas de UMA coluna, com o texto inteiro. Generico de proposito:
+         * o reviewer julga o lote de `review`, o designer desenha o de `production`.
+         * Quem diz qual coluna e o `batch_status` do input.
+         */
+        public ?array $batchContents = null,
+        /** A coluna de onde veio o lote: `review`, `production`, ... */
+        public ?string $batchStatus = null,
     ) {}
 
     /**
@@ -53,14 +59,15 @@ readonly class AgentContext
             brandProfile: $profile->only([
                 'brand_name', 'description', 'products', 'services', 'audience',
                 'persona', 'tone_of_voice', 'differentiators', 'competitors',
-                'required_words', 'forbidden_words',
+                'required_words', 'forbidden_words', 'colors',
             ]),
             activeStrategy: $strategy?->only(['title', 'summary', 'editorial_line', 'pillars']),
             scheduleWindow: $window,
             approvedContents: $window === null ? null : self::approvedContents($project),
-            reviewContents: isset($input['content_ids'])
-                ? self::reviewContents($project, $input['content_ids'])
+            batchContents: isset($input['content_ids'], $input['batch_status'])
+                ? self::batchContents($project, $input['content_ids'], $input['batch_status'])
                 : null,
+            batchStatus: $input['batch_status'] ?? null,
         );
     }
 
@@ -79,8 +86,9 @@ readonly class AgentContext
             $data['approved_contents'] = $this->approvedContents;
         }
 
-        if ($this->reviewContents !== null) {
-            $data['review_contents'] = $this->reviewContents;
+        if ($this->batchContents !== null) {
+            $data['batch_status'] = $this->batchStatus;
+            $data['batch_contents'] = $this->batchContents;
         }
 
         return $data;
@@ -98,18 +106,18 @@ readonly class AgentContext
     }
 
     /**
-     * As pecas a revisar, com o texto inteiro. O `content_ids` do input e intencao;
-     * o filtro por `review` aqui e a verdade — uma peca que saiu da coluna entre o
-     * POST e a execucao nao e julgada.
+     * O lote de uma coluna, com o texto inteiro. O `content_ids` do input e intencao;
+     * o filtro por status aqui e a verdade — uma peca que saiu da coluna entre o POST
+     * e a execucao nao e atendida.
      *
      * @param  array<int>  $ids
      */
-    private static function reviewContents(Project $project, array $ids): array
+    private static function batchContents(Project $project, array $ids, string $status): array
     {
         $columns = ['id', 'title', 'caption', 'cta', 'hashtags', 'format', 'channel'];
 
         return $project->contents()
-            ->where('status', 'review')
+            ->where('status', $status)
             ->whereIn('id', $ids)
             ->orderBy('id')
             ->get($columns)
