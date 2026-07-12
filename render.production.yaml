@@ -20,6 +20,11 @@ services:
     plan: starter
     healthCheckPath: /up
     envVars:
+      # So o web migra. O worker (abaixo) NAO define isto: duas migracoes
+      # simultaneas na primeira subida seriam corrida.
+      - key: RUN_MIGRATIONS
+        value: true
+
       - key: APP_NAME
         value: 2M Social AI
       - key: APP_ENV

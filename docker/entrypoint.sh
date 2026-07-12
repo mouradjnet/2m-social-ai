@@ -8,18 +8,16 @@ php artisan config:cache
 php artisan route:cache
 php artisan view:cache
 
-# Migrar so em quem serve HTTP.
+# Quem migra e quem o blueprint mandar — e nao "quem parece ser o servidor".
 #
-#   frankenphp  — modo pago: o web migra; o worker (servico a parte, mesma imagem)
-#                 nao migra. Duas migracoes simultaneas na primeira subida seriam
-#                 corrida.
-#   supervisord — modo free: um servico so, que serve E roda a fila. Ele migra.
+# Antes isto olhava o comando ($1). Quebrou quando o CMD virou forma shell para
+# expandir o $PORT: o `$1` passou a ser `/bin/sh`, e a migracao simplesmente parou
+# de rodar, em silencio. Uma variavel explicita nao tem essa fragilidade.
 #
-# Um `queue:work` solto (o worker do modo pago) cai no `else` e nao migra.
-case "$1" in
-  frankenphp | supervisord)
-    php artisan migrate --force
-    ;;
-esac
+# So UM processo pode migrar: no modo pago, duas migracoes simultaneas (web e
+# worker) na primeira subida seriam corrida.
+if [ "$RUN_MIGRATIONS" = "true" ]; then
+  php artisan migrate --force
+fi
 
 exec "$@"

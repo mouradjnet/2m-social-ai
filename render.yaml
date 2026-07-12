@@ -24,6 +24,10 @@ services:
     # Supervisor no lugar do frankenphp: dois processos, um container.
     dockerCommand: supervisord -c /etc/supervisor/conf.d/app.conf
     envVars:
+      # Um servico so: e ele quem migra (ver docker/entrypoint.sh).
+      - key: RUN_MIGRATIONS
+        value: true
+
       - key: APP_NAME
         value: 2M Social AI
       - key: APP_ENV

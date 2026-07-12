@@ -23,9 +23,13 @@ RUN pnpm build
 FROM composer:2 AS vendor
 
 WORKDIR /api
-COPY apps/api/composer.json apps/api/composer.lock ./
+# O codigo INTEIRO, nao so os manifestos: o `--optimize-autoloader` monta o classmap
+# a partir de `app/`, e o `post-autoload-dump` do Laravel roda `package:discover`
+# (que registra os service providers dos pacotes). Com so o composer.json aqui, o
+# autoloader sairia sem as classes do App e o discover nao rodaria.
+COPY apps/api/ ./
 # Sem dev: nem PHPUnit nem Pint vao para producao.
-RUN composer install --no-dev --no-scripts --no-interaction --prefer-dist --optimize-autoloader
+RUN composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader
 
 # --- 3. A imagem final --------------------------------------------------------
 FROM dunglas/frankenphp:1-php8.4
@@ -46,13 +50,19 @@ WORKDIR /app
 
 COPY apps/api/ ./
 COPY --from=vendor /api/vendor ./vendor
+# O `packages.php` que o package:discover gerou no stage anterior mora aqui. Sem
+# esta linha ele ficaria para tras, e o Laravel teria de redescobrir os pacotes a
+# cada boot.
+COPY --from=vendor /api/bootstrap/cache ./bootstrap/cache
 COPY --from=web /web/dist ./public
 
 # O Caddy do FrankenPHP escreve aqui; o Laravel tambem.
 RUN chown -R www-data:www-data storage bootstrap/cache
 
-# O Render injeta $PORT. O FrankenPHP escuta nele.
-ENV SERVER_NAME=:8080
+# O Render injeta $PORT e roteia SO para ela. Este default so vale fora do Render
+# (rodar a imagem na mao). Escutar numa porta fixa em producao faz o painel dizer
+# "live" enquanto tudo responde 404 com `x-render-routing: no-server`.
+ENV PORT=8080
 EXPOSE 8080
 
 # `--no-dev` ja rodou; aqui so o autoload e os caches de config/rota, que so podem
@@ -61,4 +71,8 @@ COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh
 
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
-CMD ["frankenphp", "php-server", "--root", "/app/public", "--listen", ":8080"]
+
+# Forma shell (nao exec) de proposito: e o `sh -c` que expande o $PORT. Na forma
+# exec, o FrankenPHP receberia a string literal ":$PORT" e nao escutaria em lugar
+# nenhum util. (Modo pago; no free quem serve e o supervisord — ver render.yaml.)
+CMD frankenphp php-server --root /app/public --listen ":$PORT"
