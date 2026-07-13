@@ -2,11 +2,14 @@
 
 namespace App\Ai\Providers;
 
+use App\Ai\Exceptions\LlmFailedException;
+use App\Ai\Exceptions\LlmRefusedException;
+
 interface LlmProvider
 {
     /**
-     * @throws \App\Ai\Exceptions\LlmRefusedException  classificadores recusaram
-     * @throws \App\Ai\Exceptions\LlmFailedException   qualquer outra falha do provedor
+     * @throws LlmRefusedException classificadores recusaram
+     * @throws LlmFailedException qualquer outra falha do provedor
      */
     public function generate(LlmRequest $request): LlmResponse;
 }

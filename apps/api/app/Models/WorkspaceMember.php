@@ -3,13 +3,14 @@
 namespace App\Models;
 
 use App\Enums\WorkspaceRole;
+use Database\Factories\WorkspaceMemberFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class WorkspaceMember extends Model
 {
-    /** @use HasFactory<\Database\Factories\WorkspaceMemberFactory> */
+    /** @use HasFactory<WorkspaceMemberFactory> */
     use HasFactory;
 
     protected $fillable = ['workspace_id', 'user_id', 'role', 'joined_at'];

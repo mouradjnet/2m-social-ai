@@ -3,10 +3,11 @@
 namespace App\Http\Resources;
 
 use App\Domain\BrandProfile\Completion;
+use App\Models\BrandProfile;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
-/** @mixin \App\Models\BrandProfile */
+/** @mixin BrandProfile */
 class BrandProfileResource extends JsonResource
 {
     /** O envelope ja e montado aqui embaixo; sem isso viria `data.data`. */
