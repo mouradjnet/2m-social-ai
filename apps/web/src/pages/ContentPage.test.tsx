@@ -472,3 +472,56 @@ test('reescrever manda o POST na PECA reprovada, nao no projeto', async () => {
   const status = await screen.findByRole('status')
   await waitFor(() => expect(status).toHaveTextContent(/reescrevendo a peça reprovada/i))
 })
+
+test('exportar: sem peca pronta o botao fica desabilitado', async () => {
+  server.use(
+    http.get('/api/v1/projects/1/contents', () =>
+      HttpResponse.json({ data: [content(1, 'idea'), content(2, 'review')] }),
+    ),
+  )
+
+  renderWithProviders(<ContentPage />, ROUTE)
+
+  expect(await screen.findByRole('button', { name: /exportar \(0\)/i })).toBeDisabled()
+})
+
+/**
+ * O download NAO pode ser um <a href>: a rota exige o token no header, e link de
+ * navegador nao manda header. Busca-se o blob e simula-se o clique.
+ */
+test('exportar baixa o zip com o nome que o servidor mandou', async () => {
+  const user = setup()
+
+  server.use(
+    http.get('/api/v1/projects/1/contents', () =>
+      HttpResponse.json({ data: [content(1, 'approved'), content(2, 'scheduled')] }),
+    ),
+    http.get('/api/v1/projects/1/export', () =>
+      HttpResponse.arrayBuffer(new TextEncoder().encode('PK-zip-falso').buffer, {
+        headers: {
+          'Content-Type': 'application/zip',
+          'Content-Disposition': 'attachment; filename="2f-autoshop-conteudo-2026-07-13.zip"',
+        },
+      }),
+    ),
+  )
+
+  const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
+
+  // So os dois metodos: trocar o objeto URL inteiro quebra o `new URL(...)` que o MSW
+  // usa por dentro — e a requisicao nunca chega ao handler.
+  URL.createObjectURL = vi.fn(() => 'blob:zip')
+  URL.revokeObjectURL = vi.fn()
+
+  renderWithProviders(<ContentPage />, ROUTE)
+
+  // As duas peças prontas (aprovada + agendada) sao exatamente o que o zip leva.
+  await user.click(await screen.findByRole('button', { name: /exportar \(2\)/i }))
+
+  await waitFor(() => expect(click).toHaveBeenCalled())
+
+  const link = click.mock.instances[0] as HTMLAnchorElement
+  expect(link.download).toBe('2f-autoshop-conteudo-2026-07-13.zip')
+
+  click.mockRestore()
+})

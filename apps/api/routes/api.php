@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\V1\BrandProfileController;
 use App\Http\Controllers\Api\V1\ContentController;
 use App\Http\Controllers\Api\V1\CopyController;
 use App\Http\Controllers\Api\V1\DesignController;
+use App\Http\Controllers\Api\V1\ExportController;
 use App\Http\Controllers\Api\V1\ProjectController;
 use App\Http\Controllers\Api\V1\ReviewController;
 use App\Http\Controllers\Api\V1\RewriteController;
@@ -60,6 +61,8 @@ Route::prefix('v1')->group(function () {
         // Conserta a peca reprovada, no lugar. Fecha o ciclo do revisor.
         Route::post('contents/{content}/rewrite:generate', [RewriteController::class, 'generate']);
         Route::get('projects/{project}/contents', [ContentController::class, 'index']);
+        // A ENTREGA: sem API das redes, o zip e como o conteudo sai daqui.
+        Route::get('projects/{project}/export', [ExportController::class, 'download']);
         Route::patch('contents/{content}', [ContentController::class, 'update']);
         Route::patch('strategies/{strategy}', [StrategyController::class, 'update']);
 

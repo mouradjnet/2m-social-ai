@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Shell } from '@/components/ui/Shell'
 import { useGeneration } from '@/hooks/useGeneration'
-import { api } from '@/lib/api'
+import { api, download } from '@/lib/api'
 import { groupByStatus } from '@/lib/groupByStatus'
 import type { Content, Strategy } from '@/lib/types'
 
@@ -54,6 +54,19 @@ export function ContentPage() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['contents', projectId] }),
   })
 
+  // O download nao passa pelo TanStack Query: nao ha dado para cachear, e sim um
+  // arquivo que sai do navegador para o disco.
+  const [exportando, setExportando] = useState(false)
+
+  const exportar = async () => {
+    setExportando(true)
+    try {
+      await download(`/projects/${projectId}/export`)
+    } finally {
+      setExportando(false)
+    }
+  }
+
   // A IA propoe, o humano aplica: o titulo so muda por este clique.
   const applySeo = useMutation({
     mutationFn: (id: number) => api(`/contents/${id}/seo:apply`, { method: 'POST' }),
@@ -66,6 +79,8 @@ export function ContentPage() {
   const pieces = contents.data.data
   const generating = state.kind === 'starting' || state.kind === 'running'
   const aprovadas = pieces.filter((p) => p.status === 'approved').length
+  // O que já passou pelo humano — é exatamente o que o zip leva.
+  const prontas = pieces.filter((p) => p.status === 'approved' || p.status === 'scheduled').length
   const emRevisao = pieces.filter((p) => p.status === 'review').length
   const emProducao = pieces.filter((p) => p.status === 'production').length
 
@@ -175,6 +190,18 @@ export function ContentPage() {
           onClick={() => generate({ endpoint: 'review:generate' })}
         >
           Revisar ({emRevisao})
+        </Button>
+
+        {/*
+          A ENTREGA. Sem API das redes, o zip é como o conteúdo sai daqui — antes o
+          cliente copiava peça por peça da tela.
+        */}
+        <Button
+          variant="secondary"
+          disabled={exportando || prontas === 0}
+          onClick={exportar}
+        >
+          {exportando ? 'Preparando…' : `Exportar (${prontas})`}
         </Button>
       </div>
 
