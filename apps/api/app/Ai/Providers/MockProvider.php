@@ -80,6 +80,20 @@ class MockProvider implements LlmProvider
             ];
         }
 
+        // Rewriter: schema plano com `title` + `caption`, sem chave de lote. O
+        // validate() recusa legenda IDENTICA a reprovada, entao o fixture nao pode ser
+        // constante: le a peca do proprio <context> e devolve outra coisa.
+        if (isset($properties['title'], $properties['caption']) && ! isset($properties['pieces'])) {
+            $alvo = $this->contextOf($request->userMessage)['rewrite_target'] ?? [];
+
+            return [
+                'title' => $alvo['title'] ?? 'Peca reescrita',
+                'caption' => 'Versao corrigida, sem o que o revisor apontou.',
+                'cta' => $alvo['cta'] ?? 'Fale com a gente no WhatsApp.',
+                'hashtags' => $alvo['hashtags'] ?? ['#marca'],
+            ];
+        }
+
         // Social media: schema com a chave `schedule`. Diferente dos outros dois, este
         // fixture nao pode ser constante: os `content_id` precisam ser os das pecas
         // aprovadas de verdade, senao o validate() do agente rejeita a saida e a

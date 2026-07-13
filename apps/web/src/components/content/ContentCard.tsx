@@ -12,6 +12,7 @@ interface Props {
   onBack: () => void
   onArchive: () => void
   onApplySeo: () => void
+  onRewrite: () => void
 }
 
 const CHIPS: Record<ContentStatus, string> = {
@@ -44,9 +45,18 @@ export function ContentCard({
   onBack,
   onArchive,
   onApplySeo,
+  onRewrite,
 }: Props) {
   const [copiado, setCopiado] = useState(false)
   const review = content.latest_review
+
+  // O veredito fala do texto que existia QUANDO ele foi escrito. A reescrita troca o
+  // texto no lugar, então uma violação já corrigida continuaria no card — acusando um
+  // erro que não está mais lá. Se a peça mudou depois da revisão, o veredito é velho.
+  const reviewVelha =
+    review !== null && new Date(review.created_at) < new Date(content.updated_at)
+
+  const podeReescrever = review?.verdict === 'fail' && !reviewVelha
   const seo = content.latest_seo
   const i = FLOW.indexOf(content.status)
 
@@ -143,20 +153,47 @@ export function ContentCard({
                 : 'bg-error-container text-error',
             )}
           >
-            {review.verdict === 'pass'
-              ? '✓ Sem violações'
-              : `⚠ ${review.violations.length} ${review.violations.length === 1 ? 'violação' : 'violações'}`}
+            {reviewVelha
+              ? '↻ Texto reescrito'
+              : review.verdict === 'pass'
+                ? '✓ Sem violações'
+                : `⚠ ${review.violations.length} ${review.violations.length === 1 ? 'violação' : 'violações'}`}
           </span>
 
-          {/* Quem vai corrigir precisa ver o que esta errado sem clicar. */}
-          <ul className="mt-2 flex flex-col gap-1">
-            {review.violations.map((violation) => (
-              <li key={violation.rule + violation.excerpt} className="text-body-sm text-on-surface">
-                <span className="text-on-surface-variant">{violation.rule}:</span>{' '}
-                {violation.suggestion}
-              </li>
-            ))}
-          </ul>
+          {reviewVelha ? (
+            <p className="text-body-sm text-on-surface-variant mt-2">
+              O texto mudou depois desta revisão. Mande revisar de novo para saber se o
+              defeito saiu.
+            </p>
+          ) : (
+            <>
+              {/* Quem vai corrigir precisa ver o que esta errado sem clicar. */}
+              <ul className="mt-2 flex flex-col gap-1">
+                {review.violations.map((violation) => (
+                  <li
+                    key={violation.rule + violation.excerpt}
+                    className="text-body-sm text-on-surface"
+                  >
+                    <span className="text-on-surface-variant">{violation.rule}:</span>{' '}
+                    {violation.suggestion}
+                  </li>
+                ))}
+              </ul>
+
+              {/* O revisor deixa de ser um juiz que so condena. */}
+              {podeReescrever && (
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  className="mt-3"
+                  disabled={pending}
+                  onClick={onRewrite}
+                >
+                  Reescrever com IA
+                </Button>
+              )}
+            </>
+          )}
         </div>
       )}
 

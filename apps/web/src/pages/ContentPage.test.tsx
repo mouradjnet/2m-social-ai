@@ -26,6 +26,7 @@ function content(id: number, status: Content['status'], scheduledFor: string | n
     latest_seo: null,
     source: 'ai',
     origin_ai_run_id: 7,
+    updated_at: '2026-07-13T09:00:00Z',
   }
 }
 
@@ -431,4 +432,42 @@ test('422 sem estratégia ativa mostra a mensagem e não inicia polling', async 
 
   expect(await screen.findByText(/aprove uma estrategia/i)).toBeInTheDocument()
   expect(screen.queryByText(/gerando/i)).not.toBeInTheDocument()
+})
+
+test('reescrever manda o POST na PECA reprovada, nao no projeto', async () => {
+  const user = setup()
+  let chamada: string | null = null
+
+  const reprovada: Content = {
+    ...content(9, 'review'),
+    latest_review: {
+      id: 1,
+      verdict: 'fail',
+      summary: 'Depoimento fabricado.',
+      violations: [
+        { rule: 'Depoimento fabricado', excerpt: 'O Ricardo', suggestion: 'Use um caso real.' },
+      ],
+      created_at: '2026-07-13T10:00:00Z',
+    },
+  }
+
+  server.use(
+    http.get('/api/v1/projects/1/contents', () => HttpResponse.json({ data: [reprovada] })),
+    http.post('/api/v1/contents/9/rewrite:generate', ({ request }) => {
+      chamada = new URL(request.url).pathname
+      return HttpResponse.json({ ai_run_id: 51 }, { status: 202 })
+    }),
+    http.get('/api/v1/ai-runs/51', () => HttpResponse.json(run({ status: 'running', agent: 'rewriter' }))),
+  )
+
+  renderWithProviders(<ContentPage />, ROUTE)
+
+  await user.click(await screen.findByRole('button', { name: /reescrever com ia/i }))
+
+  // O MSW so responde ao caminho declarado: se o POST fosse no projeto, nao haveria
+  // handler e a requisicao estouraria.
+  await waitFor(() => expect(chamada).toBe('/api/v1/contents/9/rewrite:generate'))
+
+  const status = await screen.findByRole('status')
+  await waitFor(() => expect(status).toHaveTextContent(/reescrevendo a peça reprovada/i))
 })

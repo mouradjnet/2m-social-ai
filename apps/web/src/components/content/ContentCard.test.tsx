@@ -21,6 +21,7 @@ function content(overrides: Partial<Content> = {}): Content {
     latest_seo: null,
     source: 'ai',
     origin_ai_run_id: 7,
+    updated_at: '2026-07-13T10:00:00Z',
     ...overrides,
   }
 }
@@ -30,6 +31,7 @@ const noop = {
   onBack: vi.fn(),
   onArchive: vi.fn(),
   onApplySeo: vi.fn(),
+  onRewrite: vi.fn(),
   pending: false,
 }
 
@@ -173,4 +175,68 @@ test('sugestao ja aplicada nao oferece aplicar de novo', () => {
 
   expect(screen.getByText(/seo aplicado/i)).toBeInTheDocument()
   expect(screen.queryByRole('button', { name: /aplicar seo/i })).not.toBeInTheDocument()
+})
+
+test('peca reprovada oferece reescrever com IA', async () => {
+  const user = userEvent.setup()
+  const onRewrite = vi.fn()
+  const review = {
+    id: 1,
+    verdict: 'fail' as const,
+    summary: 'Depoimento fabricado.',
+    violations: [
+      { rule: 'Depoimento fabricado', excerpt: 'O Ricardo', suggestion: 'Use um caso real.' },
+    ],
+    created_at: new Date().toISOString(),
+  }
+
+  render(<ContentCard content={content({ latest_review: review })} {...noop} onRewrite={onRewrite} />)
+
+  await user.click(screen.getByRole('button', { name: /reescrever com ia/i }))
+
+  expect(onRewrite).toHaveBeenCalledTimes(1)
+})
+
+test('peca aprovada nao oferece reescrever', () => {
+  const review = {
+    id: 1,
+    verdict: 'pass' as const,
+    summary: 'Coerente.',
+    violations: [],
+    created_at: new Date().toISOString(),
+  }
+
+  render(<ContentCard content={content({ latest_review: review })} {...noop} />)
+
+  expect(screen.queryByRole('button', { name: /reescrever com ia/i })).not.toBeInTheDocument()
+})
+
+/**
+ * O veredito fala do texto que existia quando ele foi escrito. A reescrita troca o
+ * texto NO LUGAR: sem isto, o card seguiria acusando uma violacao ja corrigida — e
+ * ainda ofereceria reescrever de novo o que acabou de ser reescrito.
+ */
+test('revisao anterior a reescrita vira aviso, nao violacao', () => {
+  const review = {
+    id: 1,
+    verdict: 'fail' as const,
+    summary: 'Depoimento fabricado.',
+    violations: [
+      { rule: 'Depoimento fabricado', excerpt: 'O Ricardo', suggestion: 'Use um caso real.' },
+    ],
+    created_at: '2026-07-13T10:00:00Z',
+  }
+
+  // A peca mudou DEPOIS da revisao: foi reescrita.
+  const peca = content({ latest_review: review, updated_at: '2026-07-13T11:00:00Z' })
+
+  render(<ContentCard content={peca} {...noop} />)
+
+  expect(screen.getByText(/texto reescrito/i)).toBeInTheDocument()
+  expect(screen.getByText(/mande revisar de novo/i)).toBeInTheDocument()
+
+  // A violacao velha some, e o botao nao reaparece.
+  expect(screen.queryByText(/1 violação/i)).not.toBeInTheDocument()
+  expect(screen.queryByText(/use um caso real/i)).not.toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: /reescrever com ia/i })).not.toBeInTheDocument()
 })

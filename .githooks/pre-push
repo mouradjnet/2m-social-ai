@@ -32,6 +32,10 @@ echo "→ Pint"
 echo "→ PHPUnit"
 (cd "$raiz/apps/api" && "$php" artisan test)
 
+# O vitest nao checa tipo: um fixture sem campo novo passa nos testes e quebra o build.
+echo "→ tsc"
+(cd "$raiz/apps/web" && pnpm exec tsc -b)
+
 echo "→ vitest"
 (cd "$raiz/apps/web" && pnpm test)
 

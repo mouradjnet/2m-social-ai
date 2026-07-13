@@ -102,4 +102,9 @@ jobs:
 
       - run: pnpm lint
 
+      # O vitest NAO checa tipo: um fixture sem campo novo passa nos testes e quebra
+      # o build. Aconteceu ao acrescentar `updated_at` ao Content — 83 testes verdes,
+      # 3 erros de tipo.
+      - run: pnpm exec tsc -b
+
       - run: pnpm test

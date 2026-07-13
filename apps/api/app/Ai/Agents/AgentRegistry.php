@@ -19,6 +19,7 @@ class AgentRegistry
         'designer' => DesignerAgent::class,
         'seo' => SeoAgent::class,
         'analytics' => AnalyticsAgent::class,
+        'rewriter' => RewriterAgent::class,
     ];
 
     public function get(string $name): Agent

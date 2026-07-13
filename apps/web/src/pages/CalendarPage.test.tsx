@@ -33,6 +33,7 @@ function content(id: number, scheduledFor: string | null, status: Content['statu
     latest_seo: null,
     source: 'ai',
     origin_ai_run_id: null,
+    updated_at: '2026-07-13T09:00:00Z',
   }
 }
 

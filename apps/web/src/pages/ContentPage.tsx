@@ -191,6 +191,9 @@ export function ContentPage() {
             pending={move.isPending || applySeo.isPending}
             onMove={(id, status) => move.mutate({ id, status })}
             onApplySeo={(id) => applySeo.mutate(id)}
+            // A reescrita é por PEÇA, não por projeto — daí o caminho inteiro. É a
+            // mesma execução assíncrona dos outros agentes: o ?run= e o polling.
+            onRewrite={(id) => generate({ path: `/contents/${id}/rewrite:generate` })}
           />
         )}
       </div>

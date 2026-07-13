@@ -69,6 +69,14 @@ return [
             'max_tokens' => 16000,
         ],
         // Ler numeros, priorizar e concluir: `high`.
+        // Consertar UMA peca reprovada: le o veredito, o trecho apontado e reescreve.
+        // `high` porque o erro costuma ser conceitual (um depoimento inventado nao se
+        // conserta trocando palavras), e e leitura fina do que o revisor disse.
+        'rewriter' => [
+            'model' => env('AI_MODEL_REWRITER', env('AI_MODEL_DEFAULT', 'claude-opus-4-8')),
+            'effort' => 'high',
+            'max_tokens' => 16000,
+        ],
         'analytics' => [
             'model' => env('AI_MODEL_ANALYTICS', env('AI_MODEL_DEFAULT', 'claude-opus-4-8')),
             'effort' => 'high',

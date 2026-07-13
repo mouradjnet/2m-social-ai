@@ -40,6 +40,12 @@ interface Config {
 interface GenerateOptions {
   endpoint?: string
   body?: unknown
+  /**
+   * Caminho inteiro, para quem não é `/projects/{id}/…`. A reescrita é por PEÇA
+   * (`/contents/{id}/rewrite:generate`), não por projeto — mas é a mesma execução
+   * assíncrona, com o mesmo `?run=` e o mesmo polling.
+   */
+  path?: string
 }
 
 /**
@@ -77,7 +83,7 @@ export function useGeneration({ projectId, endpoint, invalidateKey }: Config) {
 
   const generation = useMutation({
     mutationFn: (options: GenerateOptions) =>
-      api<{ ai_run_id: number }>(`/projects/${projectId}/${options.endpoint ?? endpoint}`, {
+      api<{ ai_run_id: number }>(options.path ?? `/projects/${projectId}/${options.endpoint ?? endpoint}`, {
         method: 'POST',
         ...(options.body === undefined ? {} : { body: JSON.stringify(options.body) }),
       }),

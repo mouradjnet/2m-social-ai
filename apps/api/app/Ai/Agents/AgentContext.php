@@ -74,6 +74,17 @@ readonly class AgentContext
          * vira zero, e o pilar fica zerado para sempre.
          */
         public ?array $pillarAdherence = null,
+        /**
+         * A peca a reescrever, com o veredito que a reprovou: texto inteiro + as
+         * violacoes DELA (regra, trecho e sugestao).
+         *
+         * Aqui o `excerpt` VAI, ao contrario do `past_violations`. Nao e contradicao:
+         * la o excerpt e o erro de OUTRA peca, e mostrar o texto errado convida a
+         * imita-lo; aqui e o proprio texto que esta sendo consertado, e o revisor
+         * apontando a frase exata e o que torna a correcao cirurgica em vez de uma
+         * reescrita as cegas.
+         */
+        public ?array $rewriteTarget = null,
     ) {}
 
     /**
@@ -154,6 +165,9 @@ readonly class AgentContext
             pillarAdherence: ($input['with_pillar_adherence'] ?? false)
                 ? Metrics::for($project)['aderencia']
                 : null,
+            rewriteTarget: isset($input['rewrite_content_id'])
+                ? self::rewriteTarget($project, (int) $input['rewrite_content_id'])
+                : null,
         );
     }
 
@@ -197,7 +211,46 @@ readonly class AgentContext
             $data['pillar_adherence'] = $this->pillarAdherence;
         }
 
+        if ($this->rewriteTarget !== null) {
+            $data['rewrite_target'] = $this->rewriteTarget;
+        }
+
         return $data;
+    }
+
+    /**
+     * A peca reprovada e o veredito MAIS RECENTE dela. O `content_id` do input e so
+     * intencao: a verdade e buscar a peca do projeto agora, na execucao (o job roda
+     * sem usuario, entao o WorkspaceMemberScope nao protege — o filtro por projeto e
+     * o que impede reescrever peca de outro tenant).
+     */
+    private static function rewriteTarget(Project $project, int $contentId): ?array
+    {
+        $peca = $project->contents()->find($contentId);
+
+        if ($peca === null) {
+            return null;
+        }
+
+        $review = ContentReview::query()
+            ->where('content_id', $peca->id)
+            ->latest('id')
+            ->first();
+
+        return [
+            'id' => $peca->id,
+            'title' => $peca->title,
+            'caption' => $peca->caption,
+            'cta' => $peca->cta,
+            'hashtags' => $peca->hashtags,
+            'format' => $peca->format,
+            'channel' => $peca->channel,
+            'pillar' => $peca->pillar,
+            'verdict' => $review?->verdict,
+            'summary' => $review?->summary,
+            // Com o trecho: e o proprio texto sendo consertado (ver o campo).
+            'violations' => $review?->violations ?? [],
+        ];
     }
 
     /**

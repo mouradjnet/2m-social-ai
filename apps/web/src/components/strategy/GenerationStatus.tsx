@@ -21,6 +21,7 @@ const FRASES: Record<string, string> = {
   seo: 'Otimizando o SEO das peças…',
   reviewer: 'Revisando suas peças…',
   analytics: 'Analisando seu calendário…',
+  rewriter: 'Reescrevendo a peça reprovada…',
 }
 
 const GENERICO = 'Gerando…'
