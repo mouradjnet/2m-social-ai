@@ -22,6 +22,36 @@ class AuthAndWorkspaceTest extends TestCase
         $this->assertDatabaseHas('users', ['email' => 'djair@example.com']);
     }
 
+    /**
+     * O logout REVOGA o token, nao so responde 204. Sem `Sanctum::actingAs` aqui de
+     * proposito: ele injeta o usuario e nunca tocaria no token — o teste passaria com
+     * um logout que nao revoga nada. E o token e a unica coisa que o logout precisa
+     * destruir. Era a unica rota da API sem nenhum teste.
+     */
+    public function test_logout_revoga_o_token_usado(): void
+    {
+        $token = $this->postJson('/api/v1/auth/register', [
+            'name' => 'Djair',
+            'email' => 'djair@example.com',
+            'password' => 'senha-bem-longa',
+        ])->assertCreated()->json('token');
+
+        $comToken = ['Authorization' => "Bearer {$token}"];
+
+        $this->getJson('/api/v1/me', $comToken)->assertOk();
+
+        $this->postJson('/api/v1/auth/logout', [], $comToken)->assertNoContent();
+
+        $this->assertDatabaseCount('personal_access_tokens', 0);
+
+        // O guard guarda o usuario ja resolvido DENTRO do mesmo teste: sem isto, a
+        // requisicao abaixo responde 200 lendo memoria, nao o token — e o teste
+        // passaria ate com um logout que nao revoga nada.
+        $this->app['auth']->forgetGuards();
+
+        $this->getJson('/api/v1/me', $comToken)->assertUnauthorized();
+    }
+
     public function test_allowlist_barra_email_de_fora_da_lista(): void
     {
         config(['registration.allowed_emails' => ['dono@example.com']]);
