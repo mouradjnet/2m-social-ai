@@ -56,9 +56,16 @@ class MockProvider implements LlmProvider
             $daEstrategia = array_column($context['active_strategy']['pillars'] ?? [], 'name');
             $unico = substr(md5((string) count($context['existing_contents'] ?? [])), 0, 4);
 
+            // O validate() agora exige que o pilar mais atrasado receba peca. Com mais
+            // pilares que pecas, a distribuicao ciclica abaixo poderia nao alcanca-lo e
+            // a geracao falharia em dev sem motivo. A primeira peca cobre o buraco.
+            $atrasado = $alvo === null ? $this->pilarMaisAtrasado($context) : null;
+
             return [
-                'pieces' => array_map(function (int $i) use ($alvo, $daEstrategia, $unico) {
-                    $pilar = $alvo ?? ($daEstrategia[$i % max(count($daEstrategia), 1)] ?? 'Pilar');
+                'pieces' => array_map(function (int $i) use ($alvo, $atrasado, $daEstrategia, $unico) {
+                    $pilar = $alvo
+                        ?? ($i === 0 ? $atrasado : null)
+                        ?? ($daEstrategia[$i % max(count($daEstrategia), 1)] ?? 'Pilar');
 
                     return [
                         'title' => "Peca {$i} ({$unico})",
@@ -180,6 +187,20 @@ class MockProvider implements LlmProvider
         }
 
         return [];
+    }
+
+    /** O pilar com o desvio mais negativo em `pillar_adherence`, ou null se nao ha. */
+    private function pilarMaisAtrasado(array $context): ?string
+    {
+        $pior = null;
+
+        foreach ($context['pillar_adherence']['pilares'] ?? [] as $pilar) {
+            if ($pilar['desvio'] < 0 && ($pior === null || $pilar['desvio'] < $pior['desvio'])) {
+                $pior = $pilar;
+            }
+        }
+
+        return $pior['nome'] ?? null;
     }
 
     /** O userMessage carrega o AgentContext em JSON, entre <context> e </context>. */

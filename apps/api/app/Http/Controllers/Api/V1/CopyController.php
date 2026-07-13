@@ -79,6 +79,10 @@ class CopyController extends Controller
                     // O que o reviewer ja reprovou. Sem isso o copywriter reincide no
                     // erro conceitual — o guard de titulo nao pega, o titulo e outro.
                     'with_past_violations' => true,
+                    // Pedido x entregue por pilar: e o que o analytics ja media e nao
+                    // chegava a agente nenhum. Fecha o loop estrategia -> producao ->
+                    // analise -> producao.
+                    'with_pillar_adherence' => true,
                     'pillar' => $pillar,
                 ], fn ($v) => $v !== null),
                 'created_by' => request()->user()->id,

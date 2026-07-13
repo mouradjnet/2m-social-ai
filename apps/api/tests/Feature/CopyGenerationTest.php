@@ -488,4 +488,143 @@ class CopyGenerationTest extends TestCase
         $this->assertSame('refused', $run->error_code);
         $this->assertSame(0, Content::withoutGlobalScopes()->count());
     }
+
+    /**
+     * O loop que faltava: o analytics MEDIA o pilar zerado e o numero nao chegava a
+     * agente nenhum. Agora chega — e e o mesmo calculo, feito em PHP.
+     */
+    public function test_o_contexto_leva_a_aderencia_de_cada_pilar(): void
+    {
+        $workspace = Workspace::factory()->create();
+        $project = Project::factory()->create(['workspace_id' => $workspace->id]);
+        $this->withActiveStrategy($project);
+
+        // A estrategia pede 50/50; as 2 pecas que existem sao as duas de Educacao.
+        $this->peca($project, 'A', 'Educacao');
+        $this->peca($project, 'B', 'Educacao');
+
+        $context = AgentContext::forProject($project, ['with_pillar_adherence' => true]);
+
+        $porNome = collect($context->pillarAdherence['pilares'])->keyBy('nome');
+
+        $this->assertSame(50, $porNome['Educacao']['peso_pedido']);
+        $this->assertSame(100, $porNome['Educacao']['peso_real']);
+        $this->assertSame(50, $porNome['Educacao']['desvio']);
+
+        $this->assertSame(0, $porNome['Prova social']['peso_real']);
+        $this->assertSame(-50, $porNome['Prova social']['desvio']);
+
+        $this->assertArrayHasKey('pillar_adherence', $context->toArray());
+        $this->assertSame('Prova social', $context->mostDeficientPillar());
+    }
+
+    /** Nenhum pilar em deficit: nao ha buraco a cobrir, e o guard nao tem alvo. */
+    public function test_sem_pilar_atrasado_nao_ha_alvo_a_cobrir(): void
+    {
+        $workspace = Workspace::factory()->create();
+        $project = Project::factory()->create(['workspace_id' => $workspace->id]);
+        $this->withActiveStrategy($project);
+
+        $this->peca($project, 'A', 'Educacao');
+        $this->peca($project, 'B', 'Prova social');
+
+        $context = AgentContext::forProject($project, ['with_pillar_adherence' => true]);
+
+        $this->assertNull($context->mostDeficientPillar());
+    }
+
+    /**
+     * O guard. O prompt manda cobrir o pilar mais atrasado; sem isto, prompt e
+     * torcida — e o modelo distribui pelo peso puro, deixando o pilar leve zerado.
+     */
+    public function test_lote_que_ignora_o_pilar_mais_atrasado_e_rejeitado(): void
+    {
+        $workspace = Workspace::factory()->create();
+        $project = Project::factory()->create(['workspace_id' => $workspace->id]);
+        $this->withActiveStrategy($project);
+
+        $this->peca($project, 'A', 'Educacao');
+        $this->peca($project, 'B', 'Educacao');
+
+        $context = AgentContext::forProject($project, ['with_pillar_adherence' => true]);
+
+        $lote = ['pieces' => array_map(fn (int $i) => [
+            'title' => "Peca {$i}",
+            'caption' => 'c',
+            'cta' => 'x',
+            'hashtags' => ['#a'],
+            'format' => 'post',
+            'channel' => 'instagram',
+            // Todas de Educacao — o pilar que JA estourou o peso. "Prova social",
+            // que esta 50pp atrasado, nao recebeu nenhuma.
+            'pillar' => 'Educacao',
+        ], range(0, 4))];
+
+        $this->expectException(OutputRejectedException::class);
+        $this->expectExceptionMessage('"Prova social" e o mais atrasado');
+
+        (new CopywriterAgent(5))->validate($lote, $context);
+    }
+
+    /** Uma peca do pilar atrasado basta: o resto do lote segue os pesos. */
+    public function test_lote_que_cobre_o_pilar_mais_atrasado_passa(): void
+    {
+        $workspace = Workspace::factory()->create();
+        $project = Project::factory()->create(['workspace_id' => $workspace->id]);
+        $this->withActiveStrategy($project);
+
+        $this->peca($project, 'A', 'Educacao');
+        $this->peca($project, 'B', 'Educacao');
+
+        $context = AgentContext::forProject($project, ['with_pillar_adherence' => true]);
+
+        $lote = ['pieces' => array_map(fn (int $i) => [
+            'title' => "Peca {$i}",
+            'caption' => 'c',
+            'cta' => 'x',
+            'hashtags' => ['#a'],
+            'format' => 'post',
+            'channel' => 'instagram',
+            'pillar' => $i === 0 ? 'Prova social' : 'Educacao',
+        ], range(0, 4))];
+
+        (new CopywriterAgent(5))->validate($lote, $context);
+
+        $this->expectNotToPerformAssertions();
+    }
+
+    /**
+     * Com pilar escolhido a mao, o humano JA disse qual buraco cobrir. Cobrar dele
+     * tambem o pilar mais atrasado tornaria o lote impossivel: o guard de
+     * `target_pillar` exige que TODAS as pecas sejam do pilar pedido.
+     */
+    public function test_pilar_escolhido_a_mao_desliga_o_guard_de_aderencia(): void
+    {
+        $workspace = Workspace::factory()->create();
+        $project = Project::factory()->create(['workspace_id' => $workspace->id]);
+        $this->withActiveStrategy($project);
+
+        $this->peca($project, 'A', 'Educacao');
+        $this->peca($project, 'B', 'Educacao');
+
+        // "Prova social" e o mais atrasado, mas o humano pediu "Educacao".
+        $context = AgentContext::forProject($project, [
+            'with_pillar_adherence' => true,
+            'pillar' => 'Educacao',
+        ]);
+
+        $lote = ['pieces' => array_map(fn (int $i) => [
+            'title' => "Peca {$i}",
+            'caption' => 'c',
+            'cta' => 'x',
+            'hashtags' => ['#a'],
+            'format' => 'post',
+            'channel' => 'instagram',
+            'pillar' => 'Educacao',
+        ], range(0, 4))];
+
+        (new CopywriterAgent(5))->validate($lote, $context);
+
+        $this->expectNotToPerformAssertions();
+    }
 }

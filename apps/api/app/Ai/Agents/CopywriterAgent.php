@@ -83,6 +83,12 @@ class CopywriterAgent implements Agent
           humano esta cobrindo um buraco). Sem ele, distribua as pecas pelos pilares
           da estrategia conforme os pesos: um pilar de peso maior recebe mais pecas.
           O campo `pillar` de cada peca diz de qual pilar ela saiu.
+        - `pillar_adherence` diz, por pilar, o que a estrategia PEDIU (`peso_pedido`)
+          contra o que a marca ja ENTREGOU (`peso_real`), e o `desvio` em pontos
+          percentuais: negativo = o pilar esta atrasado. Sem `target_pillar`, o lote
+          CORRIGE esse desvio — os pilares atrasados recebem mais pecas que o peso
+          puro daria, e o pilar MAIS atrasado precisa receber pelo menos uma peca.
+          Um pilar ja em dia (desvio >= 0) pode ficar de fora deste lote.
         - Cada peca escolhe `format` e `channel` coerentes com o pilar e a linha
           editorial. `format` e um de: post, carousel, reel, story, video, article,
           thread. `channel` e um de: instagram, facebook, linkedin, tiktok, youtube,
@@ -158,6 +164,21 @@ class CopywriterAgent implements Agent
                     "Pedido o pilar \"{$context->targetPillar}\", recebida peca do pilar \"{$pilar}\"."
                 );
             }
+        }
+
+        // O loop do analytics fecha AQUI. O prompt manda cobrir o pilar mais atrasado;
+        // isto CONFERE. Sem o guard, o modelo distribui pelo peso puro e o pilar leve
+        // segue zerado — foi exatamente o que aconteceu em producao (15% de um lote de
+        // 5 da 0,75, que arredonda para zero, e o pilar nunca sai do zero sozinho).
+        //
+        // Nao se aplica quando o humano escolheu o pilar a mao: ali ele ja decidiu qual
+        // buraco cobrir, e o guard de `target_pillar` acima ja garante o lote inteiro.
+        $atrasado = $context?->targetPillar === null ? $context?->mostDeficientPillar() : null;
+
+        if ($atrasado !== null && ! in_array($atrasado, array_column($pieces, 'pillar'), true)) {
+            throw new OutputRejectedException(
+                "O pilar \"{$atrasado}\" e o mais atrasado da estrategia e nao recebeu nenhuma peca."
+            );
         }
     }
 

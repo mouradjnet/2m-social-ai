@@ -2,6 +2,7 @@
 
 namespace App\Ai\Agents;
 
+use App\Domain\Analytics\Metrics;
 use App\Models\ContentReview;
 use App\Models\Project;
 
@@ -61,7 +62,43 @@ readonly class AgentContext
          * erro e conceitual, e o titulo era outro.
          */
         public ?array $pastViolations = null,
+        /**
+         * O que a estrategia PEDIU contra o que foi ENTREGUE, por pilar, com o desvio
+         * em pontos percentuais (o mesmo calculo que alimenta o analytics — numeros
+         * feitos em PHP, nao pedidos ao modelo).
+         *
+         * Sem isto o loop nao fecha: o analytics DETECTA o pilar zerado, escreve o
+         * insight, e o insight nao chega a agente nenhum — quem cobria o buraco era o
+         * humano, na mao, escolhendo o pilar no seletor. O copywriter distribui por
+         * peso e nunca cobre um pilar leve sozinho: 15% de um lote de 5 da 0,75, que
+         * vira zero, e o pilar fica zerado para sempre.
+         */
+        public ?array $pillarAdherence = null,
     ) {}
+
+    /**
+     * O pilar mais atrasado em relacao ao que a estrategia pediu, ou null se nenhum
+     * esta em deficit. E o alvo do guard do copywriter: o prompt manda cobrir o
+     * buraco, e o validate() confere — prompt sozinho e torcida.
+     */
+    public function mostDeficientPillar(): ?string
+    {
+        $pilares = $this->pillarAdherence['pilares'] ?? [];
+
+        $pior = null;
+
+        foreach ($pilares as $pilar) {
+            if ($pilar['desvio'] >= 0) {
+                continue;
+            }
+
+            if ($pior === null || $pilar['desvio'] < $pior['desvio']) {
+                $pior = $pilar;
+            }
+        }
+
+        return $pior['nome'] ?? null;
+    }
 
     /**
      * `$input` e o `ai_runs.input` da execucao, e e ele que diz o que carregar: janela
@@ -114,6 +151,9 @@ readonly class AgentContext
             pastViolations: ($input['with_past_violations'] ?? false)
                 ? self::pastViolations($project)
                 : null,
+            pillarAdherence: ($input['with_pillar_adherence'] ?? false)
+                ? Metrics::for($project)['aderencia']
+                : null,
         );
     }
 
@@ -151,6 +191,10 @@ readonly class AgentContext
 
         if ($this->pastViolations !== null) {
             $data['past_violations'] = $this->pastViolations;
+        }
+
+        if ($this->pillarAdherence !== null) {
+            $data['pillar_adherence'] = $this->pillarAdherence;
         }
 
         return $data;
