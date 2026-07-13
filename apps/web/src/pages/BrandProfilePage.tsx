@@ -110,10 +110,44 @@ const STEPS: Array<Step & { fields: Field[]; description?: string }> = [
   },
 ]
 
+/**
+ * Fusos oferecidos. Não é a lista da IANA inteira (600+): é a lista que um cliente
+ * desta agência realmente usa. O valor atual do projeto entra mesmo se não estiver
+ * aqui — a tela não pode apagar um fuso que alguém escolheu pela API.
+ */
+const FUSOS = [
+  'America/Sao_Paulo',
+  'America/Manaus',
+  'America/Belem',
+  'America/Fortaleza',
+  'America/Cuiaba',
+  'America/Rio_Branco',
+  'America/New_York',
+  'Europe/Lisbon',
+  'Europe/Madrid',
+]
+
+type Projeto = { data: { id: number; name: string; timezone: string } }
+
 export function BrandProfilePage() {
   const { projectId } = useParams()
   const queryClient = useQueryClient()
   const [currentId, setCurrentId] = useState('identity')
+
+  const projectKey = ['project', projectId]
+  const project = useQuery({
+    queryKey: projectKey,
+    queryFn: () => api<Projeto>(`/projects/${projectId}`),
+  })
+
+  const salvarFuso = useMutation({
+    mutationFn: (timezone: string) =>
+      api<Projeto>(`/projects/${projectId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ timezone }),
+      }),
+    onSuccess: (response) => queryClient.setQueryData(projectKey, response),
+  })
 
   const queryKey = ['brand-profile', projectId]
   const profile = useQuery({
@@ -181,6 +215,42 @@ export function BrandProfilePage() {
       >
         Ir para a Estratégia editorial →
       </Link>
+
+      {/*
+        O fuso do projeto. Não é enfeite: o social_media agenda NELE, e o fuso errado
+        publica na madrugada do público. Até aqui só podia ser dito na criação, e todo
+        projeto existente ficou preso no default.
+      */}
+      {project.data && (
+        <div className="mt-8 max-w-md">
+          <label
+            htmlFor="timezone"
+            className="text-label-sm text-on-surface-variant block uppercase"
+          >
+            Fuso em que esta marca publica
+          </label>
+          <select
+            id="timezone"
+            className="border-outline text-body-md text-on-surface mt-2 w-full rounded-md border bg-surface px-3 py-2"
+            value={project.data.data.timezone}
+            disabled={salvarFuso.isPending}
+            onChange={(event) => salvarFuso.mutate(event.target.value)}
+          >
+            {[...new Set([project.data.data.timezone, ...FUSOS])].map((fuso) => (
+              <option key={fuso} value={fuso}>
+                {fuso.replace('_', ' ')}
+              </option>
+            ))}
+          </select>
+          <p className="text-body-sm text-on-surface-variant mt-2" role="status">
+            {salvarFuso.isPending
+              ? 'Salvando…'
+              : salvarFuso.isSuccess
+                ? 'Fuso atualizado. As próximas peças serão agendadas nele.'
+                : 'O agendamento das peças usa este fuso.'}
+          </p>
+        </div>
+      )}
 
       <div className="mt-12 flex gap-16">
         <div className="w-64 shrink-0">

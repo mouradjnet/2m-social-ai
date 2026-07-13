@@ -20,6 +20,10 @@ class ProjectResource extends JsonResource
             'description' => $this->description,
             'owner_user_id' => $this->owner_user_id,
             'status' => $this->status,
+            // O fuso existia na coluna e no prompt do social_media, mas NUNCA saiu na
+            // API: a tela nao tinha como mostrar em que fuso a marca publica, nem
+            // conferir depois de corrigir.
+            'timezone' => $this->timezone,
             'image_path' => $this->image_path,
             'color' => $this->color,
             'created_at' => $this->created_at,

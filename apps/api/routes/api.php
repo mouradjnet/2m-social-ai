@@ -38,6 +38,8 @@ Route::prefix('v1')->group(function () {
         // WorkspaceMemberScope resolve o tenant e devolve 404 se for de outro.
         // O papel e checado pela ProjectPolicy.
         Route::get('projects/{project}', [ProjectController::class, 'show']);
+        // Corrigir o fuso depois de criado (o social_media agenda nele).
+        Route::patch('projects/{project}', [ProjectController::class, 'update']);
 
         Route::get('projects/{project}/brand-profile', [BrandProfileController::class, 'show']);
         Route::patch('projects/{project}/brand-profile', [BrandProfileController::class, 'update']);

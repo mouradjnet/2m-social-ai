@@ -124,3 +124,60 @@ test('os dois passos opcionais têm dicas diferentes', async () => {
   await user.click(within(nav).getByRole('button', { name: /links sociais/i }))
   expect(screen.getByText(/não afeta a estratégia/i)).toBeInTheDocument()
 })
+
+function projeto(timezone: string) {
+  return { data: { id: 1, name: '2F AutoShop', timezone } }
+}
+
+test('o fuso do projeto aparece selecionado', async () => {
+  server.use(
+    http.get('/api/v1/projects/1/brand-profile', () => HttpResponse.json(profile())),
+    http.get('/api/v1/projects/1', () => HttpResponse.json(projeto('America/Manaus'))),
+  )
+
+  renderWithProviders(<BrandProfilePage />, ROUTE)
+
+  const select = await screen.findByRole('combobox', { name: /fuso em que esta marca publica/i })
+  expect(select).toHaveValue('America/Manaus')
+})
+
+test('trocar o fuso manda o PATCH e confirma na tela', async () => {
+  const user = userEvent.setup()
+  let recebido: unknown = null
+
+  server.use(
+    http.get('/api/v1/projects/1/brand-profile', () => HttpResponse.json(profile())),
+    http.get('/api/v1/projects/1', () => HttpResponse.json(projeto('America/Sao_Paulo'))),
+    http.patch('/api/v1/projects/1', async ({ request }) => {
+      recebido = await request.json()
+      return HttpResponse.json(projeto('Europe/Lisbon'))
+    }),
+  )
+
+  renderWithProviders(<BrandProfilePage />, ROUTE)
+
+  const select = await screen.findByRole('combobox', { name: /fuso em que esta marca publica/i })
+  await user.selectOptions(select, 'Europe/Lisbon')
+
+  await waitFor(() => expect(recebido).toEqual({ timezone: 'Europe/Lisbon' }))
+
+  // A tela reflete o que o SERVIDOR devolveu, nao o que foi clicado.
+  await waitFor(() => expect(select).toHaveValue('Europe/Lisbon'))
+  expect(await screen.findByText(/fuso atualizado/i)).toBeInTheDocument()
+})
+
+/**
+ * Um fuso que a API tem e a lista curada nao: precisa aparecer, senao a tela
+ * silenciosamente PERDERIA o valor que alguem escolheu por fora.
+ */
+test('fuso fora da lista curada continua visivel', async () => {
+  server.use(
+    http.get('/api/v1/projects/1/brand-profile', () => HttpResponse.json(profile())),
+    http.get('/api/v1/projects/1', () => HttpResponse.json(projeto('Asia/Tokyo'))),
+  )
+
+  renderWithProviders(<BrandProfilePage />, ROUTE)
+
+  const select = await screen.findByRole('combobox', { name: /fuso em que esta marca publica/i })
+  expect(select).toHaveValue('Asia/Tokyo')
+})
