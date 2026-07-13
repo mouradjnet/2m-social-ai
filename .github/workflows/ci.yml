@@ -1,0 +1,105 @@
+# Os contratos que a suite escreve so viram BARREIRA se algo os cobrar antes do
+# merge. Sem isto, o guardiao de rotas (bc7aff3) e os indices so protegem quem
+# lembrar de rodar `artisan test` — ou seja, ninguem, num dia ruim.
+#
+# O repo e PRIVADO no plano free: os minutos de Actions sao cota compartilhada e ja
+# se esgotaram em outro projeto. Por isso existe TAMBEM o hook `.githooks/pre-push`,
+# que roda a mesma coisa localmente: se a cota acabar, a rede nao cai junto.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  backend:
+    name: API (Pint + PHPUnit)
+    runs-on: ubuntu-latest
+
+    # Postgres de verdade, nao sqlite: a suite usa jsonb, enums, timestamptz e
+    # indices parciais — nada disso existe no sqlite, e o phpunit.xml ja aponta
+    # para pgsql.
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: 2m_social_ai_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    defaults:
+      run:
+        working-directory: apps/api
+
+    env:
+      DB_CONNECTION: pgsql
+      DB_HOST: 127.0.0.1
+      DB_PORT: 5432
+      DB_DATABASE: 2m_social_ai_test
+      DB_USERNAME: postgres
+      DB_PASSWORD: postgres
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: pdo_pgsql, mbstring, sodium
+          coverage: none
+
+      - name: Cache do Composer
+        uses: actions/cache@v4
+        with:
+          path: apps/api/vendor
+          key: composer-${{ hashFiles('apps/api/composer.lock') }}
+
+      - run: composer install --no-interaction --prefer-dist --no-progress
+
+      # A APP_KEY nao vive no repo. Em CI ela e descartavel: nada cifrado aqui
+      # sobrevive ao job.
+      - name: Preparar ambiente
+        run: |
+          cp .env.example .env
+          php artisan key:generate
+
+      - name: Pint (formatacao)
+        run: vendor/bin/pint --test
+
+      - name: PHPUnit
+        run: php artisan test
+
+  frontend:
+    name: Web (vitest)
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: apps/web
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: apps/web/pnpm-lock.yaml
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm lint
+
+      - run: pnpm test

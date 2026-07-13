@@ -1,0 +1,38 @@
+#!/bin/sh
+# Roda a mesma coisa que o CI, antes do push.
+#
+# Por que existe, se ja ha GitHub Actions: o repo e PRIVADO no plano free, e os
+# minutos de Actions sao cota compartilhada entre os repos — ja se esgotaram em
+# outro projeto. Um CI que nao roda e pior que nenhum: da um verde que nao
+# significa nada. Este hook nao depende de cota.
+#
+# Instalar (uma vez por clone):
+#     git config core.hooksPath .githooks
+#
+# Pular num caso justificado:
+#     git push --no-verify
+
+set -e
+
+raiz="$(git rev-parse --show-toplevel)"
+
+# O `php` do PATH nesta maquina e 8.1, e o projeto exige 8.2+. PHP_BIN permite
+# apontar outro binario sem editar o hook.
+if [ -n "$PHP_BIN" ]; then
+    php="$PHP_BIN"
+elif [ -x "/c/Users/mysho/bin/php84/php.exe" ]; then
+    php="/c/Users/mysho/bin/php84/php.exe"
+else
+    php="php"
+fi
+
+echo "→ Pint"
+(cd "$raiz/apps/api" && "$php" vendor/bin/pint --test)
+
+echo "→ PHPUnit"
+(cd "$raiz/apps/api" && "$php" artisan test)
+
+echo "→ vitest"
+(cd "$raiz/apps/web" && pnpm test)
+
+echo "✓ suite verde — pode empurrar"

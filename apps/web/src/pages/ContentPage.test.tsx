@@ -126,8 +126,12 @@ test('gerar: clique dispara POST e mostra o estado de geração', async () => {
   // O texto nomeia o AGENTE do run, nao a tela: esta pagina dispara cinco
   // agentes pelo mesmo hook, e ja disse "Gerando sua estrategia" para todos.
   // A assercao e no role=status, nao na pagina: o link "← Estrategia" e do menu.
+  // O role=status aparece JA no estado "starting" (o run ainda nao existe), com a
+  // frase generica. A frase do agente so chega quando o GET /ai-runs/42 resolve —
+  // afirmar o texto no instante em que o elemento aparece e uma corrida, e ela
+  // perdia ~1 vez em 5. Espera-se o ESTADO, nao o instante.
   const status = await screen.findByRole('status')
-  expect(status).toHaveTextContent(/escrevendo suas peças/i)
+  await waitFor(() => expect(status).toHaveTextContent(/escrevendo suas peças/i))
   expect(status).not.toHaveTextContent(/estratégia/i)
 })
 
