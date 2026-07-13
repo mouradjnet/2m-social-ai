@@ -21,5 +21,10 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: ['./src/test/setup.ts'],
     css: false,
+    // A tela formata data e hora no fuso da MAQUINA. Sem fixar um, o mesmo teste
+    // passava aqui (America/Cayenne, UTC-3) e quebrava no CI (UTC): a peça agendada
+    // aparecia às 13:00 em vez de 10:00. O teste media o relógio de quem rodava, não
+    // o produto. `America/Sao_Paulo` é o mesmo default de `projects.timezone`.
+    env: { TZ: 'America/Sao_Paulo' },
   },
 })
