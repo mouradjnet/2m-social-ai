@@ -1377,7 +1377,7 @@ Acompanhar `ai_runs` até `succeeded` (via psql, como nas fatias anteriores). De
 - [ ] **Step 4: Ler as 5 peças**
 
 ```bash
-export PGPASSWORD='2m_social_dev_2026'
+export PGPASSWORD="$DB_PASSWORD"  # vem do apps/api/.env, nunca escrita aqui
 "C:/Users/mysho/bin/pgsql16/bin/psql.exe" -h 127.0.0.1 -p 5433 -U postgres -d 2m_social_ai -Atc \
  "select format||'/'||channel||' | '||title||' :: '||left(caption,80) from contents where origin_ai_run_id=$RUN;"
 ```

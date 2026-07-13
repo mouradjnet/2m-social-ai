@@ -1556,7 +1556,7 @@ Logar em http://localhost:5173, ir ao projeto 1, à Estratégia, clicar em "Ver 
 6. Conferir no banco que `content_revisions` registrou os movimentos:
 
 ```bash
-export PGPASSWORD='2m_social_dev_2026'
+export PGPASSWORD="$DB_PASSWORD"  # vem do apps/api/.env, nunca escrita aqui
 "C:/Users/mysho/bin/pgsql16/bin/psql.exe" -h 127.0.0.1 -p 5433 -U postgres -d 2m_social_ai -Atc \
  "select from_status||' -> '||to_status||' (user '||user_id||')' from content_revisions order by id desc limit 5;"
 ```
