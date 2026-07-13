@@ -258,4 +258,32 @@ class RewriteGenerationTest extends TestCase
 
         $this->rewrite($peca)->assertUnauthorized();
     }
+
+    /**
+     * `latest_text_revision` responde "o TEXTO mudou?", nao "a peca mudou?".
+     * Transicao de status grava revisao com `changes` NULO — e se ela contasse, arquivar
+     * uma peca reprovada apagaria a violacao do card, que e o oposto do que quem vai
+     * corrigir precisa ver.
+     */
+    public function test_transicao_de_status_nao_conta_como_troca_de_texto(): void
+    {
+        $workspace = Workspace::factory()->create();
+        $editor = $this->membro($workspace, WorkspaceRole::Editor);
+        $project = Project::factory()->create(['workspace_id' => $workspace->id]);
+        $peca = $this->peca($project);
+        $this->reprova($peca);
+
+        Sanctum::actingAs($editor);
+
+        // Arquivar: grava revisao de STATUS (changes nulo).
+        $this->patchJson("/api/v1/contents/{$peca->id}", ['status' => 'archived'])->assertOk();
+
+        $this->assertNull($peca->fresh()->latestTextRevision);
+
+        // Reescrever: grava revisao de TEXTO (com o de-para).
+        $peca->update(['status' => 'review']);
+        $this->rewrite($peca)->assertStatus(202);
+
+        $this->assertNotNull($peca->fresh()->latestTextRevision);
+    }
 }

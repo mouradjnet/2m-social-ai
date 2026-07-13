@@ -137,11 +137,13 @@ export interface Content {
   latest_seo: ContentSeo | null
   source: 'manual' | 'ai' | 'research'
   origin_ai_run_id: number | null
-  /**
-   * ISO 8601. É como se sabe que uma revisão ficou VELHA: a reescrita muda o texto
-   * no lugar, e o veredito anterior passa a falar de um texto que não existe mais.
-   */
   updated_at: string
+  /**
+   * A última vez que o TEXTO mudou (reescrita, SEO aplicado). É como se sabe que um
+   * veredito ficou velho — `updated_at` não serve, porque também muda quando a peça
+   * anda no fluxo ou é arquivada. Null se o texto nunca mudou.
+   */
+  latest_text_revision: { id: number; created_at: string } | null
 }
 
 export interface PillarAdherence {

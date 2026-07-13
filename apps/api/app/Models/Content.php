@@ -42,6 +42,27 @@ class Content extends Model
         return $this->hasOne(ContentReview::class)->latestOfMany();
     }
 
+    /**
+     * A ultima vez que o TEXTO mudou (reescrita do rewriter, SEO aplicado).
+     *
+     * `updated_at` nao serve para isso: ele muda quando a peca ANDA no fluxo ou e
+     * arquivada, e a tela usaria isso para decidir se o veredito do revisor ficou
+     * velho — arquivar uma peca reprovada apagaria a violacao do card, que e
+     * exatamente o oposto do que o usuario precisa ver.
+     *
+     * Transicao de status grava revisao com `changes` NULO; troca de texto grava o
+     * de-para. E a diferenca entre "a peca mudou" e "o texto mudou".
+     */
+    public function latestTextRevision(): HasOne
+    {
+        // Nao basta `whereNotNull`: a transicao de status grava `changes` como `{}`
+        // (jsonb vazio), nao NULL. Um `{}` passaria pelo filtro e arquivar uma peca
+        // reprovada apagaria a violacao do card.
+        return $this->hasOne(ContentRevision::class)
+            ->whereRaw("changes IS NOT NULL AND changes <> '{}'::jsonb")
+            ->latestOfMany();
+    }
+
     /** A sugestao de SEO mais recente. `applied_at` diz se ela ja virou a peca. */
     public function latestSeo(): HasOne
     {

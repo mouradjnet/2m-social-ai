@@ -27,6 +27,7 @@ function content(id: number, status: Content['status'], scheduledFor: string | n
     source: 'ai',
     origin_ai_run_id: 7,
     updated_at: '2026-07-13T09:00:00Z',
+    latest_text_revision: null,
   }
 }
 

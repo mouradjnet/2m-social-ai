@@ -50,11 +50,18 @@ export function ContentCard({
   const [copiado, setCopiado] = useState(false)
   const review = content.latest_review
 
-  // O veredito fala do texto que existia QUANDO ele foi escrito. A reescrita troca o
+  // O veredito fala do TEXTO que existia quando ele foi escrito. A reescrita troca o
   // texto no lugar, então uma violação já corrigida continuaria no card — acusando um
-  // erro que não está mais lá. Se a peça mudou depois da revisão, o veredito é velho.
+  // erro que não está mais lá.
+  //
+  // Não serve olhar `updated_at`: ele muda quando a peça anda no fluxo ou é arquivada.
+  // Arquivar uma peça reprovada apagaria a violação do card — o oposto do que quem vai
+  // corrigir precisa ver. A pergunta é se o TEXTO mudou, e quem responde isso é a
+  // última revisão COM `changes` (transição de status grava `changes` nulo).
+  const textoMudouEm = content.latest_text_revision?.created_at ?? null
+
   const reviewVelha =
-    review !== null && new Date(review.created_at) < new Date(content.updated_at)
+    review !== null && textoMudouEm !== null && new Date(review.created_at) < new Date(textoMudouEm)
 
   const podeReescrever = review?.verdict === 'fail' && !reviewVelha
   const seo = content.latest_seo

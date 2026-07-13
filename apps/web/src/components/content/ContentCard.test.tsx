@@ -22,6 +22,7 @@ function content(overrides: Partial<Content> = {}): Content {
     source: 'ai',
     origin_ai_run_id: 7,
     updated_at: '2026-07-13T10:00:00Z',
+    latest_text_revision: null,
     ...overrides,
   }
 }
@@ -227,8 +228,11 @@ test('revisao anterior a reescrita vira aviso, nao violacao', () => {
     created_at: '2026-07-13T10:00:00Z',
   }
 
-  // A peca mudou DEPOIS da revisao: foi reescrita.
-  const peca = content({ latest_review: review, updated_at: '2026-07-13T11:00:00Z' })
+  // O TEXTO mudou depois da revisao: foi reescrita.
+  const peca = content({
+    latest_review: review,
+    latest_text_revision: { id: 3, created_at: '2026-07-13T11:00:00Z' },
+  })
 
   render(<ContentCard content={peca} {...noop} />)
 
@@ -239,4 +243,36 @@ test('revisao anterior a reescrita vira aviso, nao violacao', () => {
   expect(screen.queryByText(/1 violação/i)).not.toBeInTheDocument()
   expect(screen.queryByText(/use um caso real/i)).not.toBeInTheDocument()
   expect(screen.queryByRole('button', { name: /reescrever com ia/i })).not.toBeInTheDocument()
+})
+
+/**
+ * O bug que a heuristica ingenua tinha: `updated_at` muda quando a peca ANDA no fluxo
+ * ou e arquivada. Arquivar uma peca reprovada apagaria a violacao do card — o oposto
+ * do que quem vai corrigir precisa ver. So a troca de TEXTO envelhece um veredito.
+ */
+test('arquivar a peca nao apaga a violacao do card', () => {
+  const review = {
+    id: 1,
+    verdict: 'fail' as const,
+    summary: 'Depoimento fabricado.',
+    violations: [
+      { rule: 'Depoimento fabricado', excerpt: 'O Ricardo', suggestion: 'Use um caso real.' },
+    ],
+    created_at: '2026-07-12T15:26:00Z',
+  }
+
+  // Arquivada 14 minutos DEPOIS da revisao (o caso real da peca 10 em producao),
+  // mas o texto nunca mudou.
+  const peca = content({
+    latest_review: review,
+    status: 'archived',
+    updated_at: '2026-07-12T15:40:00Z',
+    latest_text_revision: null,
+  })
+
+  render(<ContentCard content={peca} {...noop} />)
+
+  expect(screen.getByText(/1 violação/i)).toBeInTheDocument()
+  expect(screen.getByText(/use um caso real/i)).toBeInTheDocument()
+  expect(screen.queryByText(/texto reescrito/i)).not.toBeInTheDocument()
 })
