@@ -113,6 +113,43 @@ class AnalyticsMetricsTest extends TestCase
         $this->assertSame(100, collect($aderencia['pilares'])->firstWhere('nome', 'Educacao')['peso_real']);
     }
 
+    /**
+     * Peca arquivada foi DESCARTADA (reprovada pelo revisor, ou tirada do caminho pelo
+     * humano): nao e entrega. Conta-la mede o que a marca ja escreveu um dia, nao o
+     * calendario vivo — e o efeito e perverso, porque agora e este numero que decide
+     * qual pilar o proximo lote do copywriter cobre: um pilar cheio de peca reprovada
+     * apareceria em dia e deixaria de receber pecas novas.
+     */
+    public function test_arquivadas_nao_contam_como_entregues(): void
+    {
+        $this->activeStrategy([
+            ['name' => 'Educacao', 'weight' => 50, 'description' => 'd'],
+            ['name' => 'Prova social', 'weight' => 50, 'description' => 'd'],
+        ]);
+
+        // Vivas: 1 e 1 = 50/50, em dia com o que a estrategia pediu.
+        $this->content(['pillar' => 'Educacao']);
+        $this->content(['pillar' => 'Prova social']);
+
+        // Arquivadas em Educacao. Se contassem, Educacao apareceria com 80% (4 de 5) e
+        // "Prova social" viraria o pilar atrasado — um alvo inventado por peca morta.
+        $this->content(['pillar' => 'Educacao', 'status' => 'archived']);
+        $this->content(['pillar' => 'Educacao', 'status' => 'archived']);
+        $this->content(['pillar' => 'Educacao', 'status' => 'archived']);
+
+        $aderencia = Metrics::for($this->project)['aderencia'];
+
+        $this->assertSame(2, $aderencia['pecas_com_pilar']);
+
+        foreach (['Educacao', 'Prova social'] as $nome) {
+            $pilar = collect($aderencia['pilares'])->firstWhere('nome', $nome);
+
+            $this->assertSame(1, $pilar['pecas']);
+            $this->assertSame(50, $pilar['peso_real']);
+            $this->assertSame(0, $pilar['desvio']);
+        }
+    }
+
     public function test_sem_estrategia_ativa_nao_ha_aderencia(): void
     {
         $this->content(['pillar' => 'Educacao']);

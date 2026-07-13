@@ -52,6 +52,14 @@ class Metrics
      * coluna existir) sao contadas a parte, para o relatorio nao fingir que a amostra
      * e completa.
      *
+     * ARQUIVADAS NAO CONTAM COMO ENTREGUES. Peca arquivada foi descartada — foi
+     * reprovada pelo revisor, ou o humano a tirou do caminho. Conta-la como entrega
+     * mede o que a marca ja ESCREVEU um dia, nao o calendario VIVO, e o efeito e
+     * perverso: um pilar cheio de peca reprovada aparece em dia e deixa de receber
+     * pecas novas. E a mesma regra que o `existing_contents` do copywriter ja segue
+     * (peca arquivada DEVE ser reescrita) — as duas leituras nao podem divergir, e
+     * agora e este numero que decide qual pilar o proximo lote cobre.
+     *
      * @param  Collection<int, Content>  $contents
      */
     private static function aderencia(Project $project, Collection $contents): ?array
@@ -62,7 +70,7 @@ class Metrics
             return null;
         }
 
-        $comPilar = $contents->whereNotNull('pillar');
+        $comPilar = $contents->whereNotNull('pillar')->where('status', '!=', 'archived');
         $total = $comPilar->count();
         $porPilar = $comPilar->countBy('pillar');
 
@@ -83,7 +91,9 @@ class Metrics
         return [
             'pilares' => $pilares,
             'pecas_com_pilar' => $total,
-            'sem_pilar' => $contents->whereNull('pillar')->count(),
+            // Tambem sem as arquivadas: e a mesma amostra do `pecas_com_pilar` acima,
+            // e um `sem_pilar` de outra populacao nao diria nada sobre ela.
+            'sem_pilar' => $contents->whereNull('pillar')->where('status', '!=', 'archived')->count(),
         ];
     }
 
