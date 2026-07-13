@@ -63,6 +63,81 @@ class StrategyGenerationTest extends TestCase
         $this->app->bind(LlmProvider::class, fn () => $provider);
     }
 
+    private function estrategia(Project $project, string $status): Strategy
+    {
+        return Strategy::create([
+            'workspace_id' => $project->workspace_id,
+            'project_id' => $project->id,
+            'title' => "Estrategia {$status}",
+            'summary' => 's',
+            'editorial_line' => 'e',
+            'pillars' => [['name' => 'Educacao', 'weight' => 100, 'description' => 'd']],
+            'status' => $status,
+        ]);
+    }
+
+    /**
+     * Aprovar uma estrategia REBAIXA a anterior. O dominio fala em "a estrategia
+     * ativa", no singular, e todo mundo le `->where('status','active')->latest()`.
+     * Em producao o projeto ficou com DUAS ativas (a do mock e a real) e so nao
+     * quebrou porque a real era a mais nova — sorte, nao regra.
+     */
+    public function test_aprovar_uma_estrategia_arquiva_a_ativa_anterior(): void
+    {
+        $workspace = Workspace::factory()->create();
+        $editor = $this->memberOf($workspace, WorkspaceRole::Editor);
+        $project = Project::factory()->create(['workspace_id' => $workspace->id]);
+
+        $velha = $this->estrategia($project, 'active');
+        $nova = $this->estrategia($project, 'draft');
+
+        Sanctum::actingAs($editor);
+
+        $this->patchJson("/api/v1/strategies/{$nova->id}", ['status' => 'active'])->assertOk();
+
+        $this->assertSame('archived', $velha->refresh()->status);
+        $this->assertSame('active', $nova->refresh()->status);
+
+        $this->assertSame(1, Strategy::withoutGlobalScopes()
+            ->where('project_id', $project->id)
+            ->where('status', 'active')
+            ->count());
+    }
+
+    /** A estrategia ativa de OUTRO projeto nao e tocada: o escopo e o projeto. */
+    public function test_aprovar_nao_mexe_na_ativa_de_outro_projeto(): void
+    {
+        $workspace = Workspace::factory()->create();
+        $editor = $this->memberOf($workspace, WorkspaceRole::Editor);
+        $projetoA = Project::factory()->create(['workspace_id' => $workspace->id]);
+        $projetoB = Project::factory()->create(['workspace_id' => $workspace->id]);
+
+        $ativaDeB = $this->estrategia($projetoB, 'active');
+        $novaDeA = $this->estrategia($projetoA, 'draft');
+
+        Sanctum::actingAs($editor);
+
+        $this->patchJson("/api/v1/strategies/{$novaDeA->id}", ['status' => 'active'])->assertOk();
+
+        $this->assertSame('active', $ativaDeB->refresh()->status);
+    }
+
+    /**
+     * O controller e a regra; o indice parcial e a REDE. Um caminho novo que esqueca
+     * de rebaixar a anterior nao consegue gravar o estado invalido.
+     */
+    public function test_o_banco_recusa_duas_estrategias_ativas_no_mesmo_projeto(): void
+    {
+        $workspace = Workspace::factory()->create();
+        $project = Project::factory()->create(['workspace_id' => $workspace->id]);
+
+        $this->estrategia($project, 'active');
+
+        $this->expectException(UniqueConstraintViolationException::class);
+
+        $this->estrategia($project, 'active');
+    }
+
     /**
      * O teto mensal por workspace e a unica trava contra alguem torrar a chave da
      * Anthropic. Em producao com `AI_PROVIDER=mock` (o modo de demonstracao), o mock

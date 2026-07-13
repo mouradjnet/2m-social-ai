@@ -11,6 +11,7 @@ use App\Models\Strategy;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 
 class StrategyController extends Controller
@@ -101,7 +102,25 @@ class StrategyController extends Controller
             'status' => ['sometimes', 'in:draft,active,archived'],
         ]);
 
-        $strategy->update($data);
+        // Aprovar uma estrategia REBAIXA a anterior. O dominio inteiro fala em "a
+        // estrategia ativa", no singular, e le `->where('status','active')->latest()`;
+        // duas ativas e um estado que ninguem sabe interpretar — e era alcancavel por
+        // um PATCH. Em producao a estrategia do mock ficou ativa junto com a real, e
+        // so nao quebrou porque a real era a mais nova.
+        //
+        // Na MESMA transacao: entre arquivar as outras e ativar esta, o indice parcial
+        // `strategies_one_active_per_project` nao pode ver duas ativas.
+        DB::transaction(function () use ($strategy, $data) {
+            if (($data['status'] ?? null) === 'active') {
+                Strategy::withoutGlobalScopes()
+                    ->where('project_id', $strategy->project_id)
+                    ->where('id', '!=', $strategy->id)
+                    ->where('status', 'active')
+                    ->update(['status' => 'archived']);
+            }
+
+            $strategy->update($data);
+        });
 
         return response()->json(['data' => $strategy->refresh()]);
     }
