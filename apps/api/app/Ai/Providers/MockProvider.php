@@ -7,8 +7,14 @@ use Carbon\CarbonImmutable;
 /**
  * Desenvolvimento e CI. Nenhum teste automatizado chama a API real.
  *
- * A saida e deterministica e satisfaz o schema do agente. Contagens de token
- * sao plausiveis para que o calculo de custo e o orcamento sejam exercitados.
+ * A saida e deterministica e satisfaz o schema do agente. Os tokens sao ZERO, e
+ * por consequencia o custo tambem: nenhuma chamada foi feita, nada foi pago.
+ *
+ * Antes o mock declarava 1400/900 tokens "plausiveis" para exercitar o calculo de
+ * custo. O preco disso apareceu em producao com `AI_PROVIDER=mock`: cada geracao
+ * debitava 3 centavos do orcamento mensal do workspace sem gastar nada — e esse
+ * teto e a unica trava contra alguem torrar a chave. O calculo de custo ja e
+ * coberto pelo AnthropicProviderTest, com os tokens que a API real devolve.
  */
 class MockProvider implements LlmProvider
 {
@@ -17,8 +23,6 @@ class MockProvider implements LlmProvider
         return new LlmResponse(
             output: $this->fixtureFor($request),
             model: $request->model,
-            inputTokens: 1_400,
-            outputTokens: 900,
         );
     }
 

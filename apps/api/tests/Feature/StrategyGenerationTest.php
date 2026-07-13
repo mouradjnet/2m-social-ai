@@ -63,6 +63,25 @@ class StrategyGenerationTest extends TestCase
         $this->app->bind(LlmProvider::class, fn () => $provider);
     }
 
+    /**
+     * O teto mensal por workspace e a unica trava contra alguem torrar a chave da
+     * Anthropic. Em producao com `AI_PROVIDER=mock` (o modo de demonstracao), o mock
+     * declarava tokens fabricados e cada geracao debitava 3 centavos de um orcamento
+     * que ninguem gastou. Gerar no mock nao pode consumir teto nenhum.
+     */
+    public function test_geracao_no_mock_nao_consome_o_orcamento_do_workspace(): void
+    {
+        $workspace = Workspace::factory()->create();
+        $editor = $this->memberOf($workspace, WorkspaceRole::Editor);
+        $project = Project::factory()->create(['workspace_id' => $workspace->id]);
+
+        Sanctum::actingAs($editor);
+
+        $this->generate($project)->assertStatus(202);
+
+        $this->assertSame(0, Budget::spentCentsThisMonth($workspace->fresh()));
+    }
+
     public function test_geracao_devolve_202_e_grava_a_estrategia_como_rascunho(): void
     {
         $workspace = Workspace::factory()->create();
@@ -80,10 +99,11 @@ class StrategyGenerationTest extends TestCase
         $this->assertSame('mock', $run->provider);
         $this->assertNull($run->error);
 
-        // MockProvider devolve 1400 tokens de entrada e 900 de saida.
-        $this->assertSame(1400, $run->input_tokens);
-        $this->assertSame(900, $run->output_tokens);
-        $this->assertSame(3, $run->cost_cents);
+        // O MockProvider nao chama a API: zero token, zero custo. Se isto voltar a
+        // ser > 0, o mock volta a comer o orcamento do workspace (ver MockProvider).
+        $this->assertSame(0, $run->input_tokens);
+        $this->assertSame(0, $run->output_tokens);
+        $this->assertSame(0, $run->cost_cents);
         $this->assertNotNull($run->latency_ms);
 
         $strategy = Strategy::withoutGlobalScopes()->where('project_id', $project->id)->sole();
@@ -270,7 +290,7 @@ class StrategyGenerationTest extends TestCase
             ->assertOk()
             ->assertJsonPath('status', 'succeeded')
             ->assertJsonPath('agent', 'strategist')
-            ->assertJsonPath('cost_cents', 3)
+            ->assertJsonPath('cost_cents', 0)
             ->assertJsonPath('error', null);
     }
 
