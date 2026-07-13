@@ -1,0 +1,22 @@
+# O Dockerfile faz `COPY apps/api/ ./` — a pasta INTEIRA, inclusive o que o git
+# ignora. Sem este arquivo, um `docker build` nesta maquina embarca o
+# `apps/api/.env` de desenvolvimento (com a ANTHROPIC_API_KEY) dentro da imagem.
+#
+# O Render nao morde hoje porque builda a partir do clone do repo, onde o .env nao
+# existe. Isto protege o build LOCAL, e o dia em que a imagem for construida em CI.
+.env
+.env.*
+!.env.example
+
+# Dependencias: sao instaladas DENTRO da imagem (composer no estagio vendor, pnpm
+# no estagio web). Copiar as de fora atrasa o build e pode sobrescrever o que foi
+# instalado para o alvo certo.
+node_modules
+apps/*/node_modules
+apps/api/vendor
+
+# Config cacheada apontando para o banco DESTA maquina. O `docker/start.sh`
+# regenera no boot, com o ambiente do container.
+apps/api/bootstrap/cache/*.php
+
+.git
