@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\V1\ContentController;
 use App\Http\Controllers\Api\V1\CopyController;
 use App\Http\Controllers\Api\V1\DesignController;
 use App\Http\Controllers\Api\V1\ExportController;
+use App\Http\Controllers\Api\V1\InvitationController;
 use App\Http\Controllers\Api\V1\ProjectController;
 use App\Http\Controllers\Api\V1\ReviewController;
 use App\Http\Controllers\Api\V1\RewriteController;
@@ -34,7 +35,20 @@ Route::prefix('v1')->group(function () {
 
             Route::post('projects', [ProjectController::class, 'store'])
                 ->middleware('workspace:editor');
+
+            // Convidar e gesto de administracao: quem edita conteudo nao decide quem
+            // entra no workspace.
+            Route::get('invitations', [InvitationController::class, 'index'])
+                ->middleware('workspace:admin');
+            Route::post('invitations', [InvitationController::class, 'store'])
+                ->middleware('workspace:admin');
         });
+
+        // FORA do grupo acima de proposito: quem aceita ainda NAO e membro, entao nao
+        // passaria pelo `workspace:{papel}` — e nao ha `{workspace}` na rota porque o
+        // token e que diz para onde o convite leva. Exige login: o email da conta tem
+        // de bater com o do convite.
+        Route::post('invitations/{token}:accept', [InvitationController::class, 'accept']);
 
         // Depois de criado, o projeto e acessado pelo proprio id: o
         // WorkspaceMemberScope resolve o tenant e devolve 404 se for de outro.

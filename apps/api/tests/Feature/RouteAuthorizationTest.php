@@ -44,6 +44,8 @@ class RouteAuthorizationTest extends TestCase
         'POST api/v1/auth/logout' => 'so exige token, nao papel (AuthAndWorkspaceTest: revoga o token usado)',
         'POST api/v1/workspaces' => 'cria o tenant; nao ha projeto a autorizar (WorkspaceIsolationTest)',
         'POST api/v1/workspaces/{workspace}/projects' => 'middleware workspace:{papel} (WorkspaceIsolationTest)',
+        'POST api/v1/workspaces/{workspace}/invitations' => 'InvitationTest: editor 403, nao-membro 404, sem token 401 (e papel acima do proprio 422)',
+        'POST api/v1/invitations/{token}:accept' => 'InvitationTest: sem token 401, email de outro 403, vencido/aceito/inexistente 422. Nao tem {workspace}: quem aceita ainda nao e membro, e o token e que diz para onde leva',
         'PATCH api/v1/contents/{content}' => 'ContentTransitionTest: viewer 403, outro tenant 404',
         'POST api/v1/contents/{content}/unarchive' => 'ContentTransitionTest: viewer 403, outro tenant 404, sem token 401',
         'POST api/v1/contents/{content}/seo:apply' => 'SeoGenerationTest: outro tenant 404',

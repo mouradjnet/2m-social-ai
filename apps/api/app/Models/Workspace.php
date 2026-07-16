@@ -44,6 +44,11 @@ class Workspace extends Model
         return $this->hasMany(Project::class);
     }
 
+    public function invitations(): HasMany
+    {
+        return $this->hasMany(WorkspaceInvitation::class);
+    }
+
     public function roleFor(User $user): ?WorkspaceRole
     {
         return $this->members->firstWhere('user_id', $user->id)?->role;
