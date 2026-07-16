@@ -46,12 +46,12 @@ class ContentZip
             throw new RuntimeException("Nao foi possivel criar o zip em {$caminho}.");
         }
 
-        $zip->addFromString('calendario.csv', self::csv($pecas));
+        $zip->addFromString('calendario.csv', self::csv($project, $pecas));
 
         // Nomes repetidos se sobrescreveriam dentro do zip (duas pecas no mesmo dia e
         // canal, com titulo parecido): o indice garante um arquivo por peca.
         foreach ($pecas->values() as $i => $peca) {
-            $zip->addFromString(self::nomeDoArquivo($peca, $i + 1), self::markdown($project, $peca));
+            $zip->addFromString(self::nomeDoArquivo($project, $peca, $i + 1), self::markdown($project, $peca));
         }
 
         $zip->close();
@@ -59,11 +59,13 @@ class ContentZip
         return Str::slug($project->name).'-conteudo-'.now($project->timezone)->format('Y-m-d').'.zip';
     }
 
-    private static function nomeDoArquivo(Content $peca, int $ordem): string
+    private static function nomeDoArquivo(Project $project, Content $peca, int $ordem): string
     {
         // A data primeiro: em qualquer gerenciador de arquivos, a ordem alfabetica vira
-        // a ordem do calendario.
-        $quando = $peca->scheduled_for?->format('Y-m-d') ?? 'sem-data';
+        // a ordem do calendario. No FUSO DO PROJETO: uma peca das 21:30 e 00:30 UTC do
+        // dia seguinte, e o arquivo nasceria com a data errada — desordenando justamente
+        // o que esse nome existe para ordenar.
+        $quando = $peca->scheduled_for?->timezone($project->timezone)->format('Y-m-d') ?? 'sem-data';
 
         return sprintf(
             'pecas/%02d-%s-%s-%s.md',
@@ -75,7 +77,7 @@ class ContentZip
     }
 
     /** @param  Collection<int, Content>  $pecas */
-    private static function csv(Collection $pecas): string
+    private static function csv(Project $project, Collection $pecas): string
     {
         $linhas = fopen('php://temp', 'r+');
 
@@ -85,9 +87,14 @@ class ContentZip
         fputcsv($linhas, ['Data', 'Hora', 'Canal', 'Formato', 'Pilar', 'Titulo', 'Status']);
 
         foreach ($pecas as $peca) {
+            // No fuso do PROJETO: este e o calendario que o cliente abre para saber a
+            // que horas publicar, e o banco guarda UTC (config/database.php fixa a
+            // conexao pgsql em UTC).
+            $quando = $peca->scheduled_for?->timezone($project->timezone);
+
             fputcsv($linhas, [
-                $peca->scheduled_for?->format('d/m/Y') ?? '',
-                $peca->scheduled_for?->format('H:i') ?? '',
+                $quando?->format('d/m/Y') ?? '',
+                $quando?->format('H:i') ?? '',
                 $peca->channel,
                 $peca->format,
                 $peca->pillar ?? '',

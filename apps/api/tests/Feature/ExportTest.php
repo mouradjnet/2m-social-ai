@@ -168,6 +168,48 @@ class ExportTest extends TestCase
         $this->assertStringStartsWith("\u{FEFF}", $csv);
     }
 
+    /**
+     * O CSV e o calendario que o CLIENTE abre: a hora dele manda publicar. O banco
+     * guarda UTC (config/database.php fixa a conexao pgsql em UTC), entao formatar
+     * sem converter entrega o horario errado — e o `.md` da MESMA peca, que converte,
+     * discordaria do CSV dentro do mesmo zip.
+     *
+     * O cenario cruza a meia-noite de proposito: 00:30Z e 21:30 do DIA ANTERIOR em
+     * Sao Paulo. Assim a hora e a data divergem, e o nome do arquivo (que comeca pela
+     * data justamente para a ordem alfabetica virar a ordem do calendario) tambem
+     * precisa estar no fuso do projeto.
+     */
+    public function test_o_calendario_usa_o_fuso_do_projeto_e_nao_utc(): void
+    {
+        $workspace = Workspace::factory()->create();
+        $editor = $this->membro($workspace, WorkspaceRole::Editor);
+        $project = Project::factory()->create([
+            'workspace_id' => $workspace->id,
+            'timezone' => 'America/Sao_Paulo',
+        ]);
+
+        $this->peca($project, 'scheduled', ['scheduled_for' => '2026-08-04T00:30:00Z']);
+
+        Sanctum::actingAs($editor);
+
+        $arquivos = $this->abrir(
+            $this->get("/api/v1/projects/{$project->id}/export")->assertOk()->streamedContent()
+        );
+
+        $csv = $arquivos['calendario.csv'];
+
+        $this->assertStringContainsString('03/08/2026,21:30', $csv, 'O CSV entregou o horario em UTC.');
+        $this->assertStringNotContainsString('04/08/2026', $csv);
+        $this->assertStringNotContainsString('00:30', $csv);
+
+        // O `.md` ja convertia. O zip nao pode dizer duas coisas sobre a mesma peca.
+        $md = collect($arquivos)->first(fn ($_, $nome) => str_starts_with($nome, 'pecas/'));
+        $this->assertStringContainsString('03/08/2026 às 21:30', $md);
+
+        $nome = collect($arquivos)->keys()->first(fn ($n) => str_starts_with($n, 'pecas/'));
+        $this->assertStringStartsWith('pecas/01-2026-08-03-', $nome, 'O nome do arquivo saiu na data UTC.');
+    }
+
     public function test_sem_peca_pronta_nao_ha_o_que_exportar(): void
     {
         $workspace = Workspace::factory()->create();
