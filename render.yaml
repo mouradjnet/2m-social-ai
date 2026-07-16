@@ -1,14 +1,25 @@
-# MODO FREE — sem cartao.
+# MODO FREE — sem cartao, e o banco mora FORA do Render.
 #
 # O plano free do Render NAO TEM background worker, e sem worker o produto nao
 # funciona: toda geracao de IA e um job, e o usuario ficaria olhando um spinner
 # eterno. Entao aqui e UM servico so, e o container roda o servidor E a fila, sob
 # supervisao (docker/supervisord.conf).
 #
+# O Postgres free do RENDER expira em 30 dias e depois e APAGADO — nao suspenso,
+# apagado. Por isso o banco nao esta mais aqui: hoje e um Postgres free do NEON,
+# que nao expira. O custo dessa escolha e que ele deixou de ser declarado neste
+# arquivo — `DB_URL` e `sync: false` e vive so no painel. Ver docs/DEPLOY.md.
+#
 # O preco disso, honestamente:
 #   - o servico DORME apos 15 min sem trafego; o primeiro acesso depois demora ~1min,
 #     e um job enfileirado so anda quando alguem acorda o servico;
-#   - o Postgres free do Render EXPIRA em 30 dias, e depois e apagado.
+#   - o Neon suspende o compute apos 5 min ocioso, entao o primeiro acesso ainda
+#     paga um cold start do banco por cima disso.
+#
+# NAO ponha um pinger para manter a demo acordada. Com o servico de pe, o
+# `queue:work` polla o banco sem parar, o compute do Neon nunca suspende, e os
+# 100 CU-hrs/mes do free (a 0.25 CU minimo) acabam em ~17 dias. O sono dos dois
+# lados e o que mantem isto de graca.
 #
 # Serve para validar e para mostrar. Para um cliente de verdade, use o
 # `render.production.yaml` (web + worker + Postgres pagos, cada um US$7): la nada
@@ -43,14 +54,16 @@ services:
       - key: APP_URL
         sync: false
 
-      # O Render expoe a conexao inteira, nao host/porta separados — e o Laravel
-      # aceita: config/database.php le `DB_URL` antes de DB_HOST/DB_PORT.
+      # O banco e do Neon, entao nao ha `fromDatabase` para ler daqui: o valor e
+      # preenchido no painel. Use a string DIRETA do Neon, nao a `-pooler`: o
+      # pooler e PgBouncer em modo transacao, e o `migrate --force` do start.sh
+      # com os prepared statements do PDO nao sobrevive a isso.
+      # O Laravel aceita a conexao inteira: config/database.php le `DB_URL`
+      # (postgres://...) antes de DB_HOST/DB_PORT.
       - key: DB_CONNECTION
         value: pgsql
       - key: DB_URL
-        fromDatabase:
-          name: 2m-social-ai-db
-          property: connectionString
+        sync: false
 
       # Fila, cache e sessao no banco: sem Redis no MVP (ADR).
       - key: QUEUE_CONNECTION
@@ -79,8 +92,3 @@ services:
 
       - key: LOG_CHANNEL
         value: stderr
-
-databases:
-  - name: 2m-social-ai-db
-    plan: free
-    postgresMajorVersion: "16"
