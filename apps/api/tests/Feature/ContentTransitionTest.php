@@ -366,4 +366,100 @@ class ContentTransitionTest extends TestCase
         $this->patchJson("/api/v1/contents/{$content->id}", ['status' => 'production'])
             ->assertNotFound();
     }
+
+    /**
+     * O BECO SEM SAIDA. `archived` era terminal, mas o rewriter conserta peca
+     * arquivada — e o resultado ficava preso no arquivo, sem poder ser revisado nem
+     * publicado (na sessao em que isso apareceu, a peca teve de ser movida por SQL).
+     *
+     * Volta de ONDE SAIU, e o historico ja sabia: toda transicao grava a revisao.
+     */
+    public function test_desarquivar_devolve_a_peca_ao_status_de_onde_ela_saiu(): void
+    {
+        $workspace = Workspace::factory()->create();
+        $editor = $this->memberOf($workspace, WorkspaceRole::Editor);
+        $project = Project::factory()->create(['workspace_id' => $workspace->id]);
+        $content = $this->content($project, 'review');
+
+        Sanctum::actingAs($editor);
+
+        // Arquiva pelo caminho normal: e ele que grava de onde a peca veio.
+        $this->patchJson("/api/v1/contents/{$content->id}", ['status' => 'archived'])->assertOk();
+        $this->assertSame('archived', $content->refresh()->status);
+
+        $this->postJson("/api/v1/contents/{$content->id}/unarchive")
+            ->assertOk()
+            ->assertJsonPath('data.status', 'review');
+
+        $this->assertSame('review', $content->refresh()->status);
+
+        // O caminho de volta tambem e historia: sem esta linha, o de-para mentiria.
+        $this->assertDatabaseHas('content_revisions', [
+            'content_id' => $content->id,
+            'from_status' => 'archived',
+            'to_status' => 'review',
+        ]);
+    }
+
+    /** Peca arquivada direto no banco nao tem revisao: `idea` e o comeco do fluxo. */
+    public function test_desarquivar_sem_revisao_registrada_cai_em_idea(): void
+    {
+        $workspace = Workspace::factory()->create();
+        $editor = $this->memberOf($workspace, WorkspaceRole::Editor);
+        $project = Project::factory()->create(['workspace_id' => $workspace->id]);
+        $content = $this->content($project, 'archived');
+
+        Sanctum::actingAs($editor);
+
+        $this->postJson("/api/v1/contents/{$content->id}/unarchive")
+            ->assertOk()
+            ->assertJsonPath('data.status', 'idea');
+    }
+
+    /** Desarquivar o que nao esta arquivado nao e gesto nenhum. */
+    public function test_desarquivar_peca_ativa_devolve_422(): void
+    {
+        $workspace = Workspace::factory()->create();
+        $editor = $this->memberOf($workspace, WorkspaceRole::Editor);
+        $project = Project::factory()->create(['workspace_id' => $workspace->id]);
+        $content = $this->content($project, 'idea');
+
+        Sanctum::actingAs($editor);
+
+        $this->postJson("/api/v1/contents/{$content->id}/unarchive")->assertStatus(422);
+    }
+
+    public function test_viewer_nao_pode_desarquivar(): void
+    {
+        $workspace = Workspace::factory()->create();
+        $viewer = $this->memberOf($workspace, WorkspaceRole::Viewer);
+        $project = Project::factory()->create(['workspace_id' => $workspace->id]);
+        $content = $this->content($project, 'archived');
+
+        Sanctum::actingAs($viewer);
+
+        $this->postJson("/api/v1/contents/{$content->id}/unarchive")->assertForbidden();
+    }
+
+    public function test_desarquivar_peca_de_outro_workspace_devolve_404(): void
+    {
+        $mine = Workspace::factory()->create();
+        $theirs = Workspace::factory()->create();
+        $intruder = $this->memberOf($mine, WorkspaceRole::Owner);
+        $target = Project::factory()->create(['workspace_id' => $theirs->id]);
+        $content = $this->content($target, 'archived');
+
+        Sanctum::actingAs($intruder);
+
+        $this->postJson("/api/v1/contents/{$content->id}/unarchive")->assertNotFound();
+    }
+
+    public function test_desarquivar_sem_token_devolve_401(): void
+    {
+        $workspace = Workspace::factory()->create();
+        $project = Project::factory()->create(['workspace_id' => $workspace->id]);
+        $content = $this->content($project, 'archived');
+
+        $this->postJson("/api/v1/contents/{$content->id}/unarchive")->assertUnauthorized();
+    }
 }

@@ -45,6 +45,7 @@ class RouteAuthorizationTest extends TestCase
         'POST api/v1/workspaces' => 'cria o tenant; nao ha projeto a autorizar (WorkspaceIsolationTest)',
         'POST api/v1/workspaces/{workspace}/projects' => 'middleware workspace:{papel} (WorkspaceIsolationTest)',
         'PATCH api/v1/contents/{content}' => 'ContentTransitionTest: viewer 403, outro tenant 404',
+        'POST api/v1/contents/{content}/unarchive' => 'ContentTransitionTest: viewer 403, outro tenant 404, sem token 401',
         'POST api/v1/contents/{content}/seo:apply' => 'SeoGenerationTest: outro tenant 404',
         'PATCH api/v1/strategies/{strategy}' => 'aqui embaixo, em test_*_estrategia_*',
         'PATCH api/v1/projects/{project}' => 'ProjectUpdateTest: viewer 403, outro tenant 404, sem token 401',

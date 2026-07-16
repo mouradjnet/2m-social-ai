@@ -8,6 +8,7 @@ interface Props {
   onMove: (id: number, status: Content['status']) => void
   onApplySeo: (id: number) => void
   onRewrite: (id: number) => void
+  onUnarchive: (id: number) => void
 }
 
 const TITLES: Record<Column, string> = {
@@ -23,7 +24,14 @@ const TITLES: Record<Column, string> = {
 // nao esta aqui: quem agenda e o agente. Voltar de agendado e caso a parte.
 const FLOW: Content['status'][] = ['idea', 'production', 'review', 'approved']
 
-export function ContentBoard({ groups, pending, onMove, onApplySeo, onRewrite }: Props) {
+export function ContentBoard({
+  groups,
+  pending,
+  onMove,
+  onApplySeo,
+  onRewrite,
+  onUnarchive,
+}: Props) {
   return (
     /*
      * Seis colunas nao cabem: 6x256 + gaps = ~1400px contra os 1344px uteis do
@@ -55,6 +63,8 @@ export function ContentBoard({ groups, pending, onMove, onApplySeo, onRewrite }:
                   onAdvance={() => i >= 0 && i < FLOW.length - 1 && onMove(content.id, FLOW[i + 1])}
                   onBack={() => back && onMove(content.id, back)}
                   onArchive={() => onMove(content.id, 'archived')}
+                  // Sem status: o destino e do servidor, que sabe de onde ela saiu.
+                  onUnarchive={() => onUnarchive(content.id)}
                   onApplySeo={() => onApplySeo(content.id)}
                   onRewrite={() => onRewrite(content.id)}
                 />

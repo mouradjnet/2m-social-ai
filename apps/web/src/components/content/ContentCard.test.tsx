@@ -31,6 +31,7 @@ const noop = {
   onAdvance: vi.fn(),
   onBack: vi.fn(),
   onArchive: vi.fn(),
+  onUnarchive: vi.fn(),
   onApplySeo: vi.fn(),
   onRewrite: vi.fn(),
   pending: false,
@@ -64,12 +65,30 @@ test('em approved, Avancar esta desabilitado', () => {
   expect(screen.getByRole('button', { name: /avançar/i })).toBeDisabled()
 })
 
-test('em archived, os tres botoes estao desabilitados', () => {
+/**
+ * Este teste dizia "em archived, os tres botoes estao desabilitados" — era o beco
+ * sem saida escrito como especificacao. Arquivar deixou de ser ponto final: o
+ * rewriter conserta peca arquivada, e o texto novo ficava preso ali.
+ */
+test('em archived, um Desarquivar vivo no lugar dos tres botoes mortos', () => {
   render(<ContentCard content={content({ status: 'archived' })} {...noop} />)
 
-  expect(screen.getByRole('button', { name: /voltar/i })).toBeDisabled()
-  expect(screen.getByRole('button', { name: /avançar/i })).toBeDisabled()
-  expect(screen.getByRole('button', { name: /arquivar/i })).toBeDisabled()
+  expect(screen.getByRole('button', { name: /desarquivar/i })).toBeEnabled()
+
+  expect(screen.queryByRole('button', { name: /voltar/i })).not.toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: /avançar/i })).not.toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: /^arquivar$/i })).not.toBeInTheDocument()
+})
+
+test('Desarquivar chama onUnarchive', async () => {
+  const user = userEvent.setup()
+  const onUnarchive = vi.fn()
+  render(
+    <ContentCard content={content({ status: 'archived' })} {...noop} onUnarchive={onUnarchive} />,
+  )
+
+  await user.click(screen.getByRole('button', { name: /desarquivar/i }))
+  expect(onUnarchive).toHaveBeenCalledOnce()
 })
 
 test('Avancar chama onAdvance', async () => {

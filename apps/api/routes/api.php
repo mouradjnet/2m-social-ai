@@ -64,6 +64,9 @@ Route::prefix('v1')->group(function () {
         // A ENTREGA: sem API das redes, o zip e como o conteudo sai daqui.
         Route::get('projects/{project}/export', [ExportController::class, 'download']);
         Route::patch('contents/{content}', [ContentController::class, 'update']);
+        // Rota propria, e nao um `status` no PATCH acima: quem decide o destino e o
+        // servidor, lendo de onde a peca saiu. O cliente nao tem essa informacao.
+        Route::post('contents/{content}/unarchive', [ContentController::class, 'unarchive']);
         Route::patch('strategies/{strategy}', [StrategyController::class, 'update']);
 
         Route::get('ai-runs/{aiRun}', [AiRunController::class, 'show']);

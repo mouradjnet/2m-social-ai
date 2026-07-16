@@ -473,6 +473,42 @@ test('reescrever manda o POST na PECA reprovada, nao no projeto', async () => {
   await waitFor(() => expect(status).toHaveTextContent(/reescrevendo a peça reprovada/i))
 })
 
+/**
+ * O BECO SEM SAIDA. Numa peca arquivada os TRES botoes do rodape ficavam
+ * desabilitados — um cartao com tres botoes mortos. O rewriter conserta peca
+ * arquivada, e o texto novo ficava preso ali, sem poder ser revisado nem publicado.
+ */
+test('a peca arquivada tem saida: Desarquivar no lugar dos tres botoes mortos', async () => {
+  const user = setup()
+  let chamada: string | null = null
+
+  server.use(
+    http.get('/api/v1/projects/1/contents', () =>
+      HttpResponse.json({ data: [content(9, 'archived')] }),
+    ),
+    http.post('/api/v1/contents/9/unarchive', ({ request }) => {
+      chamada = new URL(request.url).pathname
+      return HttpResponse.json({ data: content(9, 'review') })
+    }),
+  )
+
+  renderWithProviders(<ContentPage />, ROUTE)
+
+  const desarquivar = await screen.findByRole('button', { name: /desarquivar/i })
+
+  // Nao basta o botao novo existir: os mortos tem de sair. Botao desabilitado que
+  // nunca habilita e ruido que ensina o usuario a nao confiar na tela.
+  expect(screen.queryByRole('button', { name: /voltar/i })).not.toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: /avançar/i })).not.toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: /^arquivar$/i })).not.toBeInTheDocument()
+
+  await user.click(desarquivar)
+
+  // Sem `status` no corpo: quem decide o destino e o servidor, lendo de onde a peca
+  // saiu. O MSW so responde ao caminho declarado — POST errado estoura.
+  await waitFor(() => expect(chamada).toBe('/api/v1/contents/9/unarchive'))
+})
+
 test('exportar: sem peca pronta o botao fica desabilitado', async () => {
   server.use(
     http.get('/api/v1/projects/1/contents', () =>

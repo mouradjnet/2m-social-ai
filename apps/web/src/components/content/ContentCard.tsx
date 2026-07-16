@@ -11,6 +11,7 @@ interface Props {
   onAdvance: () => void
   onBack: () => void
   onArchive: () => void
+  onUnarchive: () => void
   onApplySeo: () => void
   onRewrite: () => void
 }
@@ -44,6 +45,7 @@ export function ContentCard({
   onAdvance,
   onBack,
   onArchive,
+  onUnarchive,
   onApplySeo,
   onRewrite,
 }: Props) {
@@ -210,16 +212,29 @@ export function ContentCard({
         </span>
       )}
 
+      {/*
+        * Arquivada, os tres botoes abaixo ficavam TODOS desabilitados: um cartao com
+        * tres botoes mortos e nenhuma saida — e o rewriter conserta peca arquivada,
+        * entao o texto novo ficava preso aqui. Um botao vivo no lugar de tres mortos.
+        */}
       <div className="mt-4 flex gap-2">
-        <Button size="sm" variant="secondary" disabled={pending || !canBack} onClick={onBack}>
-          ← Voltar
-        </Button>
-        <Button size="sm" disabled={pending || !canAdvance} onClick={onAdvance}>
-          Avançar →
-        </Button>
-        <Button size="sm" variant="ghost" disabled={pending || isArchived} onClick={onArchive}>
-          Arquivar
-        </Button>
+        {isArchived ? (
+          <Button size="sm" variant="secondary" disabled={pending} onClick={onUnarchive}>
+            Desarquivar
+          </Button>
+        ) : (
+          <>
+            <Button size="sm" variant="secondary" disabled={pending || !canBack} onClick={onBack}>
+              ← Voltar
+            </Button>
+            <Button size="sm" disabled={pending || !canAdvance} onClick={onAdvance}>
+              Avançar →
+            </Button>
+            <Button size="sm" variant="ghost" disabled={pending} onClick={onArchive}>
+              Arquivar
+            </Button>
+          </>
+        )}
       </div>
     </Card>
   )

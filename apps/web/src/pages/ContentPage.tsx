@@ -73,6 +73,13 @@ export function ContentPage() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['contents', projectId] }),
   })
 
+  // Arquivar deixou de ser ponto final. Sem `status` no corpo de proposito: quem
+  // decide o destino e o servidor, que le de onde a peca saiu — a tela nao sabe.
+  const unarchive = useMutation({
+    mutationFn: (id: number) => api(`/contents/${id}/unarchive`, { method: 'POST' }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['contents', projectId] }),
+  })
+
   if (contents.isPending) return <Shell>Carregando…</Shell>
   if (contents.isError) return <Shell>Projeto não encontrado.</Shell>
 
@@ -215,9 +222,10 @@ export function ContentPage() {
         ) : (
           <ContentBoard
             groups={groupByStatus(pieces)}
-            pending={move.isPending || applySeo.isPending}
+            pending={move.isPending || applySeo.isPending || unarchive.isPending}
             onMove={(id, status) => move.mutate({ id, status })}
             onApplySeo={(id) => applySeo.mutate(id)}
+            onUnarchive={(id) => unarchive.mutate(id)}
             // A reescrita é por PEÇA, não por projeto — daí o caminho inteiro. É a
             // mesma execução assíncrona dos outros agentes: o ?run= e o polling.
             onRewrite={(id) => generate({ path: `/contents/${id}/rewrite:generate` })}

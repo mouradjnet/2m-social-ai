@@ -79,6 +79,54 @@ class ContentController extends Controller
     }
 
     /**
+     * Arquivar deixa de ser ponto final. O rewriter conserta peca reprovada — e o
+     * texto novo ficava preso no arquivo, sem poder ser revisado nem publicado.
+     *
+     * Nao entra no PATCH como um `status` qualquer porque quem decide o destino e o
+     * servidor, nao o cliente: a peca volta de ONDE SAIU, e so o historico sabe.
+     */
+    public function unarchive(Content $content): JsonResponse
+    {
+        Gate::authorize('update', $content->project);
+
+        if ($content->status !== 'archived') {
+            return response()->json([
+                'message' => 'So uma peca arquivada pode ser desarquivada.',
+            ], 422);
+        }
+
+        $to = $this->statusAntesDoArquivamento($content);
+
+        DB::transaction(function () use ($content, $to) {
+            $content->update(['status' => $to]);
+            ContentRevision::create([
+                'content_id' => $content->id,
+                'user_id' => request()->user()->id,
+                'from_status' => 'archived',
+                'to_status' => $to,
+            ]);
+        });
+
+        return response()->json(['data' => $content->refresh()]);
+    }
+
+    /**
+     * De onde a peca saiu: a ultima vez que ela FOI arquivada. O historico ja sabia —
+     * toda transicao grava a revisao, desde antes de desarquivar existir.
+     *
+     * Sem revisao registrada, `idea`: peca arquivada direto no banco (as mock, a peca
+     * 10 movida por SQL) nao tem de onde voltar, e o comeco do fluxo e o unico palpite
+     * honesto.
+     */
+    private function statusAntesDoArquivamento(Content $content): string
+    {
+        return ContentRevision::where('content_id', $content->id)
+            ->where('to_status', 'archived')
+            ->latest('id')
+            ->value('from_status') ?? 'idea';
+    }
+
+    /**
      * Remarcar so faz sentido para quem tem data: uma peca em `idea` nao tem o que
      * mudar. A revisao sai sem status (ambos nulos) e com `changes` contando a
      * mudanca — o historico registra data, nao so coluna.
