@@ -9,6 +9,8 @@ import { CalendarPage } from '@/pages/CalendarPage'
 import { ContentPage } from '@/pages/ContentPage'
 import { InsightsPage } from '@/pages/InsightsPage'
 import { StrategyPage } from '@/pages/StrategyPage'
+import { TeamPage } from '@/pages/TeamPage'
+import { AcceptInvitationPage } from '@/pages/AcceptInvitationPage'
 import { getToken } from '@/lib/api'
 import './index.css'
 
@@ -36,6 +38,16 @@ createRoot(document.getElementById('root')!).render(
       <BrowserRouter>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
+          {/* Sem RequireAuth: a propria pagina manda ao login e volta com o token. */}
+          <Route path="/convite/:token" element={<AcceptInvitationPage />} />
+          <Route
+            path="/equipe"
+            element={
+              <RequireAuth>
+                <TeamPage />
+              </RequireAuth>
+            }
+          />
           <Route
             path="/"
             element={

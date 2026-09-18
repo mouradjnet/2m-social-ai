@@ -5,6 +5,15 @@ export interface WorkspaceSummary {
   role: 'owner' | 'admin' | 'editor' | 'reviewer' | 'viewer'
 }
 
+/** Convite pendente. O token vale como o link inteiro: quem o tem, tem o convite. */
+export interface Invitation {
+  id: number
+  email: string
+  role: WorkspaceSummary['role']
+  token: string
+  expires_at: string
+}
+
 export interface Me {
   id: number
   name: string

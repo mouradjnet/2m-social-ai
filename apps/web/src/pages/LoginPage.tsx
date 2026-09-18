@@ -1,12 +1,22 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Button } from '@/components/ui/Button'
 import { Card, CardDescription, CardTitle } from '@/components/ui/Card'
 import { Input } from '@/components/ui/Input'
 import { ApiError, api, setToken } from '@/lib/api'
 
+/**
+ * Para onde voltar depois de entrar (ex: o link de convite). So caminho interno:
+ * `//site.com` e `https://...` levariam o usuario para fora do app com cara de login
+ * legitimo.
+ */
+function destinoSeguro(next: string | null): string {
+  return next?.startsWith('/') && !next.startsWith('//') ? next : '/'
+}
+
 export function LoginPage() {
   const navigate = useNavigate()
+  const [params] = useSearchParams()
   const [mode, setMode] = useState<'login' | 'register'>('register')
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
@@ -26,7 +36,7 @@ export function LoginPage() {
         body: JSON.stringify(payload),
       })
       setToken(token)
-      navigate('/')
+      navigate(destinoSeguro(params.get('next')))
     } catch (err) {
       if (err instanceof ApiError) setError(err)
       else throw err

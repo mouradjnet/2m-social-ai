@@ -86,15 +86,22 @@ export function ProjectsPage() {
           </p>
         </div>
 
-        <Button
-          variant="secondary"
-          onClick={() => {
-            clearToken()
-            navigate('/login')
-          }}
-        >
-          Sair
-        </Button>
+        <div className="flex items-center gap-2">
+          {(workspace.role === 'owner' || workspace.role === 'admin') && (
+            <Link to="/equipe">
+              <Button variant="secondary">Equipe</Button>
+            </Link>
+          )}
+          <Button
+            variant="secondary"
+            onClick={() => {
+              clearToken()
+              navigate('/login')
+            }}
+          >
+            Sair
+          </Button>
+        </div>
       </div>
 
       <Card className="mt-8 max-w-lg">
