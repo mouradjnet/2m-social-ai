@@ -54,7 +54,7 @@ class DesignerAgentTest extends TestCase
     public function test_rejeita_peca_fora_do_lote(): void
     {
         $this->expectException(OutputRejectedException::class);
-        $this->expectExceptionMessage('Peca 42 nao esta em producao.');
+        $this->expectExceptionMessage('Peça 42 não está em produção.');
 
         (new DesignerAgent)->validate($this->saida([$this->design(7), $this->design(42)]), $this->context());
     }
@@ -62,7 +62,7 @@ class DesignerAgentTest extends TestCase
     public function test_rejeita_peca_desenhada_duas_vezes(): void
     {
         $this->expectException(OutputRejectedException::class);
-        $this->expectExceptionMessage('Peca 7 desenhada mais de uma vez.');
+        $this->expectExceptionMessage('Peça 7 desenhada mais de uma vez.');
 
         (new DesignerAgent)->validate($this->saida([$this->design(7), $this->design(7)]), $this->context());
     }

@@ -23,7 +23,7 @@ class ExportController extends Controller
 
         if (ContentZip::pecas($project)->isEmpty()) {
             return response()->json([
-                'message' => 'Nao ha peca aprovada ou agendada para exportar.',
+                'message' => 'Não há peça aprovada ou agendada para exportar.',
             ], 422);
         }
 

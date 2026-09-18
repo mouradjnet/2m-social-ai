@@ -38,14 +38,14 @@ class StrategyController extends Controller
         // no mesmo projeto cobrariam duas vezes.
         if ($this->emAndamento($project)) {
             return response()->json([
-                'message' => 'Ja existe uma geracao em andamento para este projeto.',
+                'message' => 'Já existe uma geração em andamento para este projeto.',
             ], 409);
         }
 
         // Antes de enfileirar, nao depois de gastar.
         if (Budget::exceeded($project->workspace)) {
             return response()->json([
-                'message' => 'Orcamento mensal de IA esgotado para este espaco de trabalho.',
+                'message' => 'Orçamento mensal de IA esgotado para este espaço de trabalho.',
                 'spent_cents' => Budget::spentCentsThisMonth($project->workspace),
                 'limit_cents' => Budget::limitCents(),
             ], 402);
@@ -73,7 +73,7 @@ class StrategyController extends Controller
             // numa vai precisar de um SAVEPOINT. Por isso a checagem explicita
             // acima existe: ela e o caminho que roda de fato.
             return response()->json([
-                'message' => 'Ja existe uma geracao em andamento para este projeto.',
+                'message' => 'Já existe uma geração em andamento para este projeto.',
             ], 409);
         }
 

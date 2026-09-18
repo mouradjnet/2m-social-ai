@@ -31,19 +31,19 @@ class ScheduleController extends Controller
         // Sem peca aprovada nao ha o que agendar — a pre-condicao mais barata.
         if (! $project->contents()->where('status', 'approved')->exists()) {
             return response()->json([
-                'message' => 'Aprove pelo menos uma peca antes de agendar.',
+                'message' => 'Aprove pelo menos uma peça antes de agendar.',
             ], 422);
         }
 
         if ($this->agendamentoEmAndamento($project)) {
             return response()->json([
-                'message' => 'Ja existe um agendamento em andamento para este projeto.',
+                'message' => 'Já existe um agendamento em andamento para este projeto.',
             ], 409);
         }
 
         if (Budget::exceeded($project->workspace)) {
             return response()->json([
-                'message' => 'Orcamento mensal de IA esgotado para este espaco de trabalho.',
+                'message' => 'Orçamento mensal de IA esgotado para este espaço de trabalho.',
                 'spent_cents' => Budget::spentCentsThisMonth($project->workspace),
                 'limit_cents' => Budget::limitCents(),
             ], 402);
@@ -70,7 +70,7 @@ class ScheduleController extends Controller
             // Duas requisicoes passaram pela checagem ao mesmo tempo; o indice parcial
             // (project_id, agent) barrou a segunda.
             return response()->json([
-                'message' => 'Ja existe um agendamento em andamento para este projeto.',
+                'message' => 'Já existe um agendamento em andamento para este projeto.',
             ], 409);
         }
 

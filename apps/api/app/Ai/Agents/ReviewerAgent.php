@@ -126,7 +126,7 @@ class ReviewerAgent implements Agent
 
         if (count($reviews) !== $esperado) {
             throw new OutputRejectedException(
-                "Esperado {$esperado} pecas revisadas, recebido ".count($reviews).'.'
+                "Esperado {$esperado} peças revisadas, recebido ".count($reviews).'.'
             );
         }
 
@@ -137,11 +137,11 @@ class ReviewerAgent implements Agent
             $id = $review['content_id'] ?? 0;
 
             if (! in_array($id, $emRevisao, true)) {
-                throw new OutputRejectedException("Peca {$id} nao esta em revisao.");
+                throw new OutputRejectedException("Peça {$id} não está em revisão.");
             }
 
             if (in_array($id, $vistas, true)) {
-                throw new OutputRejectedException("Peca {$id} revisada mais de uma vez.");
+                throw new OutputRejectedException("Peça {$id} revisada mais de uma vez.");
             }
 
             $vistas[] = $id;
@@ -168,11 +168,11 @@ class ReviewerAgent implements Agent
         $violacoes = count($review['violations'] ?? []);
 
         if ($review['verdict'] === 'fail' && $violacoes === 0) {
-            throw new OutputRejectedException("Peca {$id} reprovada sem apontar violacao.");
+            throw new OutputRejectedException("Peça {$id} reprovada sem apontar violação.");
         }
 
         if ($review['verdict'] === 'pass' && $violacoes > 0) {
-            throw new OutputRejectedException("Peca {$id} aprovada, mas com violacao apontada.");
+            throw new OutputRejectedException("Peça {$id} aprovada, mas com violação apontada.");
         }
     }
 }

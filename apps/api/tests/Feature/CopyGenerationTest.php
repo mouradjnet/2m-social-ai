@@ -155,7 +155,7 @@ class CopyGenerationTest extends TestCase
         $context = AgentContext::forProject($project, ['with_existing_contents' => true]);
 
         $this->expectException(OutputRejectedException::class);
-        $this->expectExceptionMessageMatches('/ja existe no projeto/');
+        $this->expectExceptionMessageMatches('/já existe no projeto/');
 
         (new CopywriterAgent)->validate([
             'pieces' => array_fill(0, 5, [
@@ -561,7 +561,7 @@ class CopyGenerationTest extends TestCase
         ], range(0, 4))];
 
         $this->expectException(OutputRejectedException::class);
-        $this->expectExceptionMessage('"Prova social" e o mais atrasado');
+        $this->expectExceptionMessage('"Prova social" é o mais atrasado');
 
         (new CopywriterAgent(5))->validate($lote, $context);
     }

@@ -45,7 +45,7 @@ class AnalyticsAgentTest extends TestCase
     public function test_rejeita_score_acima_de_100(): void
     {
         $this->expectException(OutputRejectedException::class);
-        $this->expectExceptionMessage('Pontuacao fora de 0-100: 140.');
+        $this->expectExceptionMessage('Pontuação fora de 0-100: 140.');
 
         (new AnalyticsAgent)->validate($this->saida(['score' => 140]), $this->context());
     }
@@ -60,7 +60,7 @@ class AnalyticsAgentTest extends TestCase
     public function test_rejeita_relatorio_sem_insight(): void
     {
         $this->expectException(OutputRejectedException::class);
-        $this->expectExceptionMessage('Relatorio sem nenhum insight.');
+        $this->expectExceptionMessage('Relatório sem nenhum insight.');
 
         (new AnalyticsAgent)->validate($this->saida(['insights' => []]), $this->context());
     }
@@ -69,7 +69,7 @@ class AnalyticsAgentTest extends TestCase
     public function test_rejeita_insight_sem_acao(): void
     {
         $this->expectException(OutputRejectedException::class);
-        $this->expectExceptionMessage('Insight sem acao: Educacao domina.');
+        $this->expectExceptionMessage('Insight sem ação: Educacao domina.');
 
         $semAcao = [[
             'title' => 'Educacao domina',

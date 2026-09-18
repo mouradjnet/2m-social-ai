@@ -110,7 +110,7 @@ class AnalyticsGenerationTest extends TestCase
 
         $this->generate($project)
             ->assertStatus(422)
-            ->assertJsonPath('message', 'Nao ha conteudo para analisar.');
+            ->assertJsonPath('message', 'Não há conteúdo para analisar.');
 
         $this->assertSame(0, AiRun::count());
     }

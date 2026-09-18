@@ -109,7 +109,7 @@ class DesignGenerationTest extends TestCase
 
         $this->generate($project)
             ->assertStatus(422)
-            ->assertJsonPath('message', 'Nao ha peca em producao para desenhar.');
+            ->assertJsonPath('message', 'Não há peça em produção para desenhar.');
 
         $this->assertSame(0, AiRun::count());
     }

@@ -117,18 +117,18 @@ class AnalyticsAgent implements Agent
         $score = $output['score'] ?? -1;
 
         if ($score < 0 || $score > 100) {
-            throw new OutputRejectedException("Pontuacao fora de 0-100: {$score}.");
+            throw new OutputRejectedException("Pontuação fora de 0-100: {$score}.");
         }
 
         $insights = $output['insights'] ?? [];
 
         if ($insights === []) {
-            throw new OutputRejectedException('Relatorio sem nenhum insight.');
+            throw new OutputRejectedException('Relatório sem nenhum insight.');
         }
 
         foreach ($insights as $insight) {
             if (trim($insight['action'] ?? '') === '') {
-                throw new OutputRejectedException("Insight sem acao: {$insight['title']}.");
+                throw new OutputRejectedException("Insight sem ação: {$insight['title']}.");
             }
         }
     }

@@ -57,7 +57,7 @@ class ReviewerAgentTest extends TestCase
     public function test_rejeita_lote_incompleto(): void
     {
         $this->expectException(OutputRejectedException::class);
-        $this->expectExceptionMessage('Esperado 2 pecas revisadas, recebido 1.');
+        $this->expectExceptionMessage('Esperado 2 peças revisadas, recebido 1.');
 
         (new ReviewerAgent)->validate($this->saida([$this->aprovada(7)]), $this->context());
     }
@@ -65,7 +65,7 @@ class ReviewerAgentTest extends TestCase
     public function test_rejeita_peca_fora_do_lote(): void
     {
         $this->expectException(OutputRejectedException::class);
-        $this->expectExceptionMessage('Peca 42 nao esta em revisao.');
+        $this->expectExceptionMessage('Peça 42 não está em revisão.');
 
         (new ReviewerAgent)->validate($this->saida([$this->aprovada(7), $this->aprovada(42)]), $this->context());
     }
@@ -73,7 +73,7 @@ class ReviewerAgentTest extends TestCase
     public function test_rejeita_peca_revisada_duas_vezes(): void
     {
         $this->expectException(OutputRejectedException::class);
-        $this->expectExceptionMessage('Peca 7 revisada mais de uma vez.');
+        $this->expectExceptionMessage('Peça 7 revisada mais de uma vez.');
 
         (new ReviewerAgent)->validate($this->saida([$this->aprovada(7), $this->aprovada(7)]), $this->context());
     }
@@ -82,7 +82,7 @@ class ReviewerAgentTest extends TestCase
     public function test_rejeita_fail_sem_violacao(): void
     {
         $this->expectException(OutputRejectedException::class);
-        $this->expectExceptionMessage('Peca 9 reprovada sem apontar violacao.');
+        $this->expectExceptionMessage('Peça 9 reprovada sem apontar violação.');
 
         (new ReviewerAgent)->validate(
             $this->saida([$this->aprovada(7), $this->reprovada(9, [])]),
@@ -93,7 +93,7 @@ class ReviewerAgentTest extends TestCase
     public function test_rejeita_pass_com_violacao(): void
     {
         $this->expectException(OutputRejectedException::class);
-        $this->expectExceptionMessage('Peca 7 aprovada, mas com violacao apontada.');
+        $this->expectExceptionMessage('Peça 7 aprovada, mas com violação apontada.');
 
         $incoerente = [
             'content_id' => 7,

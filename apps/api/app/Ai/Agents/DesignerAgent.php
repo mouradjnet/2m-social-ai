@@ -115,11 +115,11 @@ class DesignerAgent implements Agent
             $id = $design['content_id'] ?? 0;
 
             if (! in_array($id, $emProducao, true)) {
-                throw new OutputRejectedException("Peca {$id} nao esta em producao.");
+                throw new OutputRejectedException("Peça {$id} não está em produção.");
             }
 
             if (in_array($id, $vistas, true)) {
-                throw new OutputRejectedException("Peca {$id} desenhada mais de uma vez.");
+                throw new OutputRejectedException("Peça {$id} desenhada mais de uma vez.");
             }
 
             $vistas[] = $id;

@@ -31,19 +31,19 @@ class DesignController extends Controller
 
         if ($ids === []) {
             return response()->json([
-                'message' => 'Nao ha peca em producao para desenhar.',
+                'message' => 'Não há peça em produção para desenhar.',
             ], 422);
         }
 
         if ($this->designEmAndamento($project)) {
             return response()->json([
-                'message' => 'Ja existe uma geracao de imagens em andamento para este projeto.',
+                'message' => 'Já existe uma geração de imagens em andamento para este projeto.',
             ], 409);
         }
 
         if (Budget::exceeded($project->workspace)) {
             return response()->json([
-                'message' => 'Orcamento mensal de IA esgotado para este espaco de trabalho.',
+                'message' => 'Orçamento mensal de IA esgotado para este espaço de trabalho.',
                 'spent_cents' => Budget::spentCentsThisMonth($project->workspace),
                 'limit_cents' => Budget::limitCents(),
             ], 402);
@@ -68,7 +68,7 @@ class DesignController extends Controller
             ]);
         } catch (UniqueConstraintViolationException) {
             return response()->json([
-                'message' => 'Ja existe uma geracao de imagens em andamento para este projeto.',
+                'message' => 'Já existe uma geração de imagens em andamento para este projeto.',
             ], 409);
         }
 

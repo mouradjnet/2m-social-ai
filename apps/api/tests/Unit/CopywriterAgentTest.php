@@ -37,7 +37,7 @@ class CopywriterAgentTest extends TestCase
     public function test_rejeita_numero_diferente_de_cinco(): void
     {
         $this->expectException(OutputRejectedException::class);
-        $this->expectExceptionMessage('Esperado 5 pecas, recebido 4.');
+        $this->expectExceptionMessage('Esperado 5 peças, recebido 4.');
 
         (new CopywriterAgent)->validate($this->outputWith(4));
     }
@@ -45,7 +45,7 @@ class CopywriterAgentTest extends TestCase
     public function test_rejeita_format_fora_do_enum(): void
     {
         $this->expectException(OutputRejectedException::class);
-        $this->expectExceptionMessage('Formato invalido: banner.');
+        $this->expectExceptionMessage('Formato inválido: banner.');
 
         $pieces = ['pieces' => [
             $this->piece(['format' => 'banner']),
@@ -58,7 +58,7 @@ class CopywriterAgentTest extends TestCase
     public function test_rejeita_channel_fora_do_enum(): void
     {
         $this->expectException(OutputRejectedException::class);
-        $this->expectExceptionMessage('Canal invalido: telegram.');
+        $this->expectExceptionMessage('Canal inválido: telegram.');
 
         $pieces = ['pieces' => [
             $this->piece(['channel' => 'telegram']),

@@ -129,7 +129,7 @@ class ReviewGenerationTest extends TestCase
 
         $this->generate($project)
             ->assertStatus(422)
-            ->assertJsonPath('message', 'Nao ha peca em revisao para revisar.');
+            ->assertJsonPath('message', 'Não há peça em revisão para revisar.');
 
         $this->assertSame(0, AiRun::count());
     }

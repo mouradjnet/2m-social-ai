@@ -51,7 +51,7 @@ class SeoAgentTest extends TestCase
     public function test_rejeita_lote_incompleto(): void
     {
         $this->expectException(OutputRejectedException::class);
-        $this->expectExceptionMessage('Esperado 2 pecas otimizadas, recebido 1.');
+        $this->expectExceptionMessage('Esperado 2 peças otimizadas, recebido 1.');
 
         (new SeoAgent)->validate($this->saida([$this->bloco(7)]), $this->context());
     }
@@ -59,7 +59,7 @@ class SeoAgentTest extends TestCase
     public function test_rejeita_peca_fora_do_lote(): void
     {
         $this->expectException(OutputRejectedException::class);
-        $this->expectExceptionMessage('Peca 42 nao esta em producao.');
+        $this->expectExceptionMessage('Peça 42 não está em produção.');
 
         (new SeoAgent)->validate($this->saida([$this->bloco(7), $this->bloco(42)]), $this->context());
     }
@@ -67,7 +67,7 @@ class SeoAgentTest extends TestCase
     public function test_rejeita_peca_otimizada_duas_vezes(): void
     {
         $this->expectException(OutputRejectedException::class);
-        $this->expectExceptionMessage('Peca 7 otimizada mais de uma vez.');
+        $this->expectExceptionMessage('Peça 7 otimizada mais de uma vez.');
 
         (new SeoAgent)->validate($this->saida([$this->bloco(7), $this->bloco(7)]), $this->context());
     }

@@ -84,7 +84,7 @@ class AnthropicProviderTest extends TestCase
         ]));
 
         $this->expectException(LlmRefusedException::class);
-        $this->expectExceptionMessage('O modelo recusou esta requisicao.');
+        $this->expectExceptionMessage('O modelo recusou esta requisição.');
 
         $provider->generate($this->request());
     }

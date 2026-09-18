@@ -132,7 +132,7 @@ class CopywriterAgent implements Agent
         $count = count($pieces);
 
         if ($count !== $this->batchSize) {
-            throw new OutputRejectedException("Esperado {$this->batchSize} pecas, recebido {$count}.");
+            throw new OutputRejectedException("Esperado {$this->batchSize} peças, recebido {$count}.");
         }
 
         // Titulos que a marca ja tem. O prompt manda nao repetir; isto CONFERE — em
@@ -145,23 +145,23 @@ class CopywriterAgent implements Agent
         foreach ($pieces as $piece) {
             $format = $piece['format'] ?? '';
             if (! in_array($format, self::FORMATS, true)) {
-                throw new OutputRejectedException("Formato invalido: {$format}.");
+                throw new OutputRejectedException("Formato inválido: {$format}.");
             }
 
             $channel = $piece['channel'] ?? '';
             if (! in_array($channel, self::CHANNELS, true)) {
-                throw new OutputRejectedException("Canal invalido: {$channel}.");
+                throw new OutputRejectedException("Canal inválido: {$channel}.");
             }
 
             $titulo = (string) ($piece['title'] ?? '');
             if (in_array(mb_strtolower(trim($titulo)), $jaExistem, true)) {
-                throw new OutputRejectedException("A peca \"{$titulo}\" ja existe no projeto.");
+                throw new OutputRejectedException("A peça \"{$titulo}\" já existe no projeto.");
             }
 
             $pilar = $piece['pillar'] ?? '';
             if ($context?->targetPillar !== null && $pilar !== $context->targetPillar) {
                 throw new OutputRejectedException(
-                    "Pedido o pilar \"{$context->targetPillar}\", recebida peca do pilar \"{$pilar}\"."
+                    "Pedido o pilar \"{$context->targetPillar}\", recebida peça do pilar \"{$pilar}\"."
                 );
             }
         }
@@ -177,7 +177,7 @@ class CopywriterAgent implements Agent
 
         if ($atrasado !== null && ! in_array($atrasado, array_column($pieces, 'pillar'), true)) {
             throw new OutputRejectedException(
-                "O pilar \"{$atrasado}\" e o mais atrasado da estrategia e nao recebeu nenhuma peca."
+                "O pilar \"{$atrasado}\" é o mais atrasado da estratégia e não recebeu nenhuma peça."
             );
         }
     }

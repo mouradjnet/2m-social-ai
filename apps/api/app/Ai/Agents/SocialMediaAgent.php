@@ -116,7 +116,7 @@ class SocialMediaAgent implements Agent
 
         if (count($schedule) !== $esperado) {
             throw new OutputRejectedException(
-                "Esperado {$esperado} pecas agendadas, recebido ".count($schedule).'.'
+                "Esperado {$esperado} peças agendadas, recebido ".count($schedule).'.'
             );
         }
 
@@ -128,11 +128,11 @@ class SocialMediaAgent implements Agent
             $id = $entrada['content_id'] ?? 0;
 
             if (! in_array($id, $aprovadas, true)) {
-                throw new OutputRejectedException("Peca {$id} nao esta entre as aprovadas.");
+                throw new OutputRejectedException("Peça {$id} não está entre as aprovadas.");
             }
 
             if (in_array($id, $vistas, true)) {
-                throw new OutputRejectedException("Peca {$id} agendada mais de uma vez.");
+                throw new OutputRejectedException("Peça {$id} agendada mais de uma vez.");
             }
 
             $vistas[] = $id;
@@ -140,7 +140,7 @@ class SocialMediaAgent implements Agent
 
             if ($quando->lt($inicio) || $quando->gte($fim)) {
                 throw new OutputRejectedException(
-                    "Peca {$id} agendada para {$quando->toDateTimeString()}, fora da janela."
+                    "Peça {$id} agendada para {$quando->toDateTimeString()}, fora da janela."
                 );
             }
         }
@@ -193,7 +193,7 @@ class SocialMediaAgent implements Agent
         try {
             return CarbonImmutable::parse($quando, $timezone);
         } catch (Exception) {
-            throw new OutputRejectedException("Data invalida: {$quando}.");
+            throw new OutputRejectedException("Data inválida: {$quando}.");
         }
     }
 

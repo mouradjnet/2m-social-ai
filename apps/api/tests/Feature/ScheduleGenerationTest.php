@@ -185,7 +185,7 @@ class ScheduleGenerationTest extends TestCase
 
         $this->generate($project)
             ->assertStatus(422)
-            ->assertJsonPath('message', 'Aprove pelo menos uma peca antes de agendar.');
+            ->assertJsonPath('message', 'Aprove pelo menos uma peça antes de agendar.');
 
         $this->assertSame(0, AiRun::count());
     }

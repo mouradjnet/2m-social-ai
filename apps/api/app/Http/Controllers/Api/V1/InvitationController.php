@@ -53,13 +53,13 @@ class InvitationController extends Controller
 
         if (! $meu->atLeast($papel)) {
             return response()->json([
-                'message' => 'Voce nao pode convidar alguem com papel acima do seu.',
+                'message' => 'Você não pode convidar alguém com papel acima do seu.',
             ], 422);
         }
 
         if ($workspace->users()->where('users.email', $email)->exists()) {
             return response()->json([
-                'message' => 'Esta pessoa ja e membro deste workspace.',
+                'message' => 'Esta pessoa já é membro deste espaço de trabalho.',
             ], 422);
         }
 
@@ -92,12 +92,12 @@ class InvitationController extends Controller
         // Mesma resposta para token inexistente, vencido e ja aceito: um 422 que
         // distinguisse os tres contaria a um estranho se o token existe.
         if ($invitation === null || $invitation->accepted_at !== null || $invitation->expires_at->isPast()) {
-            return response()->json(['message' => 'Convite invalido ou expirado.'], 422);
+            return response()->json(['message' => 'Convite inválido ou expirado.'], 422);
         }
 
         if (strtolower($request->user()->email) !== strtolower($invitation->email)) {
             return response()->json([
-                'message' => 'Este convite e para outro email. Entre com a conta convidada.',
+                'message' => 'Este convite é para outro e-mail. Entre com a conta convidada.',
             ], 403);
         }
 

@@ -53,7 +53,7 @@ class SocialMediaAgentTest extends TestCase
     public function test_rejeita_peca_que_nao_esta_no_lote(): void
     {
         $this->expectException(OutputRejectedException::class);
-        $this->expectExceptionMessage('Peca 42 nao esta entre as aprovadas.');
+        $this->expectExceptionMessage('Peça 42 não está entre as aprovadas.');
 
         (new SocialMediaAgent)->validate(
             $this->saida([
@@ -67,7 +67,7 @@ class SocialMediaAgentTest extends TestCase
     public function test_rejeita_peca_agendada_duas_vezes(): void
     {
         $this->expectException(OutputRejectedException::class);
-        $this->expectExceptionMessage('Peca 7 agendada mais de uma vez.');
+        $this->expectExceptionMessage('Peça 7 agendada mais de uma vez.');
 
         (new SocialMediaAgent)->validate(
             $this->saida([
@@ -81,7 +81,7 @@ class SocialMediaAgentTest extends TestCase
     public function test_rejeita_lote_incompleto(): void
     {
         $this->expectException(OutputRejectedException::class);
-        $this->expectExceptionMessage('Esperado 2 pecas agendadas, recebido 1.');
+        $this->expectExceptionMessage('Esperado 2 peças agendadas, recebido 1.');
 
         (new SocialMediaAgent)->validate(
             $this->saida([$this->entry(7, '2026-08-03T10:00:00')]),

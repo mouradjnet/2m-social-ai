@@ -96,7 +96,7 @@ class RewriterAgent implements Agent
     {
         foreach (['title', 'caption', 'cta'] as $campo) {
             if (trim((string) ($output[$campo] ?? '')) === '') {
-                throw new OutputRejectedException("A peca reescrita veio sem `{$campo}`.");
+                throw new OutputRejectedException("A peça reescrita veio sem `{$campo}`.");
             }
         }
 
@@ -110,7 +110,7 @@ class RewriterAgent implements Agent
         // com o revisor e nao muda nada. O titulo pode ate continuar (o defeito costuma
         // estar no corpo), mas a legenda TEM que mudar — e ela que foi reprovada.
         if (trim($output['caption']) === trim((string) $original['caption'])) {
-            throw new OutputRejectedException('A peca reescrita e identica a reprovada.');
+            throw new OutputRejectedException('A peça reescrita é idêntica à reprovada.');
         }
     }
 

@@ -126,7 +126,7 @@ class SeoGenerationTest extends TestCase
 
         $this->postJson("/api/v1/contents/{$content->id}/seo:apply")
             ->assertStatus(422)
-            ->assertJsonPath('message', 'Esta peca nao tem sugestao de SEO para aplicar.');
+            ->assertJsonPath('message', 'Esta peça não tem sugestão de SEO para aplicar.');
 
         $this->assertSame('Titulo do copywriter', $content->fresh()->title);
     }
@@ -148,7 +148,7 @@ class SeoGenerationTest extends TestCase
 
         $this->generate($project)
             ->assertStatus(422)
-            ->assertJsonPath('message', 'Nao ha peca em producao para otimizar.');
+            ->assertJsonPath('message', 'Não há peça em produção para otimizar.');
 
         $this->assertSame(0, AiRun::count());
     }

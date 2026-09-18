@@ -91,7 +91,7 @@ class ContentController extends Controller
 
         if ($content->status !== 'archived') {
             return response()->json([
-                'message' => 'So uma peca arquivada pode ser desarquivada.',
+                'message' => 'Só uma peça arquivada pode ser desarquivada.',
             ], 422);
         }
 
@@ -135,7 +135,7 @@ class ContentController extends Controller
     {
         if ($content->status !== 'scheduled') {
             return response()->json([
-                'message' => 'So uma peca agendada pode ser remarcada.',
+                'message' => 'Só uma peça agendada pode ser remarcada.',
             ], 422);
         }
 

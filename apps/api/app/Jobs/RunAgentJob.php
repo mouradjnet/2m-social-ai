@@ -138,7 +138,7 @@ class RunAgentJob implements ShouldQueue
             ->whereIn('status', ['queued', 'running'])
             ->update([
                 'status' => 'failed',
-                'error' => 'A geracao foi interrompida. Tente novamente.',
+                'error' => 'A geração foi interrompida. Tente novamente.',
                 'error_code' => 'provider_failed',
             ]);
     }

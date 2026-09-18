@@ -34,19 +34,19 @@ class SeoController extends Controller
 
         if ($ids === []) {
             return response()->json([
-                'message' => 'Nao ha peca em producao para otimizar.',
+                'message' => 'Não há peça em produção para otimizar.',
             ], 422);
         }
 
         if ($this->seoEmAndamento($project)) {
             return response()->json([
-                'message' => 'Ja existe uma otimizacao em andamento para este projeto.',
+                'message' => 'Já existe uma otimização em andamento para este projeto.',
             ], 409);
         }
 
         if (Budget::exceeded($project->workspace)) {
             return response()->json([
-                'message' => 'Orcamento mensal de IA esgotado para este espaco de trabalho.',
+                'message' => 'Orçamento mensal de IA esgotado para este espaço de trabalho.',
                 'spent_cents' => Budget::spentCentsThisMonth($project->workspace),
                 'limit_cents' => Budget::limitCents(),
             ], 402);
@@ -69,7 +69,7 @@ class SeoController extends Controller
             ]);
         } catch (UniqueConstraintViolationException) {
             return response()->json([
-                'message' => 'Ja existe uma otimizacao em andamento para este projeto.',
+                'message' => 'Já existe uma otimização em andamento para este projeto.',
             ], 409);
         }
 
@@ -93,7 +93,7 @@ class SeoController extends Controller
 
         if ($seo === null) {
             return response()->json([
-                'message' => 'Esta peca nao tem sugestao de SEO para aplicar.',
+                'message' => 'Esta peça não tem sugestão de SEO para aplicar.',
             ], 422);
         }
 

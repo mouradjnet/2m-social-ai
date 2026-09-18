@@ -14,7 +14,7 @@ class LlmRefusedException extends RuntimeException
     public function __construct(public readonly ?string $category = null)
     {
         parent::__construct(
-            'O modelo recusou esta requisicao'.($category ? " (categoria: {$category})" : '').'.'
+            'O modelo recusou esta requisição'.($category ? " (categoria: {$category})" : '').'.'
         );
     }
 }

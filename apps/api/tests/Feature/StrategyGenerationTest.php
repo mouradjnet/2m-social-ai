@@ -217,7 +217,7 @@ class StrategyGenerationTest extends TestCase
         $run = AiRun::withoutGlobalScopes()->findOrFail($response->json('ai_run_id'));
 
         $this->assertSame('failed', $run->status);
-        $this->assertSame('O modelo recusou esta requisicao.', $run->error);
+        $this->assertSame('O modelo recusou esta requisição.', $run->error);
         $this->assertStringNotContainsString('Tente novamente', $run->error);
 
         $this->assertSame(0, Strategy::withoutGlobalScopes()->count());
@@ -430,7 +430,7 @@ class StrategyGenerationTest extends TestCase
             'model' => 'claude-opus-4-8',
             'status' => 'failed',
             'input' => [],
-            'error' => 'O modelo recusou esta requisicao.',
+            'error' => 'O modelo recusou esta requisição.',
             'error_code' => 'refused',
             'created_by' => $editor->id,
         ]);

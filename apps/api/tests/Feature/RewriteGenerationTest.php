@@ -215,7 +215,7 @@ class RewriteGenerationTest extends TestCase
         $context = AgentContext::forProject($project, ['rewrite_content_id' => $peca->id]);
 
         $this->expectException(OutputRejectedException::class);
-        $this->expectExceptionMessage('identica a reprovada');
+        $this->expectExceptionMessage('idêntica à reprovada');
 
         (new RewriterAgent)->validate([
             'title' => $peca->title,

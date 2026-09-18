@@ -108,7 +108,7 @@ class SeoAgent implements Agent
 
         if (count($blocos) !== $esperado) {
             throw new OutputRejectedException(
-                "Esperado {$esperado} pecas otimizadas, recebido ".count($blocos).'.'
+                "Esperado {$esperado} peças otimizadas, recebido ".count($blocos).'.'
             );
         }
 
@@ -119,11 +119,11 @@ class SeoAgent implements Agent
             $id = $bloco['content_id'] ?? 0;
 
             if (! in_array($id, $emProducao, true)) {
-                throw new OutputRejectedException("Peca {$id} nao esta em producao.");
+                throw new OutputRejectedException("Peça {$id} não está em produção.");
             }
 
             if (in_array($id, $vistas, true)) {
-                throw new OutputRejectedException("Peca {$id} otimizada mais de uma vez.");
+                throw new OutputRejectedException("Peça {$id} otimizada mais de uma vez.");
             }
 
             $vistas[] = $id;
