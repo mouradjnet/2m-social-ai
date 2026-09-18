@@ -50,7 +50,9 @@ return [
     |
     */
 
-    'expiration' => null,
+    // Em minutos. Sem prazo, um token vazado valia para sempre. O front ja trata
+    // o 401 (apaga o token e volta ao login).
+    'expiration' => (int) env('SANCTUM_EXPIRATION', 60 * 24 * 7),
 
     /*
     |--------------------------------------------------------------------------

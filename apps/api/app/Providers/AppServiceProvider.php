@@ -8,6 +8,10 @@ use App\Ai\Exceptions\LlmFailedException;
 use App\Ai\Providers\AnthropicProvider;
 use App\Ai\Providers\LlmProvider;
 use App\Ai\Providers\MockProvider;
+use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -33,7 +37,30 @@ class AppServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
-        //
+        // Por EMAIL, nao por IP: atras do proxy do Render todo mundo chega com o
+        // mesmo IP, e o que se protege e a conta. O custo e aceito: um estranho
+        // consegue travar o login de alguem por um minuto.
+        RateLimiter::for('login', fn (Request $request) => Limit::perMinute(5)
+            ->by(strtolower((string) $request->input('email')))
+            ->response($this->muitasTentativas(...)));
+
+        RateLimiter::for('register', fn (Request $request) => Limit::perMinute(5)
+            ->by($request->ip())
+            ->response($this->muitasTentativas(...)));
+    }
+
+    /**
+     * No formato de erro de validacao, preso ao email: a tela de login so exibe
+     * `errors.{campo}`, e um 429 so com `message` falharia em silencio.
+     */
+    private function muitasTentativas(Request $request, array $headers): JsonResponse
+    {
+        $mensagem = 'Muitas tentativas. Aguarde um minuto e tente de novo.';
+
+        return response()->json([
+            'message' => $mensagem,
+            'errors' => ['email' => [$mensagem]],
+        ], 429, $headers);
     }
 
     private function anthropicClient(): Client
