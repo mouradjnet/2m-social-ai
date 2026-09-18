@@ -7,22 +7,9 @@ import { Input } from '@/components/ui/Input'
 import { Shell } from '@/components/ui/Shell'
 import { ApiError, api } from '@/lib/api'
 import { copyToClipboard } from '@/lib/copyToClipboard'
-import type { Invitation, Me, WorkspaceSummary } from '@/lib/types'
-
-type Role = WorkspaceSummary['role']
-
-/** Do mais alto ao mais baixo, a mesma ordem do WorkspaceRole do backend. */
-const PAPEIS: { value: Role; label: string }[] = [
-  { value: 'owner', label: 'Dono' },
-  { value: 'admin', label: 'Administrador' },
-  { value: 'editor', label: 'Editor' },
-  { value: 'reviewer', label: 'Revisor' },
-  { value: 'viewer', label: 'Leitor' },
-]
-
-const rotulo = (role: Role) => PAPEIS.find((p) => p.value === role)?.label ?? role
-
-const podeConvidar = (role: Role) => role === 'owner' || role === 'admin'
+import { PAPEIS, podeConvidar, rotulo } from '@/lib/roles'
+import type { Role } from '@/lib/roles'
+import type { Invitation, Me } from '@/lib/types'
 
 /** Nao ha mailer: o link e a entrega. Quem convida copia e manda por onde quiser. */
 const linkDoConvite = (token: string) => `${window.location.origin}/convite/${token}`
