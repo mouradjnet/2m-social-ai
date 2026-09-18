@@ -40,7 +40,9 @@ return [
             'connection' => env('DB_QUEUE_CONNECTION'),
             'table' => env('DB_QUEUE_TABLE', 'jobs'),
             'queue' => env('DB_QUEUE', 'default'),
-            'retry_after' => (int) env('DB_QUEUE_RETRY_AFTER', 90),
+            // Maior que o `--timeout=180` do worker (docker/): menor, uma geracao
+            // lenta seria reapanhada ainda viva. Cobrado por teste.
+            'retry_after' => (int) env('DB_QUEUE_RETRY_AFTER', 240),
             'after_commit' => false,
         ],
 

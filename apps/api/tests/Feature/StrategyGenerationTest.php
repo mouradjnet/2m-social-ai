@@ -9,6 +9,7 @@ use App\Ai\Providers\LlmProvider;
 use App\Ai\Providers\LlmRequest;
 use App\Ai\Providers\LlmResponse;
 use App\Enums\WorkspaceRole;
+use App\Jobs\RunAgentJob;
 use App\Models\AiRun;
 use App\Models\Project;
 use App\Models\Strategy;
@@ -20,6 +21,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Testing\TestResponse;
 use Laravel\Sanctum\Sanctum;
+use RuntimeException;
 use Tests\TestCase;
 
 /**
@@ -704,6 +706,148 @@ class StrategyGenerationTest extends TestCase
 
         // Nada foi persistido: a estrategia so nasce depois do validate().
         $this->assertSame(0, Strategy::withoutGlobalScopes()->count());
+    }
+
+    /**
+     * Provider cuja 1a chamada sai fora das regras (pesos somam 99) e a 2a, se
+     * `$segundaValida`, passa. Cada chamada gasta 20 mil tokens de saida = 50c.
+     */
+    private function providerRejeitaPrimeira(bool $segundaValida): LlmProvider
+    {
+        return new class($segundaValida) implements LlmProvider
+        {
+            private int $chamadas = 0;
+
+            public function __construct(private bool $segundaValida) {}
+
+            public function generate(LlmRequest $request): LlmResponse
+            {
+                $this->chamadas++;
+                $ultimo = ($this->chamadas === 2 && $this->segundaValida) ? 25 : 24;
+
+                return new LlmResponse(
+                    output: [
+                        'title' => 't',
+                        'summary' => 's',
+                        'editorial_line' => 'e',
+                        'pillars' => [
+                            ['name' => 'a', 'weight' => 40, 'description' => 'd'],
+                            ['name' => 'b', 'weight' => 35, 'description' => 'd'],
+                            ['name' => 'c', 'weight' => $ultimo, 'description' => 'd'],
+                        ],
+                    ],
+                    model: 'claude-opus-4-8',
+                    inputTokens: 1_000,
+                    outputTokens: 20_000,
+                );
+            }
+        };
+    }
+
+    /**
+     * A tentativa rejeitada foi paga. Gravar so a que passou deixa o Budget — a
+     * unica trava contra torrarem a chave — contando metade do gasto real.
+     */
+    public function test_retentativa_bem_sucedida_grava_o_custo_das_duas_chamadas(): void
+    {
+        $this->bindProvider($this->providerRejeitaPrimeira(segundaValida: true));
+
+        $workspace = Workspace::factory()->create();
+        $editor = $this->memberOf($workspace, WorkspaceRole::Editor);
+        $project = Project::factory()->create(['workspace_id' => $workspace->id]);
+
+        Sanctum::actingAs($editor);
+
+        $runId = $this->generate($project)->assertStatus(202)->json('ai_run_id');
+        $run = AiRun::withoutGlobalScopes()->findOrFail($runId);
+
+        $this->assertSame('succeeded', $run->status);
+        $this->assertSame(2_000, $run->input_tokens);
+        $this->assertSame(40_000, $run->output_tokens);
+        $this->assertSame(102, $run->cost_cents);
+        $this->assertSame(102, Budget::spentCentsThisMonth($workspace));
+    }
+
+    /** Falhar nao devolve o dinheiro: duas chamadas pagas, custo gravado. */
+    public function test_saida_rejeitada_duas_vezes_grava_o_custo_das_duas_chamadas(): void
+    {
+        $this->bindProvider($this->providerRejeitaPrimeira(segundaValida: false));
+
+        $workspace = Workspace::factory()->create();
+        $editor = $this->memberOf($workspace, WorkspaceRole::Editor);
+        $project = Project::factory()->create(['workspace_id' => $workspace->id]);
+
+        Sanctum::actingAs($editor);
+
+        $runId = $this->generate($project)->assertStatus(202)->json('ai_run_id');
+        $run = AiRun::withoutGlobalScopes()->findOrFail($runId);
+
+        $this->assertSame('failed', $run->status);
+        $this->assertSame('rejected_output', $run->error_code);
+        $this->assertSame(40_000, $run->output_tokens);
+        $this->assertSame(102, $run->cost_cents);
+        $this->assertSame(102, Budget::spentCentsThisMonth($workspace));
+    }
+
+    /**
+     * Job morto no meio (deploy, container derrubado, timeout) nunca chega ao
+     * catch do handle(). Sem o failed(), a execucao fica `running` para sempre e o
+     * indice parcial devolve 409 naquele agente ate alguem mexer no banco.
+     */
+    public function test_job_que_morre_no_meio_libera_o_agente(): void
+    {
+        $workspace = Workspace::factory()->create();
+        $editor = $this->memberOf($workspace, WorkspaceRole::Editor);
+        $project = Project::factory()->create(['workspace_id' => $workspace->id]);
+
+        $run = $this->runEmAndamento($workspace, $project, $editor, 'running');
+
+        (new RunAgentJob($run->id))->failed(new RuntimeException('Job has timed out.'));
+
+        $run->refresh();
+        $this->assertSame('failed', $run->status);
+        $this->assertSame('provider_failed', $run->error_code);
+        $this->assertNotNull($run->error);
+
+        Sanctum::actingAs($editor);
+
+        $this->generate($project)->assertStatus(202);
+    }
+
+    /** O failed() chegando atrasado nao pode reescrever uma execucao ja terminada. */
+    public function test_failed_nao_mexe_em_execucao_ja_terminada(): void
+    {
+        $workspace = Workspace::factory()->create();
+        $editor = $this->memberOf($workspace, WorkspaceRole::Editor);
+        $project = Project::factory()->create(['workspace_id' => $workspace->id]);
+
+        $run = $this->runEmAndamento($workspace, $project, $editor, 'succeeded');
+
+        (new RunAgentJob($run->id))->failed(new RuntimeException('atrasado'));
+
+        $this->assertSame('succeeded', $run->refresh()->status);
+        $this->assertNull($run->error_code);
+    }
+
+    /**
+     * O job derrubado no meio so e reapanhado (e so entao cai no failed()) depois
+     * do `retry_after`. Se ele for menor que o `--timeout` do worker, uma geracao
+     * lenta e reapanhada VIVA por outro worker — o Laravel exige retry_after maior.
+     */
+    public function test_retry_after_da_fila_e_maior_que_o_timeout_do_worker(): void
+    {
+        $retryAfter = config('queue.connections.database.retry_after');
+
+        foreach (['docker/start.sh', 'docker/supervisord.conf'] as $arquivo) {
+            $conteudo = file_get_contents(base_path("../../{$arquivo}"));
+
+            $this->assertMatchesRegularExpression('/--timeout=(\d+)/', $conteudo, $arquivo);
+            preg_match_all('/--timeout=(\d+)/', $conteudo, $m);
+
+            foreach ($m[1] as $timeout) {
+                $this->assertGreaterThan((int) $timeout, $retryAfter, "{$arquivo}: --timeout={$timeout}");
+            }
+        }
     }
 
     public function test_dois_agentes_diferentes_coexistem_no_mesmo_projeto(): void

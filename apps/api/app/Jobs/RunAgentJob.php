@@ -9,6 +9,7 @@ use App\Ai\Exceptions\LlmRefusedException;
 use App\Ai\Exceptions\OutputRejectedException;
 use App\Ai\Providers\LlmProvider;
 use App\Ai\Providers\LlmRequest;
+use App\Ai\Providers\LlmResponse;
 use App\Models\AiRun;
 use App\Models\Project;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -20,6 +21,14 @@ use Throwable;
 class RunAgentJob implements ShouldQueue
 {
     use Queueable;
+
+    /**
+     * Toda chamada ao provedor, inclusive as rejeitadas pelo validate(): todas
+     * foram pagas, e o Budget so enxerga o que for gravado em `cost_cents`.
+     *
+     * @var list<LlmResponse>
+     */
+    private array $respostas = [];
 
     public function __construct(private readonly int $aiRunId) {}
 
@@ -58,6 +67,7 @@ class RunAgentJob implements ShouldQueue
                 'error' => $this->userFacingMessage($e),
                 'error_code' => $errorCode,
                 'latency_ms' => $this->elapsedMs($startedAt),
+                ...$this->gasto(),
             ]);
 
             return;
@@ -69,11 +79,7 @@ class RunAgentJob implements ShouldQueue
             $run->update([
                 'status' => 'succeeded',
                 'output' => $output['data'],
-                'input_tokens' => $output['response']->inputTokens,
-                'output_tokens' => $output['response']->outputTokens,
-                'cache_read_tokens' => $output['response']->cacheReadTokens,
-                'cache_write_tokens' => $output['response']->cacheWriteTokens,
-                'cost_cents' => $output['response']->costCents(config('ai.pricing')),
+                ...$this->gasto(),
                 'latency_ms' => $this->elapsedMs($startedAt),
             ]);
         });
@@ -100,11 +106,12 @@ class RunAgentJob implements ShouldQueue
 
         foreach ([1, 2] as $attempt) {
             $response = $provider->generate($request);
+            $this->respostas[] = $response;
 
             try {
                 $agent->validate($response->output, $context);
 
-                return ['data' => $response->output, 'response' => $response];
+                return ['data' => $response->output];
             } catch (OutputRejectedException $e) {
                 if ($attempt === 2) {
                     throw $e;
@@ -113,6 +120,44 @@ class RunAgentJob implements ShouldQueue
         }
 
         throw new OutputRejectedException('inalcancavel');
+    }
+
+    /**
+     * O job morreu fora do handle(): timeout, ou o processo derrubado no meio
+     * (deploy, container reciclado) e o job reapanhado depois do `retry_after`,
+     * ja sem tentativas. O catch do handle() nunca rodou, entao a execucao ficaria
+     * `running` para sempre — e o indice parcial devolveria 409 naquele agente.
+     *
+     * So mexe em execucao ainda ativa: nao reescreve uma que ja terminou. O custo
+     * de uma chamada em voo se perde aqui; nao ha resposta para medi-lo.
+     */
+    public function failed(?Throwable $e): void
+    {
+        AiRun::withoutGlobalScopes()
+            ->whereKey($this->aiRunId)
+            ->whereIn('status', ['queued', 'running'])
+            ->update([
+                'status' => 'failed',
+                'error' => 'A geracao foi interrompida. Tente novamente.',
+                'error_code' => 'provider_failed',
+            ]);
+    }
+
+    /**
+     * Soma de todas as chamadas deste job. Custo por chamada, arredondado para
+     * cima em cada uma: e assim que cada uma e cobrada.
+     */
+    private function gasto(): array
+    {
+        $soma = fn (callable $campo) => array_sum(array_map($campo, $this->respostas));
+
+        return [
+            'input_tokens' => $soma(fn (LlmResponse $r) => $r->inputTokens),
+            'output_tokens' => $soma(fn (LlmResponse $r) => $r->outputTokens),
+            'cache_read_tokens' => $soma(fn (LlmResponse $r) => $r->cacheReadTokens),
+            'cache_write_tokens' => $soma(fn (LlmResponse $r) => $r->cacheWriteTokens),
+            'cost_cents' => $soma(fn (LlmResponse $r) => $r->costCents(config('ai.pricing'))),
+        ];
     }
 
     /**
