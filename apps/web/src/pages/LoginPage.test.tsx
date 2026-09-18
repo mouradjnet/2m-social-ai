@@ -32,6 +32,30 @@ async function entrar(url: string) {
   return screen.findByTestId('destino')
 }
 
+function abrir(url: string) {
+  render(
+    <MemoryRouter initialEntries={[url]}>
+      <Routes>
+        <Route path="/login" element={<LoginPage />} />
+      </Routes>
+    </MemoryRouter>,
+  )
+}
+
+/** Quem chega pelo link de convite precisa saber por que esta aqui, e com qual conta. */
+test('vindo de um convite, explica o que fazer', () => {
+  abrir('/login?next=%2Fconvite%2Ftok-ana')
+
+  expect(screen.getByText(/você recebeu um convite/i)).toBeInTheDocument()
+  expect(screen.getByText(/com o e-mail que foi convidado/i)).toBeInTheDocument()
+})
+
+test('sem convite, nao fala de convite', () => {
+  abrir('/login?next=%2Fprojects%2F1%2Fstrategy')
+
+  expect(screen.queryByText(/você recebeu um convite/i)).not.toBeInTheDocument()
+})
+
 test('sem next, vai para os projetos', async () => {
   expect(await entrar('/login')).toHaveTextContent(/^\/$/)
 })

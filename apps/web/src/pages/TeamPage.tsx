@@ -34,6 +34,7 @@ function CopiarLink({ token }: { token: string }) {
     <Button
       variant="secondary"
       size="sm"
+      className="shrink-0 whitespace-nowrap"
       onClick={async () => {
         if (await copyToClipboard(linkDoConvite(token))) {
           setCopiado(true)
@@ -111,7 +112,7 @@ export function TeamPage() {
         </CardDescription>
 
         <form
-          className="mt-6 flex flex-wrap items-end gap-4"
+          className="mt-6 flex flex-wrap items-start gap-4"
           onSubmit={(e) => {
             e.preventDefault()
             convidar.mutate({ email, role })
@@ -146,9 +147,15 @@ export function TeamPage() {
             </select>
           </div>
 
-          <Button type="submit" disabled={convidar.isPending}>
-            {convidar.isPending ? 'Gerando…' : 'Gerar convite'}
-          </Button>
+          {/* Rotulo invisivel: mantem o botao na linha dos campos, que tem rotulo em cima. */}
+          <div className="flex flex-col gap-2">
+            <span aria-hidden="true" className="text-label-sm font-display invisible">
+              &nbsp;
+            </span>
+            <Button type="submit" disabled={convidar.isPending}>
+              {convidar.isPending ? 'Gerando…' : 'Gerar convite'}
+            </Button>
+          </div>
         </form>
 
         {novo && (

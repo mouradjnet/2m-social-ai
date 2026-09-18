@@ -17,6 +17,8 @@ function destinoSeguro(next: string | null): string {
 export function LoginPage() {
   const navigate = useNavigate()
   const [params] = useSearchParams()
+  const destino = destinoSeguro(params.get('next'))
+  const veioDeConvite = destino.startsWith('/convite/')
   const [mode, setMode] = useState<'login' | 'register'>('register')
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
@@ -36,7 +38,7 @@ export function LoginPage() {
         body: JSON.stringify(payload),
       })
       setToken(token)
-      navigate(destinoSeguro(params.get('next')))
+      navigate(destino)
     } catch (err) {
       if (err instanceof ApiError) setError(err)
       else throw err
@@ -54,6 +56,13 @@ export function LoginPage() {
             ? 'Comece organizando o marketing de conteúdo do seu primeiro cliente.'
             : 'Bem-vindo de volta.'}
         </CardDescription>
+
+        {veioDeConvite && (
+          <p className="text-body-sm bg-surface-container-low rounded-control mt-4 p-3">
+            Você recebeu um convite. Entre ou crie sua conta com o e-mail que foi convidado — em
+            seguida você volta para aceitá-lo.
+          </p>
+        )}
 
         <form onSubmit={submit} className="mt-6 flex flex-col gap-6">
           {mode === 'register' && (
