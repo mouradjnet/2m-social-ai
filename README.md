@@ -23,7 +23,7 @@ Perfil da Marca → Estratégia → Conteúdo → Revisão → Calendário → E
 
 A entrega é um **zip**: um `.md` por peça aprovada/agendada e um `calendario.csv`. Não há integração com as redes sociais.
 
-O trabalho é em equipe: workspaces com papéis e **convite por link** (por enquanto só na API — ainda não há tela para convidar).
+O trabalho é em equipe: workspaces com papéis e **convite por link** — o admin gera em `/equipe`, o convidado aceita em `/convite/{token}`. Não há envio de e-mail: o link é copiado e mandado por fora.
 
 ## Documentos
 
