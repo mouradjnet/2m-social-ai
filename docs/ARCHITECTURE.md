@@ -115,6 +115,25 @@ O spec pede "Laravel 12 (API REST)". O instalador entrega **13.19** — o spec d
 
 **Consequência.** O Analytics pode, enfim, ler desempenho real — mas só do Instagram, e só depois que a integração estiver no ar.
 
+### ADR-14 — Instagram API with Instagram Login, não Facebook Login
+**As duas portas oficiais para publicar no Instagram:**
+
+| | Instagram Login (`graph.instagram.com`) | Facebook Login (`graph.facebook.com`) |
+|---|---|---|
+| Pré-requisito | Conta profissional (Empresa ou Criador) | Conta profissional **vinculada a uma Página do Facebook** |
+| Quem autoriza | O próprio perfil do Instagram | Um usuário do Facebook que administra a Página |
+| Escopos para publicar | `instagram_business_basic`, `instagram_business_content_publish` | `instagram_basic`, `instagram_content_publish`, `pages_show_list`, `pages_read_engagement` (+ `business_management` em alguns casos) |
+| Token | Longo de 60 dias, renovável | Token de Página |
+| Serve para | Publicar e ler o próprio perfil | Tudo isso + anúncios, Páginas, Business Manager |
+
+**Decidido:** Instagram Login. Não exige Página do Facebook, pede metade dos escopos e quem autoriza é quem é dono do perfil. O produto não mexe em anúncios nem em Páginas — o que o Facebook Login dá a mais não seria usado.
+
+**Custo aceito:** o token longo vence em 60 dias. O comando `instagram:refresh-tokens` roda todo dia e renova quando faltam 10; token recusado vira `expired` e a tela pede reconexão.
+
+**Driver `fake` por padrão** (`INSTAGRAM_DRIVER`), como o `AI_PROVIDER=mock`: conecta e "publica" sem sair da máquina. Só `graph` fala com a Meta, e exige `INSTAGRAM_APP_ID`/`INSTAGRAM_APP_SECRET` para sequer montar.
+
+**Segurança:** o `state` do OAuth é aleatório (32 bytes), de uso único, expira em 10 minutos e está amarrado a quem pediu e ao projeto — sem isso, um callback forjado plantaria a conta de outra pessoa no projeto. O papel é conferido de novo na volta. O token é criptografado com o cast `encrypted` (depende do `APP_KEY`: trocar a chave sem `APP_PREVIOUS_KEYS` desconecta as contas), fica fora de todo JSON, e as mensagens de erro passam por um filtro que troca `access_token=` por `***`. A senha do Instagram nunca passa pelo sistema.
+
 ## 3. Camadas
 
 ```

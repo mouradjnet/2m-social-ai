@@ -69,6 +69,8 @@ class RouteAuthorizationTest extends TestCase
             'analisar' => ['post', 'analytics:generate'],
             'editar perfil da marca' => ['patch', 'brand-profile'],
             'subir imagem' => ['post', 'assets'],
+            'conectar instagram' => ['post', 'instagram:connect'],
+            'desconectar instagram' => ['delete', 'instagram'],
         ];
     }
 

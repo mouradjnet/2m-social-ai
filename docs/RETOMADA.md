@@ -80,3 +80,20 @@ arquivo é um uuid — a URL é pública, então não pode ser adivinhável.
 **Remoção segura.** Imagem presa a peça aprovada, agendada ou publicada não sai (409).
 Presa só a rascunhos, sai e os rascunhos ficam sem imagem. Trocar a imagem de uma
 peça grava revisão com o de-para e só vale antes da aprovação.
+
+---
+
+## Fase 3 — Integração oficial com o Instagram (2026-09-28)
+
+Fluxo escolhido: **Instagram API with Instagram Login** — ver ADR-14.
+
+- `InstagramGateway` com dois adaptadores: `GraphInstagramGateway` (Meta) e
+  `FakeInstagramGateway` (padrão; conecta e publica sem sair da máquina).
+- OAuth: `POST /projects/{id}/instagram:connect` (admin+) devolve a URL da Meta; a
+  Meta volta em `GET /api/v1/instagram/callback`, que confere o `state`, troca o
+  code, pega o token longo, exige os dois escopos e conta profissional, e grava a
+  conta. `DELETE /projects/{id}/instagram` desconecta (apaga o token, guarda a linha).
+- Renovação diária às 03:17 (`instagram:refresh-tokens`).
+- Toda falha da Meta sai classificada: `transient`, `permanent`, `auth` ou
+  `unknown` — este último só no `media_publish`, onde a Meta pode ter publicado
+  mesmo sem responder.

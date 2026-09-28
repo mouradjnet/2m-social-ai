@@ -10,6 +10,7 @@ use App\Http\Controllers\Api\V1\ContentImageController;
 use App\Http\Controllers\Api\V1\CopyController;
 use App\Http\Controllers\Api\V1\DesignController;
 use App\Http\Controllers\Api\V1\ExportController;
+use App\Http\Controllers\Api\V1\InstagramController;
 use App\Http\Controllers\Api\V1\InvitationController;
 use App\Http\Controllers\Api\V1\ProjectController;
 use App\Http\Controllers\Api\V1\ReviewController;
@@ -24,6 +25,11 @@ Route::prefix('v1')->group(function () {
     // O servico e publico: sem limite, o login aceita tentativas de senha sem fim.
     Route::post('auth/register', [AuthController::class, 'register'])->middleware('throttle:register');
     Route::post('auth/login', [AuthController::class, 'login'])->middleware('throttle:login');
+
+    // Onde a Meta devolve o navegador depois do consentimento. Sem auth:sanctum de
+    // proposito: um redirect nao carrega o token da API. Quem prova quem pediu e o
+    // `state` de uso unico (InstagramController::connect).
+    Route::get('instagram/callback', [InstagramController::class, 'callback']);
 
     Route::middleware('auth:sanctum')->group(function () {
         Route::post('auth/logout', [AuthController::class, 'logout']);
@@ -90,6 +96,10 @@ Route::prefix('v1')->group(function () {
         Route::get('projects/{project}/assets', [AssetController::class, 'index']);
         Route::post('projects/{project}/assets', [AssetController::class, 'store']);
         Route::delete('assets/{asset}', [AssetController::class, 'destroy']);
+        // A conta do Instagram do projeto (ADR-14). Conectar e desconectar: admin+.
+        Route::get('projects/{project}/instagram', [InstagramController::class, 'show']);
+        Route::post('projects/{project}/instagram:connect', [InstagramController::class, 'connect']);
+        Route::delete('projects/{project}/instagram', [InstagramController::class, 'disconnect']);
         // A imagem que vai ao ar com a peca. So antes da aprovacao (ADR-13).
         Route::put('contents/{content}/image', [ContentImageController::class, 'update']);
 
