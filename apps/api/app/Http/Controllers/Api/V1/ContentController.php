@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Enums\WorkspaceRole;
 use App\Http\Controllers\Controller;
 use App\Models\Content;
 use App\Models\ContentRevision;
@@ -30,7 +31,7 @@ class ContentController extends Controller
         return response()->json([
             // A ultima review e a ultima sugestao de SEO vem juntas: o board mostra
             // veredito e sugestao sem uma chamada por card.
-            'data' => $project->contents()->with(['latestReview', 'latestSeo', 'latestTextRevision'])->latest()->get(),
+            'data' => $project->contents()->with(['latestReview', 'latestSeo', 'latestTextRevision', 'approver'])->latest()->get(),
         ]);
     }
 
@@ -60,12 +61,25 @@ class ContentController extends Controller
             ], 422);
         }
 
-        DB::transaction(function () use ($content, $from, $to) {
+        // Aprovar e o gesto que autoriza o sistema a publicar (ADR-13): so reviewer+.
+        // Editor escreve e manda para revisao; quem aprova responde pelo que vai ao ar.
+        if ($this->isAprovacao($from, $to)
+            && ! $content->project->workspace->roleFor($request->user())?->atLeast(WorkspaceRole::Reviewer)) {
+            return response()->json([
+                'message' => 'Só quem revisa pode aprovar uma peça.',
+            ], 403);
+        }
+
+        DB::transaction(function () use ($content, $from, $to, $request) {
             $content->update([
                 'status' => $to,
                 // Desagendar limpa a data: sem isto a peca voltaria para Aprovado
                 // carregando uma data fantasma, e o board a mostraria agendada.
                 ...$this->isDesagendamento($from, $to) ? ['scheduled_for' => null] : [],
+                // A aprovacao tem nome e hora. Devolver para revisao a desfaz: o que
+                // voltar a ser aprovado sera aprovado de novo, por alguem.
+                ...$this->isAprovacao($from, $to) ? ['approved_by' => $request->user()->id, 'approved_at' => now()] : [],
+                ...$from === 'approved' && $to === 'review' ? ['approved_by' => null, 'approved_at' => null] : [],
             ]);
             ContentRevision::create([
                 'content_id' => $content->id,
@@ -75,7 +89,7 @@ class ContentController extends Controller
             ]);
         });
 
-        return response()->json(['data' => $content->refresh()]);
+        return response()->json(['data' => $content->refresh()->load('approver')]);
     }
 
     /**
@@ -176,6 +190,11 @@ class ContentController extends Controller
         $j = array_search($to, self::FLOW, true);
 
         return $i !== false && $j !== false && abs($i - $j) === 1;
+    }
+
+    private function isAprovacao(string $from, string $to): bool
+    {
+        return $from === 'review' && $to === 'approved';
     }
 
     private function isDesagendamento(string $from, string $to): bool

@@ -37,6 +37,8 @@ Rotas são `/api/v1/workspaces/{workspace}/projects/...`. O workspace vem da URL
 **Por quê:** o padrão de "workspace atual implícito" é a origem clássica de IDOR — basta esquecer um `where workspace_id = ?` em uma query. Com o workspace na rota, o middleware autoriza uma vez e o Global Scope do Eloquent filtra em profundidade. Duas camadas independentes.
 
 ### ADR-03 — Publicação = agendar + exportar. Sem API das redes no MVP
+> **Substituído em parte pelo ADR-13 (2026-09-28):** o Instagram passa a ser publicado pelo sistema. Exportar continua existindo para as outras redes.
+
 O conteúdo aprovado é agendado no calendário e exportado (texto + hashtags + imagem). O usuário publica manualmente.
 
 **Por quê:** publicar via API no Instagram, Facebook, LinkedIn, TikTok e YouTube exige app review, verificação de negócio e OAuth por rede — meses de trabalho fora do nosso controle, que travariam todo o resto do roadmap. E é coerente com *"a IA auxilia, o usuário decide. Nunca publique automaticamente."*
@@ -81,6 +83,8 @@ O spec lista "Objetivos" duas vezes: em Projetos e em Perfil da Marca. Adotamos 
 - Stripe e Mercado Pago entram quando houver o que cobrar.
 
 ### ADR-11 — O Dashboard não exibe métrica que não sabemos calcular
+> **Revisto pelo ADR-13 (2026-09-28):** o sistema passa a publicar. Continua não existindo ator "sistema" no log: a publicação é registrada em nome de quem aprovou, e o fato de ter sido automática fica na própria publicação.
+
 As telas do Stitch trazem um tile "ENGAJAMENTO +12.4%" e um item de atividade "Sistema publicou Tweet Matinal". Os dois descrevem um produto diferente do que ADR-03 define.
 
 **Decidido:**
@@ -95,6 +99,21 @@ O spec pede "Laravel 12 (API REST)". O instalador entrega **13.19** — o spec d
 **Decidido:** Laravel 13. Nada no nosso desenho depende da major 12 (Sanctum, filas, policies e migrations funcionam igual), e começar uma major atrás só adiaria a migração para antes do primeiro usuário pagante.
 
 **Detalhe que custou um ciclo:** o pluralizador do Laravel trata `research` como invariável, então `foreignId('research_id')->constrained()` procura a tabela `research`, não `researches`. Precisa ser `constrained('researches')`.
+
+### ADR-13 — A IA propõe, o humano aprova e o sistema publica
+**Contexto.** O ADR-03 deixou a publicação nas mãos do usuário porque a integração com as redes custava meses e porque o spec dizia *"nunca publique automaticamente"*. A primeira conta real (@2msaudefeminina) precisa do contrário: aprovar num dia e ver o post sair na hora marcada, sem ninguém de plantão.
+
+**Decidido.** O sistema publica no Instagram — e **só** o que um humano aprovou. O princípio muda de "a IA auxilia, o usuário decide e publica" para **"a IA propõe, o humano aprova e o sistema publica"**. A decisão continua humana; só o clique final deixa de ser.
+
+**Regras que tornam isso seguro:**
+
+1. **Aprovar é gesto de `reviewer`+.** Até aqui, qualquer `editor` levava uma peça de Revisão a Aprovado — o ADR-01 dizia o contrário e nada o cobrava. Agora aprovar autoriza uma publicação real, e o servidor exige o papel (`403` para editor).
+2. **A aprovação tem nome e hora** (`contents.approved_by`, `contents.approved_at`), além da revisão `review → approved` que o histórico já gravava. Devolver para Revisão desfaz a aprovação.
+3. **A aprovação cobre um texto, não um status.** O `PublishGate` recusa a peça se qualquer revisão com mudança de conteúdo (texto, hashtags, imagem) for posterior à última aprovação. A ordem é pelo id da revisão (append-only), não pelo relógio. Remarcar a data não pede nova aprovação.
+4. **Peça aprovada tem o texto congelado.** O `seo:apply` recusa com `422` em `approved`/`scheduled`/`published`.
+5. **Nenhum ator "sistema" no histórico** (ADR-11 continua valendo): a transição `scheduled → published` é gravada em nome de quem aprovou. O registro da automação — tentativas, respostas da Meta, id da mídia — vive na tabela `publications`, que guarda também o snapshot do que foi aprovado (aprovador, hora da aprovação, legenda, imagem, conta de destino e horário programado).
+
+**Consequência.** O Analytics pode, enfim, ler desempenho real — mas só do Instagram, e só depois que a integração estiver no ar.
 
 ## 3. Camadas
 

@@ -89,6 +89,14 @@ class SeoController extends Controller
     {
         Gate::authorize('update', $content->project);
 
+        // Peca aprovada tem o texto congelado (ADR-13): o humano aprovou ESTE titulo e
+        // estas hashtags. Mudar exige voltar para revisao — e aprovar de novo.
+        if (in_array($content->status, ['approved', 'scheduled', 'published'], true)) {
+            return response()->json([
+                'message' => 'Peça aprovada não muda o texto. Devolva para revisão antes de aplicar o SEO.',
+            ], 422);
+        }
+
         $seo = $content->latestSeo()->first();
 
         if ($seo === null) {

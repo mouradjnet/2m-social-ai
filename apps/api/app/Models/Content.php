@@ -16,6 +16,7 @@ class Content extends Model
         'caption', 'cta', 'hashtags', 'objective_id', 'format', 'channel', 'pillar',
         'image_prompt', 'status', 'assignee_id', 'scheduled_for',
         'source', 'origin_ai_run_id', 'created_by',
+        'approved_by', 'approved_at',
     ];
 
     protected function casts(): array
@@ -24,12 +25,19 @@ class Content extends Model
             'hashtags' => 'array',
             'scheduled_for' => 'datetime',
             'published_at' => 'datetime',
+            'approved_at' => 'datetime',
         ];
     }
 
     public function project(): BelongsTo
     {
         return $this->belongsTo(Project::class);
+    }
+
+    /** Quem aprovou (ADR-13). So id e nome: a tela nao precisa de mais nada do usuario. */
+    public function approver(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'approved_by')->select(['id', 'name']);
     }
 
     /**

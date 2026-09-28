@@ -175,7 +175,9 @@ O coração do sistema.
 | `status` | enum | ver máquina de estados abaixo |
 | `assignee_id` | fk users null | |
 | `scheduled_for` | timestamptz null | |
-| `published_at` | timestamptz null | marcado manualmente pelo usuário |
+| `approved_by` | fk users null | quem aprovou (ADR-13). Só `reviewer`+ aprova; devolver para revisão limpa |
+| `approved_at` | timestamptz null | quando aprovou |
+| `published_at` | timestamptz null | preenchido quando a publicação no Instagram é confirmada |
 | `source` | enum | `manual` `ai` `research` — sustenta o chip "Gerado por IA" das telas |
 | `origin_ai_run_id` | fk ai_runs null | rastreabilidade: qual geração produziu esta peça |
 | `created_by` | fk users | |
@@ -198,7 +200,7 @@ idea ──▶ production ──▶ review ──┬──▶ approved ──▶
 | `review → production` | reviewer+ | exige comentário |
 | `approved → scheduled` | editor+ | `scheduled_for` no futuro |
 | `scheduled → approved` | editor+ | — |
-| `scheduled → published` | editor+ | ação manual explícita |
+| `scheduled → published` | sistema, em nome de `approved_by` | `PublishGate` + confirmação da Meta (ADR-13) |
 | `published → archived` | editor+ | — |
 | `* → archived` | admin+ | — |
 
