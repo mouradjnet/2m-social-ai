@@ -14,6 +14,11 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        // Atras de proxy (o Nginx da VPS, o balanceador do Render): o app so e
+        // alcancavel pela rede interna, entao confiar no X-Forwarded-* de quem chega
+        // e seguro — e e o que faz o Laravel saber que o acesso foi por HTTPS.
+        $middleware->trustProxies(at: '*');
+
         $middleware->alias([
             'workspace' => EnsureWorkspaceMember::class,
         ]);

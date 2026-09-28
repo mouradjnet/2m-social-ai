@@ -20,3 +20,13 @@ apps/api/vendor
 apps/api/bootstrap/cache/*.php
 
 .git
+
+# As imagens da biblioteca de ESTA maquina (e o link simbolico para elas). Em
+# producao elas moram num volume; nunca dentro da imagem.
+apps/api/public/storage
+apps/api/storage/app/public/*
+!apps/api/storage/app/public/.gitignore
+
+# Segredos e backups da VPS, se alguem buildar de dentro de deploy/vps.
+deploy/vps/.env
+deploy/vps/backups

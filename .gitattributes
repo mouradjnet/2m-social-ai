@@ -1,0 +1,3 @@
+# Scripts de shell rodam em Linux (container, VPS). Com CRLF, o `#!/bin/sh` quebra:
+# um checkout no Windows (core.autocrlf=true) nao pode converter estes arquivos.
+*.sh text eol=lf

@@ -1,0 +1,176 @@
+# 2M Social AI na VPS (Hostinger, Ubuntu 24.04) — uma stack INDEPENDENTE.
+#
+# O que ela NAO faz, de proposito:
+#   - nao escuta nas portas 80/443: quem termina o HTTPS e o proxy reverso que ja
+#     existe na VPS (o do 2M Prev). Esta stack publica UMA porta, so em 127.0.0.1;
+#   - nao entra na rede de outros apps nem reaproveita volumes de ninguem;
+#   - nao expoe o Postgres para fora do Docker.
+#
+# Subir:   docker compose --env-file .env up -d --build
+# Estado:  docker compose ps        Logs: docker compose logs -f app worker scheduler
+# Ver docs/DEPLOY-VPS.md antes do primeiro deploy (tem uma auditoria a rodar antes).
+
+name: 2m-social
+
+x-app: &app
+  build:
+    context: ../..
+    dockerfile: Dockerfile
+  image: 2m-social-ai:${APP_VERSION:-latest}
+  restart: unless-stopped
+  env_file: .env
+  environment: &app-env
+    APP_ENV: production
+    APP_DEBUG: "false"
+    APP_URL: https://${APP_DOMAIN:?defina APP_DOMAIN no .env}
+    DB_CONNECTION: pgsql
+    DB_HOST: db
+    DB_PORT: "5432"
+    DB_DATABASE: ${DB_DATABASE:-2m_social_ai}
+    DB_USERNAME: ${DB_USERNAME:-social}
+    DB_PASSWORD: ${DB_PASSWORD:?defina DB_PASSWORD no .env}
+    DB_URL: ""
+    QUEUE_CONNECTION: database
+    CACHE_STORE: database
+    SESSION_DRIVER: database
+    FILESYSTEM_DISK: local
+    MEDIA_DISK: public
+    # Logs no stdout do container: o Docker guarda e roda (ver `logging`).
+    LOG_CHANNEL: stderr
+    LOG_LEVEL: ${LOG_LEVEL:-info}
+    INSTAGRAM_REDIRECT_URI: https://${APP_DOMAIN}/api/v1/instagram/callback
+  depends_on:
+    db:
+      condition: service_healthy
+  networks: [interna]
+  logging: &logging
+    driver: json-file
+    options:
+      max-size: "10m"
+      max-file: "5"
+
+services:
+  app:
+    <<: *app
+    environment:
+      <<: *app-env
+      ROLE: web
+      PORT: "8080"
+      # So o `app` migra: worker e scheduler sobem junto, e duas migracoes na mesma
+      # hora seriam corrida.
+      RUN_MIGRATIONS: "true"
+    volumes:
+      - media:/app/storage/app/public
+    healthcheck:
+      test: ["CMD", "php", "-r", "exit(@file_get_contents('http://127.0.0.1:8080/up') === false ? 1 : 0);"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+    mem_limit: ${APP_MEM_LIMIT:-512m}
+
+  worker:
+    <<: *app
+    environment:
+      <<: *app-env
+      ROLE: worker
+    # Nao precisa do volume de midia: a Meta busca a imagem pela URL publica.
+    healthcheck:
+      disable: true
+    mem_limit: ${WORKER_MEM_LIMIT:-384m}
+    depends_on:
+      app:
+        condition: service_healthy
+
+  scheduler:
+    <<: *app
+    environment:
+      <<: *app-env
+      ROLE: scheduler
+    # O agendador toca este arquivo a cada minuto (routes/console.php). Processo de
+    # pe nao prova agendador rodando; o arquivo recente prova.
+    healthcheck:
+      test: ["CMD-SHELL", "find /app/storage/framework/scheduler-heartbeat -mmin -3 | grep -q ."]
+      interval: 60s
+      timeout: 5s
+      retries: 3
+      start_period: 120s
+    mem_limit: ${SCHEDULER_MEM_LIMIT:-256m}
+    depends_on:
+      app:
+        condition: service_healthy
+
+  # Nginx PROPRIO desta stack, atras do proxy da VPS. Serve /storage (as imagens
+  # que a Meta busca) direto do volume, sem passar pelo PHP, e repassa o resto.
+  nginx:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    ports:
+      # So localhost: o proxy da VPS encaminha o dominio para ca. Nunca 80/443.
+      - "127.0.0.1:${HTTP_PORT:-8090}:80"
+    volumes:
+      - ./nginx/app.conf:/etc/nginx/conf.d/default.conf:ro
+      - media:/var/www/media:ro
+    depends_on:
+      app:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1/up"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    networks: [interna]
+    logging: *logging
+    mem_limit: 64m
+
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_DATABASE:-2m_social_ai}
+      POSTGRES_USER: ${DB_USERNAME:-social}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?defina DB_PASSWORD no .env}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    # Sem `ports`: o banco so existe dentro da rede `interna`.
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks: [interna]
+    logging: *logging
+    mem_limit: ${DB_MEM_LIMIT:-512m}
+
+  # Backup diario do banco e das imagens para ./backups (no disco da VPS). Copiar
+  # para fora da VPS e o passo que falta — ver docs/DEPLOY-VPS.md.
+  backup:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    entrypoint: ["/bin/sh", "/scripts/backup-loop.sh"]
+    environment:
+      PGHOST: db
+      PGDATABASE: ${DB_DATABASE:-2m_social_ai}
+      PGUSER: ${DB_USERNAME:-social}
+      PGPASSWORD: ${DB_PASSWORD}
+      BACKUP_HOUR: ${BACKUP_HOUR:-04}
+      BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-14}
+      TZ: ${BACKUP_TZ:-America/Sao_Paulo}
+    volumes:
+      - ./scripts:/scripts:ro
+      - ./backups:/backups
+      - media:/media:ro
+    depends_on:
+      db:
+        condition: service_healthy
+    networks: [interna]
+    logging: *logging
+    mem_limit: 128m
+
+volumes:
+  pgdata:
+  media:
+
+networks:
+  interna:
+    name: 2m-social-interna

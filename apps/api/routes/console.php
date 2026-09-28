@@ -16,4 +16,8 @@ Artisan::command('inspire', function () {
 // publicacao, e o que espera nova tentativa volta para a fila `publishing`.
 Schedule::command('publications:dispatch')->everyMinute()->withoutOverlapping(5);
 
+// Batimento do agendador: o healthcheck do container `scheduler` confere que este
+// arquivo mudou nos ultimos minutos. Processo vivo nao prova agendador rodando.
+Schedule::call(fn () => touch(storage_path('framework/scheduler-heartbeat')))->everyMinute()->name('heartbeat');
+
 Schedule::command('instagram:refresh-tokens')->dailyAt('03:17')->withoutOverlapping();

@@ -1,5 +1,7 @@
 # Deploy
 
+> **Hospedagem definitiva: a VPS — ver [DEPLOY-VPS.md](DEPLOY-VPS.md).** O Render abaixo continua servindo para demonstração; no modo free o container roda servidor, fila **e agendador** (a publicação automática depende dele), mas o serviço dorme e um post agendado só sai quando alguém o acorda. No `render.production.yaml` o agendador não tem serviço próprio: publicar a partir do Render pago exige acrescentar um worker com `ROLE=scheduler`.
+
 **Onde:** Render, por blueprint (a infra está declarada no repo — não em cliques num painel).
 
 **A forma:** o Laravel serve a API **e** a SPA no mesmo domínio. Um único origin, sem CORS, e o `fetch('/api/v1/...')` do frontend continua relativo. O build do Vite entra em `public/` na imagem (ver `Dockerfile`), e o catch-all de `routes/web.php` devolve o `index.html` nos deep links.
