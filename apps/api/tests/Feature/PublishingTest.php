@@ -528,6 +528,39 @@ class PublishingTest extends TestCase
         );
     }
 
+    /**
+     * A conferencia tambem falha, varias vezes. A publicacao NAO vira `failed` (que
+     * ofereceria "tentar de novo" sobre um post que pode estar no ar): fica `unknown`
+     * sem nova tentativa, e um humano decide.
+     */
+    public function test_conferencia_que_nao_conclui_espera_um_humano_e_nunca_republica(): void
+    {
+        $this->conta();
+        $this->pecaAprovada();
+        $this->meta([
+            'publish' => Http::response(['error' => ['code' => 2]], 502),
+            'status' => Http::sequence()
+                ->push(['status_code' => 'FINISHED'])
+                ->whenEmpty(Http::response(['error' => ['code' => 1, 'message' => 'Indisponível']], 500)),
+        ]);
+
+        $this->dispatch();
+        for ($i = 0; $i < 8; $i++) {
+            $this->travel(61)->minutes();
+            $this->dispatch();
+        }
+
+        $p = Publication::withoutGlobalScopes()->sole();
+        $this->assertSame('unknown', $p->status);
+        $this->assertNull($p->next_attempt_at);
+        $this->assertStringContainsString('Confira o perfil e decida', $p->last_error);
+        $this->assertSame(1, $this->publicacoes());
+
+        // E "tentar de novo" nao se aplica: so a decisao humana.
+        Sanctum::actingAs($this->reviewer);
+        $this->postJson("/api/v1/publications/{$p->id}/retry")->assertStatus(422);
+    }
+
     public function test_worker_que_morreu_no_meio_vira_desconhecido(): void
     {
         $this->conta();

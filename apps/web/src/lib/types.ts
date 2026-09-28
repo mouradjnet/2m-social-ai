@@ -153,6 +153,15 @@ export interface Content {
    * anda no fluxo ou é arquivada. Null se o texto nunca mudou.
    */
   latest_text_revision: { id: number; created_at: string } | null
+  /** Quem aprovou e quando (ADR-13). So reviewer+ aprova. */
+  approved_by?: number | null
+  approved_at?: string | null
+  approver?: { id: number; name: string } | null
+  image_asset_id?: number | null
+  /** A imagem que vai ao ar. Sem ela, o Instagram nao publica. */
+  image?: Asset | null
+  /** A publicacao mais recente no Instagram. */
+  latest_publication?: Publication | null
 }
 
 export interface PillarAdherence {
@@ -218,4 +227,77 @@ export interface AiRun {
   cost_cents: number | null
   latency_ms: number | null
   created_at: string
+}
+
+/** Uma imagem da biblioteca. `url` e publica: e o que a Meta busca ao publicar. */
+export interface Asset {
+  id: number
+  project_id: number
+  original_name: string | null
+  mime: string
+  size_bytes: number
+  width: number | null
+  height: number | null
+  url: string
+  /** Quantas pecas usam esta imagem. */
+  contents_count?: number
+  created_at: string
+}
+
+export interface InstagramAccount {
+  id: number
+  project_id: number
+  ig_user_id: string
+  username: string
+  account_type: string
+  status: 'active' | 'expired' | 'disconnected'
+  token_expires_at: string | null
+  /** Dias ate o token vencer; negativo = venceu. A tela avisa abaixo de 7. */
+  expires_in_days: number | null
+  last_error: string | null
+  connected_at: string
+  connector?: { id: number; name: string } | null
+}
+
+export type PublicationStatus =
+  | 'pending'
+  | 'publishing'
+  | 'published'
+  | 'failed'
+  | 'unknown'
+  | 'cancelled'
+
+export interface PublicationAttempt {
+  id: number
+  number: number
+  step: string
+  outcome: string
+  http_status: number | null
+  meta_code: number | null
+  meta_subcode: number | null
+  message: string | null
+  created_at: string
+}
+
+/** O que o sistema fez em nome de quem aprovou (ADR-13), com o snapshot aprovado. */
+export interface Publication {
+  id: number
+  content_id: number
+  caption: string
+  image_url: string | null
+  account_username: string | null
+  approved_by: number | null
+  approved_at: string | null
+  scheduled_for: string
+  status: PublicationStatus
+  media_id: string | null
+  permalink: string | null
+  published_at: string | null
+  attempts: number
+  next_attempt_at: string | null
+  error_kind: string | null
+  last_error: string | null
+  content?: { id: number; title: string; status: ContentStatus }
+  approver?: { id: number; name: string } | null
+  attempts_log?: PublicationAttempt[]
 }

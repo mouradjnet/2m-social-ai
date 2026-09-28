@@ -1,8 +1,8 @@
 import type { Content, ContentStatus } from '@/lib/types'
 
 /**
- * As colunas visiveis do quadro. `published` fica de fora: exige publicar, que nao
- * existe. Uma peca nesse estado simplesmente nao aparece em nenhuma coluna.
+ * As colunas visiveis do quadro. `published` ganhou coluna quando o sistema passou a
+ * publicar no Instagram (ADR-13): antes, uma peca publicada sumia do quadro.
  */
 export const COLUMNS = [
   'idea',
@@ -10,6 +10,7 @@ export const COLUMNS = [
   'review',
   'approved',
   'scheduled',
+  'published',
   'archived',
 ] as const
 

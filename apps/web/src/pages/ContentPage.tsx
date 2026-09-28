@@ -2,12 +2,14 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { ContentBoard } from '@/components/content/ContentBoard'
+import { PublicationEditor } from '@/components/content/PublicationEditor'
+import { InstagramBanner } from '@/components/instagram/InstagramBanner'
 import { GenerationStatus } from '@/components/strategy/GenerationStatus'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Shell } from '@/components/ui/Shell'
 import { useGeneration } from '@/hooks/useGeneration'
-import { api, download } from '@/lib/api'
+import { api, download, errorMessage } from '@/lib/api'
 import { groupByStatus } from '@/lib/groupByStatus'
 import type { Content, Strategy } from '@/lib/types'
 
@@ -28,6 +30,9 @@ export function ContentPage() {
   // um buraco: a distribuicao por peso nunca sorteia um pilar leve (15% de 5 pecas
   // da 0,75, que vira zero) e ele fica zerado para sempre.
   const [pillar, setPillar] = useState('')
+  // A peca aberta no editor de publicacao. O id, nao o objeto: a lista se atualiza
+  // e o editor le a versao nova.
+  const [editando, setEditando] = useState<number | null>(null)
 
   // Um hook so: o ai_run_id mora no `?run=`, e duas instancias brigariam por ele.
   // Escrever e agendar invalidam a mesma query, entao o endpoint vai na chamada.
@@ -84,6 +89,10 @@ export function ContentPage() {
   if (contents.isError) return <Shell>Projeto não encontrado.</Shell>
 
   const pieces = contents.data.data
+  const emEdicao = pieces.find((p) => p.id === editando) ?? null
+  // O erro do ultimo gesto no quadro — aprovar sem ser revisor (403), mexer numa peca
+  // que esta sendo publicada (409). Antes ele sumia em silencio.
+  const erroDoQuadro = move.error ?? applySeo.error ?? unarchive.error
   const generating = state.kind === 'starting' || state.kind === 'running'
   const aprovadas = pieces.filter((p) => p.status === 'approved').length
   // O que já passou pelo humano — é exatamente o que o zip leva.
@@ -110,6 +119,20 @@ export function ContentPage() {
         </Link>
 
         <div className="flex gap-4">
+          <Link
+            to={`/projects/${projectId}/library`}
+            className="text-body-sm text-on-surface-variant hover:text-primary"
+          >
+            Biblioteca →
+          </Link>
+
+          <Link
+            to={`/projects/${projectId}/instagram`}
+            className="text-body-sm text-on-surface-variant hover:text-primary"
+          >
+            Instagram →
+          </Link>
+
           <Link
             to={`/projects/${projectId}/insights`}
             className="text-body-sm text-on-surface-variant hover:text-primary"
@@ -212,7 +235,24 @@ export function ContentPage() {
         </Button>
       </div>
 
+      <InstagramBanner projectId={projectId!} />
+
       <GenerationStatus state={state} onRetry={retry} onDismiss={dismiss} />
+
+      {erroDoQuadro && (
+        <p role="alert" className="text-body-sm text-error mt-4">
+          {errorMessage(erroDoQuadro)}
+        </p>
+      )}
+
+      {emEdicao && (
+        <PublicationEditor
+          key={emEdicao.id}
+          projectId={projectId!}
+          content={emEdicao}
+          onClose={() => setEditando(null)}
+        />
+      )}
 
       <div className="mt-8">
         {pieces.length === 0 && state.kind === 'idle' ? (
@@ -229,6 +269,7 @@ export function ContentPage() {
             // A reescrita é por PEÇA, não por projeto — daí o caminho inteiro. É a
             // mesma execução assíncrona dos outros agentes: o ?run= e o polling.
             onRewrite={(id) => generate({ path: `/contents/${id}/rewrite:generate` })}
+            onEdit={(id) => setEditando(id)}
           />
         )}
       </div>

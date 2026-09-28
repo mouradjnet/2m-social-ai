@@ -99,3 +99,40 @@ export async function download(path: string): Promise<void> {
 
   URL.revokeObjectURL(url)
 }
+
+/**
+ * Sobe um arquivo. Sem `Content-Type` de proposito: o navegador escreve o
+ * `multipart/form-data` com o boundary — definido a mao, o servidor nao acha as partes.
+ */
+export async function upload<T>(path: string, file: File, field = 'file'): Promise<T> {
+  const token = getToken()
+  const body = new FormData()
+  body.append(field, file)
+
+  const response = await fetch(`/api/v1${path}`, {
+    method: 'POST',
+    body,
+    headers: {
+      Accept: 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+  })
+
+  const json = await response.json().catch(() => null)
+
+  if (!response.ok) {
+    if (response.status === 401) clearToken()
+    throw new ApiError(response.status, json)
+  }
+
+  return json as T
+}
+
+/** A mensagem que o servidor mandou (422, 403, 409), ou um texto generico. */
+export function errorMessage(error: unknown, fallback = 'Algo deu errado. Tente de novo.'): string {
+  if (error instanceof ApiError) {
+    return error.message422 ?? fallback
+  }
+
+  return fallback
+}

@@ -53,6 +53,7 @@ class RouteAuthorizationTest extends TestCase
         'PATCH api/v1/projects/{project}' => 'ProjectUpdateTest: viewer 403, outro tenant 404, sem token 401',
         'POST api/v1/contents/{content}/rewrite:generate' => 'RewriteGenerationTest: viewer 403, outro tenant 404, sem token 401',
         'DELETE api/v1/assets/{asset}' => 'AssetTest: outro tenant 404, imagem de peca aprovada 409',
+        'PATCH api/v1/contents/{content}/draft' => 'ContentDraftTest: viewer 403, outro tenant 404, peca aprovada 422',
         'POST api/v1/contents/{content}/schedule' => 'PublishingTest: viewer 403, outro tenant 404, peca nao aprovada 422',
         'POST api/v1/publications/{publication}/retry' => 'PublishingTest: viewer 403, outro tenant 404, publicacao viva 422',
         'POST api/v1/publications/{publication}/resolve' => 'PublishingTest: editor 403 (decidir e de reviewer+), outro tenant 404',

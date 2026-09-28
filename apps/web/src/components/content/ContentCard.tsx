@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Button } from '@/components/ui/Button'
+import { PublicationBadge } from '@/components/instagram/PublicationBadge'
 import { Card } from '@/components/ui/Card'
 import { cn } from '@/lib/cn'
 import { copyToClipboard } from '@/lib/copyToClipboard'
@@ -14,6 +15,8 @@ interface Props {
   onUnarchive: () => void
   onApplySeo: () => void
   onRewrite: () => void
+  /** Abre o editor de publicacao (texto, imagem, previa, agendar). */
+  onEdit?: () => void
 }
 
 const CHIPS: Record<ContentStatus, string> = {
@@ -48,6 +51,7 @@ export function ContentCard({
   onUnarchive,
   onApplySeo,
   onRewrite,
+  onEdit,
 }: Props) {
   const [copiado, setCopiado] = useState(false)
   const review = content.latest_review
@@ -77,9 +81,10 @@ export function ContentCard({
   }
   const isArchived = content.status === 'archived'
   const isScheduled = content.status === 'scheduled'
-  // De agendado so da para desagendar (volta a Aprovado) ou arquivar. Avancar seria
-  // publicar, que nao existe; e agendar e do agente, nao deste botao.
-  const canBack = isScheduled || (i > 0 && !isArchived)
+  const isPublished = content.status === 'published'
+  // De agendado so da para desagendar (volta a Aprovado) ou arquivar. Avancar e o
+  // sistema publicar na hora (ADR-13); agendar e pelo editor ou pelo agente.
+  const canBack = isScheduled || (i > 0 && !isArchived && !isPublished)
   const canAdvance = i >= 0 && i < FLOW.length - 1 && !isArchived
 
   return (
@@ -92,6 +97,15 @@ export function ContentCard({
           {CHIPS[content.status]}
         </span>
       </div>
+
+      {content.image && (
+        <img
+          src={content.image.url}
+          alt=""
+          className="mt-2 aspect-square w-full rounded object-cover"
+          loading="lazy"
+        />
+      )}
 
       <h3 className="text-label-md text-on-surface mt-2">{content.title}</h3>
 
@@ -206,6 +220,16 @@ export function ContentCard({
         </div>
       )}
 
+      {content.approver && (
+        <p className="text-label-sm text-secondary mt-3">✓ Aprovada por {content.approver.name}</p>
+      )}
+
+      {content.latest_publication && (
+        <div className="mt-2">
+          <PublicationBadge publication={content.latest_publication} />
+        </div>
+      )}
+
       {content.source === 'ai' && (
         <span className="text-label-sm bg-secondary-container text-secondary mt-3 inline-block rounded-full px-2 py-0.5">
           Gerado por IA
@@ -217,7 +241,12 @@ export function ContentCard({
         * tres botoes mortos e nenhuma saida — e o rewriter conserta peca arquivada,
         * entao o texto novo ficava preso aqui. Um botao vivo no lugar de tres mortos.
         */}
-      <div className="mt-4 flex gap-2">
+      <div className="mt-4 flex flex-wrap gap-2">
+        {onEdit && !isArchived && (
+          <Button size="sm" variant="secondary" disabled={pending} onClick={onEdit}>
+            {['idea', 'production', 'review'].includes(content.status) ? 'Editar' : 'Abrir'}
+          </Button>
+        )}
         {isArchived ? (
           <Button size="sm" variant="secondary" disabled={pending} onClick={onUnarchive}>
             Desarquivar

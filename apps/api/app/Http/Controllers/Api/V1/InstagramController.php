@@ -70,10 +70,7 @@ class InstagramController extends Controller
         $pedido = Cache::pull('instagram-oauth:'.$request->query('state', ''));
 
         if ($pedido === null) {
-            return redirect('/?'.http_build_query([
-                'instagram' => 'erro',
-                'motivo' => 'O link de conexão expirou ou já foi usado. Tente de novo.',
-            ]));
+            return $this->voltar('/', 'erro', 'O link de conexão expirou ou já foi usado. Tente de novo.');
         }
 
         $project = Project::withoutGlobalScopes()->findOrFail($pedido['project_id']);
@@ -140,8 +137,13 @@ class InstagramController extends Controller
         return null;
     }
 
+    /**
+     * Redirect RELATIVO: atras de um proxy (o do Vite em dev, o Nginx na VPS) o host
+     * que o Laravel enxerga nao e o que o navegador usa, e um Location absoluto
+     * mandaria o usuario para o endereco interno.
+     */
     private function voltar(string $destino, string $resultado, string $detalhe): RedirectResponse
     {
-        return redirect($destino.'?'.http_build_query(['instagram' => $resultado, 'motivo' => $detalhe]));
+        return new RedirectResponse($destino.'?'.http_build_query(['instagram' => $resultado, 'motivo' => $detalhe]));
     }
 }

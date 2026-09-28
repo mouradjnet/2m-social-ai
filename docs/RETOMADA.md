@@ -133,3 +133,33 @@ falhou continua no histórico.
 (`<input datetime-local>`) era lida como UTC e o post remarcado para 18:30 sairia
 às 15:30 em São Paulo. Agora é lida no fuso do projeto — o teste que fixava o
 comportamento antigo foi corrigido junto.
+
+---
+
+## Fase 5 — Interface administrativa (2026-09-28)
+
+Telas novas, no mesmo design system (tokens do `@theme`, `Card`/`Button`/`Input`):
+
+| Onde | O quê |
+|---|---|
+| `/projects/{id}/instagram` | Conectar/desconectar (com confirmação em dois cliques), validade da autorização, resultado do OAuth; histórico com indicadores, link do post, aprovador, erro, "Tentar de novo agora" e a decisão humana ("Está no ar"/"Não saiu") para resultado desconhecido |
+| `/projects/{id}/library` | Upload com o motivo da recusa, grade com dimensões/tamanho/uso, remoção com confirmação |
+| Conteúdo → **Editar/Abrir** | Editor de publicação: título, legenda, CTA, hashtags (contador 30), escolha da imagem e **prévia do post** com contador de 2200 caracteres. Aprovada: somente leitura, mostra quem aprovou e agenda no fuso do projeto |
+| Quadro | Coluna **Publicado**, miniatura, "Aprovada por", chip do estado no Instagram; o erro do gesto (403 ao aprovar sem ser revisor, 409 com publicação em andamento) aparece em vez de sumir |
+| Conteúdo e Calendário | Alerta de conexão: ausente, vencida ou vencendo em menos de 7 dias |
+
+Backend que a interface pediu: `PATCH /contents/{id}/draft` (edição do texto só antes
+da aprovação, com revisão de-para).
+
+**Verificado no navegador** (driver `fake`, usuário descartável num workspace
+separado): conectar → aprovar como dono → agendar para dali a 2 min → o
+`publications:dispatch` criou a publicação e o `queue:work --queue=publishing,default`
+publicou → histórico mostrou "Publicado" com mídia e aprovador. A hora 20:48
+digitada foi gravada como `20:48-03`.
+
+Dois defeitos achados nessa verificação e corrigidos: o callback do OAuth devolvia
+um `Location` absoluto com o host interno (atrás do proxy do Vite — e seria o mesmo
+atrás do Nginx); agora é relativo. E uma publicação que já teve resultado
+desconhecido podia virar `failed` se a própria conferência falhasse várias vezes,
+o que ofereceria "tentar de novo" sobre um post possivelmente no ar; agora ela fica
+`unknown` até um humano decidir.

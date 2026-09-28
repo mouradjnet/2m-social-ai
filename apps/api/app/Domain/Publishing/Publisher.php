@@ -264,6 +264,28 @@ class Publisher
         $transitorias = PublicationAttempt::where('publication_id', $this->publicacao->id)
             ->where('outcome', 'transient')->count();
 
+        // Uma vez incerta, sempre incerta ate alguem ter certeza. Se a publicacao ja
+        // teve um media_publish sem resposta, ela nunca vira `failed` sozinha: `failed`
+        // oferece "tentar de novo", e tentar de novo o que pode estar no ar e postar em
+        // dobro. Quando a conferencia nao conclui, um humano olha o perfil e decide.
+        $incerta = PublicationAttempt::where('publication_id', $this->publicacao->id)
+            ->where('outcome', 'unknown')->exists();
+
+        if ($incerta) {
+            $insiste = $e->kind === 'transient' && $transitorias <= count($backoff);
+
+            $this->publicacao->update([
+                'status' => 'unknown',
+                'error_kind' => 'unknown',
+                'last_error' => $insiste
+                    ? 'Conferindo com a Meta se o post saiu: '.$e->getMessage()
+                    : 'Não foi possível confirmar com a Meta se o post saiu. Confira o perfil e decida.',
+                'next_attempt_at' => $insiste ? now()->addMinutes($backoff[$transitorias - 1]) : null,
+            ]);
+
+            return;
+        }
+
         if ($e->kind === 'transient' && $transitorias <= count($backoff)) {
             $this->publicacao->update([
                 'status' => 'pending',

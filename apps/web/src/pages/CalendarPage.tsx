@@ -1,11 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
+import { InstagramBanner } from '@/components/instagram/InstagramBanner'
+import { PublicationBadge } from '@/components/instagram/PublicationBadge'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { Input } from '@/components/ui/Input'
 import { Shell } from '@/components/ui/Shell'
-import { api } from '@/lib/api'
+import { api, errorMessage } from '@/lib/api'
 import { buildMonth, sameLocalDay, shiftMonth } from '@/lib/calendarGrid'
 import { cn } from '@/lib/cn'
 import type { Content } from '@/lib/types'
@@ -84,6 +86,8 @@ export function CalendarPage() {
         </div>
       </div>
 
+      <InstagramBanner projectId={projectId!} />
+
       {agendadas === 0 && (
         <p className="text-body-lg text-on-surface-variant mt-6">
           Nenhuma peça agendada ainda. Aprove peças e use “Agendar aprovadas” no Conteúdo.
@@ -129,6 +133,11 @@ export function CalendarPage() {
                       : 'bg-secondary-container text-secondary',
                   )}
                 >
+                  {content.latest_publication?.status === 'published'
+                    ? '✓ '
+                    : content.latest_publication?.status === 'failed'
+                      ? '⚠ '
+                      : ''}
                   {hour(content.scheduled_for as string)} {content.title}
                 </button>
               ))}
@@ -143,6 +152,12 @@ export function CalendarPage() {
           <p className="text-body-sm text-on-surface-variant mt-1">
             {selected.format} · {selected.channel}
           </p>
+
+          {selected.latest_publication && (
+            <div className="mt-2">
+              <PublicationBadge publication={selected.latest_publication} />
+            </div>
+          )}
 
           <div className="mt-4 flex flex-wrap items-end gap-3">
             <Input
@@ -167,6 +182,12 @@ export function CalendarPage() {
               Desagendar
             </Button>
           </div>
+
+          {patch.isError && (
+            <p role="alert" className="text-body-sm text-error mt-3">
+              {errorMessage(patch.error)}
+            </p>
+          )}
         </Card>
       )}
     </Shell>

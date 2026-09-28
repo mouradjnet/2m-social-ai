@@ -9,6 +9,7 @@ interface Props {
   onApplySeo: (id: number) => void
   onRewrite: (id: number) => void
   onUnarchive: (id: number) => void
+  onEdit: (id: number) => void
 }
 
 const TITLES: Record<Column, string> = {
@@ -17,6 +18,7 @@ const TITLES: Record<Column, string> = {
   review: 'Revisão',
   approved: 'Aprovado',
   scheduled: 'Agendado',
+  published: 'Publicado',
   archived: 'Arquivado',
 }
 
@@ -31,6 +33,7 @@ export function ContentBoard({
   onApplySeo,
   onRewrite,
   onUnarchive,
+  onEdit,
 }: Props) {
   return (
     /*
@@ -67,6 +70,7 @@ export function ContentBoard({
                   onUnarchive={() => onUnarchive(content.id)}
                   onApplySeo={() => onApplySeo(content.id)}
                   onRewrite={() => onRewrite(content.id)}
+                  onEdit={() => onEdit(content.id)}
                 />
               )
             })}

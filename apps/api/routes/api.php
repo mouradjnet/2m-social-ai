@@ -101,6 +101,8 @@ Route::prefix('v1')->group(function () {
         Route::get('projects/{project}/instagram', [InstagramController::class, 'show']);
         Route::post('projects/{project}/instagram:connect', [InstagramController::class, 'connect']);
         Route::delete('projects/{project}/instagram', [InstagramController::class, 'disconnect']);
+        // O editor de publicacao: texto, CTA e hashtags. So antes da aprovacao.
+        Route::patch('contents/{content}/draft', [ContentController::class, 'updateDraft']);
         // Agendar uma peca aprovada a mao. Sendo do Instagram, o sistema publica na hora.
         Route::post('contents/{content}/schedule', [ContentController::class, 'schedule']);
         // O historico da publicacao automatica (ADR-13) e os dois gestos humanos sobre ele.

@@ -11,6 +11,8 @@ import { InsightsPage } from '@/pages/InsightsPage'
 import { StrategyPage } from '@/pages/StrategyPage'
 import { TeamPage } from '@/pages/TeamPage'
 import { AcceptInvitationPage } from '@/pages/AcceptInvitationPage'
+import { InstagramPage } from '@/pages/InstagramPage'
+import { LibraryPage } from '@/pages/LibraryPage'
 import { getToken } from '@/lib/api'
 import './index.css'
 
@@ -85,6 +87,22 @@ createRoot(document.getElementById('root')!).render(
             element={
               <RequireAuth>
                 <CalendarPage />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/projects/:projectId/library"
+            element={
+              <RequireAuth>
+                <LibraryPage />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/projects/:projectId/instagram"
+            element={
+              <RequireAuth>
+                <InstagramPage />
               </RequireAuth>
             }
           />

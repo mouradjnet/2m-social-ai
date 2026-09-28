@@ -40,14 +40,21 @@ test('agrupa as pecas nas colunas por status', () => {
   expect(groups.archived).toEqual([])
 })
 
-test('as colunas visiveis vao de ideia a agendado, mais arquivado, nesta ordem', () => {
-  expect(COLUMNS).toEqual(['idea', 'production', 'review', 'approved', 'scheduled', 'archived'])
+test('as colunas visiveis vao de ideia a publicado, mais arquivado, nesta ordem', () => {
+  expect(COLUMNS).toEqual([
+    'idea',
+    'production',
+    'review',
+    'approved',
+    'scheduled',
+    'published',
+    'archived',
+  ])
 })
 
-test('um status oculto (published) nao aparece em nenhuma coluna', () => {
+// Antes do ADR-13 a peca publicada sumia do quadro: nao havia coluna para ela.
+test('a peca publicada pelo sistema aparece na coluna Publicado', () => {
   const groups = groupByStatus([content(1, 'published')])
 
-  for (const col of COLUMNS) {
-    expect(groups[col]).toEqual([])
-  }
+  expect(groups.published).toHaveLength(1)
 })

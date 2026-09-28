@@ -179,6 +179,55 @@ class ContentController extends Controller
     }
 
     /**
+     * O editor de publicacao: o humano corrige o texto que a IA escreveu. So antes da
+     * aprovacao (ADR-13) — depois, o texto e o que foi aprovado. Grava a revisao com o
+     * de-para, como a reescrita e o SEO: e o que faz o veredito do revisor ficar velho
+     * e o PublishGate exigir nova aprovacao se algo escapar.
+     */
+    public function updateDraft(Request $request, Content $content): JsonResponse
+    {
+        Gate::authorize('update', $content->project);
+
+        $data = $request->validate([
+            'title' => ['sometimes', 'required', 'string', 'max:200'],
+            'caption' => ['sometimes', 'nullable', 'string', 'max:2200'],
+            'cta' => ['sometimes', 'nullable', 'string', 'max:280'],
+            'hashtags' => ['sometimes', 'array', 'max:30'],
+            'hashtags.*' => ['string', 'max:100', 'regex:/^#?[\pL\pN_]+$/u'],
+        ], [
+            'hashtags.max' => 'O Instagram aceita até 30 hashtags.',
+            'hashtags.*.regex' => 'Hashtag só tem letras, números e _ (sem espaço).',
+        ]);
+
+        if (! in_array($content->status, ['idea', 'production', 'review'], true)) {
+            return response()->json([
+                'message' => 'Peça aprovada não muda o texto. Devolva para revisão antes.',
+            ], 422);
+        }
+
+        $mudancas = [];
+
+        foreach ($data as $campo => $valor) {
+            if ($content->{$campo} !== $valor) {
+                $mudancas[$campo] = ['from' => $content->{$campo}, 'to' => $valor];
+            }
+        }
+
+        if ($mudancas !== []) {
+            DB::transaction(function () use ($content, $data, $mudancas, $request) {
+                $content->update($data);
+                ContentRevision::create([
+                    'content_id' => $content->id,
+                    'user_id' => $request->user()->id,
+                    'changes' => $mudancas,
+                ]);
+            });
+        }
+
+        return response()->json(['data' => $content->refresh()->load(['image', 'latestTextRevision'])]);
+    }
+
+    /**
      * Agendar a mao: a peca aprovada ganha data e vai para o calendario — e, sendo do
      * Instagram, para a fila de publicacao quando a hora chegar (ADR-13). O agente
      * social_media continua existindo para distribuir um lote; este e o gesto de uma
