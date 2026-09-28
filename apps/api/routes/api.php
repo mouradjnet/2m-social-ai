@@ -2,9 +2,11 @@
 
 use App\Http\Controllers\Api\V1\AiRunController;
 use App\Http\Controllers\Api\V1\AnalyticsController;
+use App\Http\Controllers\Api\V1\AssetController;
 use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\BrandProfileController;
 use App\Http\Controllers\Api\V1\ContentController;
+use App\Http\Controllers\Api\V1\ContentImageController;
 use App\Http\Controllers\Api\V1\CopyController;
 use App\Http\Controllers\Api\V1\DesignController;
 use App\Http\Controllers\Api\V1\ExportController;
@@ -83,6 +85,13 @@ Route::prefix('v1')->group(function () {
         // servidor, lendo de onde a peca saiu. O cliente nao tem essa informacao.
         Route::post('contents/{content}/unarchive', [ContentController::class, 'unarchive']);
         Route::patch('strategies/{strategy}', [StrategyController::class, 'update']);
+
+        // Biblioteca de imagens. A imagem sai daqui pronta para o Instagram.
+        Route::get('projects/{project}/assets', [AssetController::class, 'index']);
+        Route::post('projects/{project}/assets', [AssetController::class, 'store']);
+        Route::delete('assets/{asset}', [AssetController::class, 'destroy']);
+        // A imagem que vai ao ar com a peca. So antes da aprovacao (ADR-13).
+        Route::put('contents/{content}/image', [ContentImageController::class, 'update']);
 
         Route::get('ai-runs/{aiRun}', [AiRunController::class, 'show']);
     });

@@ -16,7 +16,7 @@ class Content extends Model
         'caption', 'cta', 'hashtags', 'objective_id', 'format', 'channel', 'pillar',
         'image_prompt', 'status', 'assignee_id', 'scheduled_for',
         'source', 'origin_ai_run_id', 'created_by',
-        'approved_by', 'approved_at',
+        'approved_by', 'approved_at', 'image_asset_id',
     ];
 
     protected function casts(): array
@@ -32,6 +32,11 @@ class Content extends Model
     public function project(): BelongsTo
     {
         return $this->belongsTo(Project::class);
+    }
+
+    public function image(): BelongsTo
+    {
+        return $this->belongsTo(Asset::class, 'image_asset_id');
     }
 
     /** Quem aprovou (ADR-13). So id e nome: a tela nao precisa de mais nada do usuario. */

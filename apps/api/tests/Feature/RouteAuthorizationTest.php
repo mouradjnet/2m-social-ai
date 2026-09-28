@@ -52,6 +52,8 @@ class RouteAuthorizationTest extends TestCase
         'PATCH api/v1/strategies/{strategy}' => 'aqui embaixo, em test_*_estrategia_*',
         'PATCH api/v1/projects/{project}' => 'ProjectUpdateTest: viewer 403, outro tenant 404, sem token 401',
         'POST api/v1/contents/{content}/rewrite:generate' => 'RewriteGenerationTest: viewer 403, outro tenant 404, sem token 401',
+        'DELETE api/v1/assets/{asset}' => 'AssetTest: outro tenant 404, imagem de peca aprovada 409',
+        'PUT api/v1/contents/{content}/image' => 'AssetTest: viewer 403, outro tenant 404, peca aprovada 422',
     ];
 
     /** Toda rota que dispara IA (e cobra por isso) exige pelo menos `editor`. */
@@ -66,6 +68,7 @@ class RouteAuthorizationTest extends TestCase
             'otimizar seo' => ['post', 'seo:generate'],
             'analisar' => ['post', 'analytics:generate'],
             'editar perfil da marca' => ['patch', 'brand-profile'],
+            'subir imagem' => ['post', 'assets'],
         ];
     }
 

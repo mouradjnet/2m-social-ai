@@ -43,3 +43,40 @@ fora desta retomada.
 
 **Nada impeditivo encontrado.** A única pendência de ambiente é o Postgres local,
 que não é serviço e precisa ser iniciado à mão.
+
+---
+
+## Fase 1 — ADR-13 (2026-09-28)
+
+"A IA propõe, o humano aprova e o sistema publica" — ver
+[ARCHITECTURE.md](ARCHITECTURE.md#adr-13--a-ia-propõe-o-humano-aprova-e-o-sistema-publica).
+Aprovar passou a exigir `reviewer`+ (antes qualquer editor aprovava, contra o
+ADR-01), ganhou `approved_by`/`approved_at` e o `PublishGate` recusa peça cuja
+aprovação é mais velha que a última mudança de texto ou imagem.
+
+---
+
+## Fase 2 — Biblioteca de imagens (2026-09-28)
+
+**Onde as imagens moram.** A Meta não recebe o arquivo: ela *busca* a imagem numa
+URL pública na hora de publicar. O disco precisa sobreviver a deploys e servir por
+HTTPS.
+
+| Opção | A favor | Contra |
+|---|---|---|
+| **Volume Docker na VPS, servido pelo Nginx** ✅ | Zero custo novo, zero dependência, backup junto do banco | O disco da VPS é o limite; se a VPS cair, a Meta não busca |
+| Cloudflare R2 | Sem custo de saída, CDN | Mais uma conta e chave; pacote `league/flysystem-aws-s3-v3` (+ AWS SDK) |
+| AWS S3 | Padrão de mercado | Custo de saída; mesma dependência |
+
+**Decidido:** volume persistente na VPS (`MEDIA_DISK=public`). O código só fala com
+`Storage::disk(config('media.disk'))`: migrar para R2 é instalar o adaptador S3,
+declarar o disco e trocar a variável — nenhuma linha de domínio muda.
+
+**Validação no upload, não na publicação.** JPEG/PNG/WebP até 8 MB, largura ≥ 320 px,
+proporção entre 4:5 e 1.91:1. Tudo é reencodado para JPEG (o único formato que a
+API aceita para imagem), reduzido a 1440 px de largura e sai sem EXIF. O nome do
+arquivo é um uuid — a URL é pública, então não pode ser adivinhável.
+
+**Remoção segura.** Imagem presa a peça aprovada, agendada ou publicada não sai (409).
+Presa só a rascunhos, sai e os rascunhos ficam sem imagem. Trocar a imagem de uma
+peça grava revisão com o de-para e só vale antes da aprovação.
