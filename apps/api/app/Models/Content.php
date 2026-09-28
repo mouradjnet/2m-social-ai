@@ -16,7 +16,7 @@ class Content extends Model
         'caption', 'cta', 'hashtags', 'objective_id', 'format', 'channel', 'pillar',
         'image_prompt', 'status', 'assignee_id', 'scheduled_for',
         'source', 'origin_ai_run_id', 'created_by',
-        'approved_by', 'approved_at', 'image_asset_id',
+        'approved_by', 'approved_at', 'image_asset_id', 'published_at',
     ];
 
     protected function casts(): array
@@ -32,6 +32,12 @@ class Content extends Model
     public function project(): BelongsTo
     {
         return $this->belongsTo(Project::class);
+    }
+
+    /** A publicacao mais recente no Instagram — o board e o calendario mostram o estado dela. */
+    public function latestPublication(): HasOne
+    {
+        return $this->hasOne(Publication::class)->latestOfMany();
     }
 
     public function image(): BelongsTo

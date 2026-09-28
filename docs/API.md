@@ -276,6 +276,37 @@ POST   /api/v1/workspaces/{workspace}/notifications:read-all
 
 ---
 
+## Instagram e publicação automática (ADR-13, ADR-14)
+
+Rotas **implementadas** em 2026-09. O `{project}` passa pelo `WorkspaceMemberScope` (outro tenant = 404).
+
+```
+# Biblioteca de imagens (editor+ para subir e remover)
+GET    /api/v1/projects/{project}/assets
+POST   /api/v1/projects/{project}/assets              multipart: file (JPEG/PNG/WebP, ≤ 8 MB)
+DELETE /api/v1/assets/{asset}                         409 se usada em peça aprovada ou publicação
+PUT    /api/v1/contents/{content}/image               { asset_id | null }  — só idea/production/review
+
+# Conta do Instagram (admin+ para conectar/desconectar)
+GET    /api/v1/projects/{project}/instagram           conta viva (sem token) ou null
+POST   /api/v1/projects/{project}/instagram:connect   → { authorize_url }
+GET    /api/v1/instagram/callback                     público; volta da Meta, redireciona para a SPA
+DELETE /api/v1/projects/{project}/instagram           apaga o token, guarda a linha
+
+# Agendar e publicar
+POST   /api/v1/contents/{content}/schedule            { scheduled_for } — peça aprovada; hora sem fuso = fuso do projeto
+GET    /api/v1/projects/{project}/publications        histórico (100 mais recentes)
+GET    /api/v1/publications/{publication}             com attempts_log
+POST   /api/v1/publications/{publication}/retry       falhou → remarca a peça para agora (editor+)
+POST   /api/v1/publications/{publication}/resolve     { outcome: published|failed, permalink? } — só `unknown` (reviewer+)
+```
+
+**Aprovar** (`PATCH /contents/{id} {status: approved}` a partir de `review`) exige `reviewer`+ e grava `approved_by`/`approved_at`. Com publicação em andamento (`pending`/`publishing`/`unknown`), a peça não muda de status nem de hora (`409`).
+
+**Estados da publicação:** `pending` → `publishing` → `published`; ou `failed` (recusa ou falha definitiva), `unknown` (a Meta não confirmou o `media_publish` — o sistema confere antes de qualquer nova tentativa) e `cancelled` (a peça foi desagendada antes de enviar).
+
+---
+
 ## Códigos de status usados
 
 | Código | Significado no contexto |

@@ -233,6 +233,24 @@ Um "post reutilizável" é um `template` de `kind = content` — não um `conten
 
 ---
 
+## Instagram e publicação (ADR-13, ADR-14)
+
+### `instagram_accounts`
+`workspace_id`, `project_id`, `ig_user_id` (o id da conta profissional), `username`, `account_type`, `access_token` text **criptografado** (cast `encrypted`; nulo ao desconectar), `token_expires_at`, `token_refreshed_at`, `scopes` jsonb, `status` enum (`active` `expired` `disconnected`), `last_error`, `connected_by`, `connected_at`, `disconnected_at`.
+Índice único parcial: **uma conta viva por projeto** (`status <> 'disconnected'`). A linha não é apagada ao desconectar — as publicações apontam para ela.
+
+### `publications`
+O que o sistema fez em nome de quem aprovou. Guarda o **snapshot** aprovado: `caption` (legenda + CTA + hashtags, como foi ao ar), `image_url`, `account_username`, `approved_by`, `approved_at`, `scheduled_for`. E o resultado: `status` enum (`pending` `publishing` `published` `failed` `unknown` `cancelled`), `container_id`, `media_id` (o id que a Meta devolveu), `permalink`, `published_at`, `attempts`, `next_attempt_at`, `error_kind`, `last_error`.
+Índices únicos: `(content_id, scheduled_for)` — uma publicação por horário (o agendador pode rodar duas vezes; o banco aceita uma); e parcial `(content_id) WHERE status IN (pending, publishing, published, unknown)` — **nunca duas publicações vivas da mesma peça**.
+
+### `publication_attempts`
+Append-only. Cada conversa com a Meta: `step` (`gate` `container` `status` `publish` `reconcile` `recover` `resolve` `meta`), `outcome` (`success` `waiting` `transient` `permanent` `auth` `unknown` `refused`), `http_status`, `meta_code`, `meta_subcode`, `message`.
+
+### `assets` (biblioteca)
+Passou a ser usada: cada imagem já é o JPEG que o Instagram aceita. Ganhou `original_name`. `path` é um uuid (a URL é pública).
+
+---
+
 ## IA e auditoria
 
 ### `ai_runs`

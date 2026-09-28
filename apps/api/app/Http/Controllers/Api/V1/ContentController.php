@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Content;
 use App\Models\ContentRevision;
 use App\Models\Project;
+use App\Models\Publication;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -31,7 +32,7 @@ class ContentController extends Controller
         return response()->json([
             // A ultima review e a ultima sugestao de SEO vem juntas: o board mostra
             // veredito e sugestao sem uma chamada por card.
-            'data' => $project->contents()->with(['latestReview', 'latestSeo', 'latestTextRevision', 'approver', 'image'])->latest()->get(),
+            'data' => $project->contents()->with(['latestReview', 'latestSeo', 'latestTextRevision', 'approver', 'image', 'latestPublication'])->latest()->get(),
         ]);
     }
 
@@ -47,6 +48,12 @@ class ContentController extends Controller
             'status' => ['required_without:scheduled_for', 'prohibits:scheduled_for', 'string'],
             'scheduled_for' => ['required_without:status', 'date'],
         ]);
+
+        // Com a publicacao em andamento, a peca nao anda nem muda de hora: o worker
+        // pode estar no meio da conversa com a Meta.
+        if ($emAndamento = $this->publicacaoEmAndamento($content)) {
+            return $emAndamento;
+        }
 
         if (isset($data['scheduled_for'])) {
             return $this->reschedule($content, $data['scheduled_for']);
@@ -154,7 +161,7 @@ class ContentController extends Controller
         }
 
         $de = $content->scheduled_for;
-        $para = CarbonImmutable::parse($quando);
+        $para = self::horaLocal($quando, $content->project->timezone);
 
         DB::transaction(function () use ($content, $de, $para) {
             $content->update(['scheduled_for' => $para]);
@@ -169,6 +176,68 @@ class ContentController extends Controller
         });
 
         return response()->json(['data' => $content->refresh()]);
+    }
+
+    /**
+     * Agendar a mao: a peca aprovada ganha data e vai para o calendario — e, sendo do
+     * Instagram, para a fila de publicacao quando a hora chegar (ADR-13). O agente
+     * social_media continua existindo para distribuir um lote; este e o gesto de uma
+     * peca so.
+     */
+    public function schedule(Request $request, Content $content): JsonResponse
+    {
+        Gate::authorize('update', $content->project);
+
+        $data = $request->validate(['scheduled_for' => ['required', 'date']]);
+
+        if ($content->status !== 'approved') {
+            return response()->json([
+                'message' => 'Só uma peça aprovada pode ser agendada.',
+            ], 422);
+        }
+
+        $quando = self::horaLocal($data['scheduled_for'], $content->project->timezone);
+
+        if ($quando->lt(now()->addMinute())) {
+            return response()->json([
+                'message' => 'Escolha um horário no futuro.',
+                'errors' => ['scheduled_for' => ['Escolha um horário no futuro.']],
+            ], 422);
+        }
+
+        DB::transaction(function () use ($content, $quando, $request) {
+            $content->update(['status' => 'scheduled', 'scheduled_for' => $quando->utc()]);
+            ContentRevision::create([
+                'content_id' => $content->id,
+                'user_id' => $request->user()->id,
+                'from_status' => 'approved',
+                'to_status' => 'scheduled',
+            ]);
+        });
+
+        return response()->json(['data' => $content->refresh()->load('approver')]);
+    }
+
+    /**
+     * A hora que chega sem fuso ("2026-10-01T08:30", o que o <input datetime-local>
+     * manda) e a hora do PROJETO — o fuso do publico da marca. Antes era lida como UTC
+     * (o fuso da aplicacao) e a peca remarcada para 08:30 ia ao ar as 05:30 em Sao
+     * Paulo. Com offset explicito, vale o offset.
+     */
+    private static function horaLocal(string $quando, ?string $timezone): CarbonImmutable
+    {
+        return CarbonImmutable::parse($quando, $timezone ?? 'UTC')->utc();
+    }
+
+    private function publicacaoEmAndamento(Content $content): ?JsonResponse
+    {
+        $viva = Publication::where('content_id', $content->id)
+            ->whereIn('status', Publication::IN_FLIGHT)
+            ->exists();
+
+        return $viva ? response()->json([
+            'message' => 'A publicação desta peça está em andamento. Aguarde o resultado.',
+        ], 409) : null;
     }
 
     /**

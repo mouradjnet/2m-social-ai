@@ -7,6 +7,7 @@ use App\Domain\Media\InvalidImageException;
 use App\Http\Controllers\Controller;
 use App\Models\Asset;
 use App\Models\Project;
+use App\Models\Publication;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -105,6 +106,13 @@ class AssetController extends Controller
         if ($asset->contents()->whereIn('status', self::CONGELADOS)->exists()) {
             return response()->json([
                 'message' => 'Esta imagem está numa peça aprovada. Troque a imagem da peça antes de remover.',
+            ], 409);
+        }
+
+        // O historico diz qual imagem foi ao ar; apagar o arquivo apagaria a prova.
+        if (Publication::where('asset_id', $asset->id)->exists()) {
+            return response()->json([
+                'message' => 'Esta imagem já foi usada numa publicação e fica no histórico.',
             ], 409);
         }
 

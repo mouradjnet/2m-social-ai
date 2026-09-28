@@ -97,3 +97,39 @@ Fluxo escolhido: **Instagram API with Instagram Login** — ver ADR-14.
 - Toda falha da Meta sai classificada: `transient`, `permanent`, `auth` ou
   `unknown` — este último só no `media_publish`, onde a Meta pode ter publicado
   mesmo sem responder.
+
+---
+
+## Fase 4 — Publicação automática (2026-09-28)
+
+**O ciclo.** O agendador roda `publications:dispatch` a cada minuto. Toda peça do
+Instagram agendada cuja hora chegou vira uma linha em `publications` — `pending`,
+ou já `failed` com o motivo se alguma porta estiver fechada (sem aprovação, texto
+mudado depois dela, sem imagem, sem conta, token vencido, legenda acima de 2200,
+horário perdido há mais de 12 h). O `PublishJob` roda na fila `publishing`, só dela.
+
+**Idempotência, em três camadas:**
+1. Uma publicação por peça **por horário** (índice único). Rodar o agendador duas vezes não cria duas.
+2. Nunca duas publicações **vivas** da mesma peça (índice único parcial).
+3. Reivindicação atômica: `UPDATE ... SET status='publishing' WHERE status IN (pending, unknown)`. Dois workers com o mesmo job: um passa, o outro não faz nada.
+
+**Resultado desconhecido não se repete às cegas.** Timeout ou 5xx no
+`media_publish` deixa a publicação `unknown`. Dois minutos depois o sistema
+pergunta o estado do container: `PUBLISHED` → conclui (acha a mídia pela legenda
+entre as recentes), `FINISHED` → a Meta não publicou e é seguro publicar, `EXPIRED`
+→ novo container. Worker morto no meio (`publishing` há mais de 10 min) vira
+`unknown` e segue o mesmo caminho. Se nada decidir, um reviewer confere o perfil e
+decide à mão (`resolve`).
+
+**Falhas.** Transitórias (limite de taxa, cota de 24 h, 5xx antes de publicar)
+tentam de novo em 1, 5, 15, 30 e 60 min e depois falham. Permanentes (imagem
+recusada) falham na hora. Token recusado falha e marca a conta como `expired`.
+Cada conversa com a Meta fica em `publication_attempts`.
+
+**Tentar de novo** = remarcar a peça para agora: abre uma publicação nova e a que
+falhou continua no histórico.
+
+**Fuso.** Corrigido um defeito anterior: a hora sem fuso vinda da tela
+(`<input datetime-local>`) era lida como UTC e o post remarcado para 18:30 sairia
+às 15:30 em São Paulo. Agora é lida no fuso do projeto — o teste que fixava o
+comportamento antigo foi corrigido junto.

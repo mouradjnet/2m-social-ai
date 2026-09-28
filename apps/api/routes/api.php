@@ -13,6 +13,7 @@ use App\Http\Controllers\Api\V1\ExportController;
 use App\Http\Controllers\Api\V1\InstagramController;
 use App\Http\Controllers\Api\V1\InvitationController;
 use App\Http\Controllers\Api\V1\ProjectController;
+use App\Http\Controllers\Api\V1\PublicationController;
 use App\Http\Controllers\Api\V1\ReviewController;
 use App\Http\Controllers\Api\V1\RewriteController;
 use App\Http\Controllers\Api\V1\ScheduleController;
@@ -100,6 +101,13 @@ Route::prefix('v1')->group(function () {
         Route::get('projects/{project}/instagram', [InstagramController::class, 'show']);
         Route::post('projects/{project}/instagram:connect', [InstagramController::class, 'connect']);
         Route::delete('projects/{project}/instagram', [InstagramController::class, 'disconnect']);
+        // Agendar uma peca aprovada a mao. Sendo do Instagram, o sistema publica na hora.
+        Route::post('contents/{content}/schedule', [ContentController::class, 'schedule']);
+        // O historico da publicacao automatica (ADR-13) e os dois gestos humanos sobre ele.
+        Route::get('projects/{project}/publications', [PublicationController::class, 'index']);
+        Route::get('publications/{publication}', [PublicationController::class, 'show']);
+        Route::post('publications/{publication}/retry', [PublicationController::class, 'retry']);
+        Route::post('publications/{publication}/resolve', [PublicationController::class, 'resolve']);
         // A imagem que vai ao ar com a peca. So antes da aprovacao (ADR-13).
         Route::put('contents/{content}/image', [ContentImageController::class, 'update']);
 

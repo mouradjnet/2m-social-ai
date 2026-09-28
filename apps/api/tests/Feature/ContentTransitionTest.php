@@ -240,14 +240,16 @@ class ContentTransitionTest extends TestCase
             ->assertOk()
             ->assertJsonPath('data.status', 'scheduled');
 
-        $this->assertSame('2026-08-07 18:30:00', $content->fresh()->scheduled_for->toDateTimeString());
+        // A hora sem fuso e a do projeto (America/Sao_Paulo): 18:30 la sao 21:30 UTC,
+        // que e o que o banco guarda. Antes ela era lida como UTC e o post saia 3h cedo.
+        $this->assertSame('2026-08-07 21:30:00', $content->fresh()->scheduled_for->toDateTimeString());
 
         // Remarcar nao e transicao: o status nao mudou, e quem conta o que houve e
         // `changes` — a coluna que existia desde a primeira migration e nunca fora usada.
         $revisao = ContentRevision::where('content_id', $content->id)->latest('id')->first();
         $this->assertNull($revisao->from_status);
         $this->assertNull($revisao->to_status);
-        $this->assertSame('2026-08-07 18:30:00', $revisao->changes['scheduled_for']['to']);
+        $this->assertSame('2026-08-07 21:30:00', $revisao->changes['scheduled_for']['to']);
         $this->assertStringStartsWith('2026-08-03', $revisao->changes['scheduled_for']['from']);
     }
 
