@@ -19,7 +19,9 @@ class Workspace extends Model
 
     protected function casts(): array
     {
-        return ['trial_ends_at' => 'immutable_datetime'];
+        // `monthly_budget_cents` fica FORA do fillable de proposito: so o comando
+        // do operador escreve nele (Budget).
+        return ['trial_ends_at' => 'immutable_datetime', 'monthly_budget_cents' => 'integer'];
     }
 
     public function owner(): BelongsTo

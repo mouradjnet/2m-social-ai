@@ -313,3 +313,13 @@ export interface ActivityEntry {
   created_at: string
   user: { id: number; name: string } | null
 }
+
+/** O consumo de IA do mes no workspace (GET /workspaces/{id}/usage). */
+export interface Usage {
+  month: string
+  spent_cents: number
+  limit_cents: number
+  limit_source: 'default' | 'workspace'
+  by_agent: { agent: string; runs: number; cost_cents: number }[]
+  by_project: { project_id: number | null; name: string | null; runs: number; cost_cents: number }[]
+}

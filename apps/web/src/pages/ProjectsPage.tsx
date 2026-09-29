@@ -89,9 +89,14 @@ export function ProjectsPage() {
 
         <div className="flex items-center gap-2">
           {podeConvidar(workspace.role) && (
-            <Link to="/equipe">
-              <Button variant="secondary">Equipe</Button>
-            </Link>
+            <>
+              <Link to="/consumo">
+                <Button variant="secondary">Consumo de IA</Button>
+              </Link>
+              <Link to="/equipe">
+                <Button variant="secondary">Equipe</Button>
+              </Link>
+            </>
           )}
           <Button
             variant="secondary"

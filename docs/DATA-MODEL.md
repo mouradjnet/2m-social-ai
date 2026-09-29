@@ -40,6 +40,7 @@ Padrão Laravel: `name`, `email` (unique), `password`, `email_verified_at`, `rem
 | `slug` | varchar(140) unique | |
 | `owner_id` | fk users | |
 | `plan` | varchar(30) | `free` no MVP; existe para não migrar depois |
+| `monthly_budget_cents` | int null | teto mensal de IA; nulo = padrão do config. Só `php artisan workspace:budget` escreve (fora do fillable). Desde `2026_09_29_020000` |
 | `trial_ends_at` | timestamptz null | |
 
 ### `workspace_members`

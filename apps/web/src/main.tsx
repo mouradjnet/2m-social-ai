@@ -10,6 +10,7 @@ import { ContentPage } from '@/pages/ContentPage'
 import { InsightsPage } from '@/pages/InsightsPage'
 import { StrategyPage } from '@/pages/StrategyPage'
 import { TeamPage } from '@/pages/TeamPage'
+import { UsagePage } from '@/pages/UsagePage'
 import { AcceptInvitationPage } from '@/pages/AcceptInvitationPage'
 import { InstagramPage } from '@/pages/InstagramPage'
 import { LibraryPage } from '@/pages/LibraryPage'
@@ -47,6 +48,14 @@ createRoot(document.getElementById('root')!).render(
             element={
               <RequireAuth>
                 <TeamPage />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/consumo"
+            element={
+              <RequireAuth>
+                <UsagePage />
               </RequireAuth>
             }
           />

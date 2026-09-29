@@ -37,6 +37,7 @@ DELETE /api/v1/workspaces/{workspace}/members/{member}
 
 POST   /api/v1/workspaces/{workspace}/invitations        {email, role}
 GET    /api/v1/workspaces/{workspace}/invitations
+GET    /api/v1/workspaces/{workspace}/usage              consumo de IA do mês: gasto, teto, por agente e por projeto (admin+)
 DELETE /api/v1/invitations/{invitation}
 POST   /api/v1/invitations/{token}:accept                não exige ser membro
 ```

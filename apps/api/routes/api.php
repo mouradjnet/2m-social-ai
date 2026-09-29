@@ -20,6 +20,7 @@ use App\Http\Controllers\Api\V1\RewriteController;
 use App\Http\Controllers\Api\V1\ScheduleController;
 use App\Http\Controllers\Api\V1\SeoController;
 use App\Http\Controllers\Api\V1\StrategyController;
+use App\Http\Controllers\Api\V1\UsageController;
 use App\Http\Controllers\Api\V1\WorkspaceController;
 use Illuminate\Support\Facades\Route;
 
@@ -52,6 +53,10 @@ Route::prefix('v1')->group(function () {
             Route::get('invitations', [InvitationController::class, 'index'])
                 ->middleware('workspace:admin');
             Route::post('invitations', [InvitationController::class, 'store'])
+                ->middleware('workspace:admin');
+
+            // Quanto a IA custou no mes, e onde. So leitura: o teto e do operador.
+            Route::get('usage', [UsageController::class, 'show'])
                 ->middleware('workspace:admin');
         });
 

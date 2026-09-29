@@ -244,7 +244,7 @@ if ($message->stopReason === 'refusal') {
 
 - `ai_runs` grava `input_tokens`, `output_tokens`, `cache_read_tokens`, `cache_write_tokens`, `cost_cents`, `latency_ms`.
 - Preço `claude-opus-4-8`: **$5 / 1M tokens de entrada, $25 / 1M de saída**. Leitura de cache ≈ 0,1× da entrada; escrita de cache = 1,25× (TTL 5min).
-- **Orçamento mensal por workspace**, verificado *antes* de enfileirar o job — não depois de gastar. Estourou, a rota devolve 402 com o número.
+- **Orçamento mensal por workspace**, verificado *antes* de enfileirar o job — não depois de gastar. Estourou, a rota devolve 402 com o número. O teto é `workspaces.monthly_budget_cents` quando o operador o fixou (`php artisan workspace:budget {ws} {centavos}` / `--default`) e `AI_WORKSPACE_MONTHLY_BUDGET_CENTS` quando não. **Nenhuma rota muda o teto**: ele protege a chave de quem paga a IA. O consumo do mês aparece em `/consumo` (admin+).
 - Rate limit de rota (`throttle`) nas rotas `:generate`, separado do orçamento.
 
 ## 9. Erros
