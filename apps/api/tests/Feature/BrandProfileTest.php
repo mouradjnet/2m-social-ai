@@ -208,4 +208,29 @@ class BrandProfileTest extends TestCase
             ->assertJsonPath('data.forbidden_words', ['barato', 'promocao'])
             ->assertJsonPath('data.competitors.0.name', 'Rival');
     }
+
+    /** A tela mostra a mensagem da API ao usuario: ela precisa estar em portugues. */
+    public function test_erros_de_validacao_voltam_em_portugues_com_o_nome_do_campo(): void
+    {
+        $project = $this->actAs(WorkspaceRole::Editor);
+
+        $erros = $this->patchJson("/api/v1/projects/{$project->id}/brand-profile", [
+            'instagram' => '@2msaudefeminina',
+            'colors' => ['b23a6f'],
+        ])->assertStatus(422)->json('errors');
+
+        $this->assertSame('O campo Instagram deve ser um link completo começando com https://.', $erros['instagram'][0]);
+        // A chave e `colors.0` (com ponto): o assertJsonPath a leria como caminho.
+        $this->assertSame('Cada cor precisa ser um código hexadecimal com #, ex: #b23a6f.', $erros['colors.0'][0]);
+    }
+
+    /** O resto do sistema tambem: a traducao e geral, nao so do perfil. */
+    public function test_regra_generica_sai_traduzida(): void
+    {
+        $project = $this->actAs(WorkspaceRole::Editor);
+
+        $this->patchJson("/api/v1/projects/{$project->id}/brand-profile", ['brand_name' => str_repeat('a', 161)])
+            ->assertStatus(422)
+            ->assertJsonPath('errors.brand_name.0', 'O campo nome da marca não pode ter mais de 160 caracteres.');
+    }
 }

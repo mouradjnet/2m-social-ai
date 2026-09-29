@@ -53,4 +53,22 @@ class UpdateBrandProfileRequest extends FormRequest
             'colors.*' => ['string', 'regex:/^#[0-9a-fA-F]{6}$/'],
         ];
     }
+
+    /**
+     * As duas regras que mais pegam quem preenche: dizer o formato certo, nao so
+     * que esta errado ("@2msaudefeminina" e "b23a6f" foram os casos reais).
+     */
+    public function messages(): array
+    {
+        $link = 'O campo :attribute deve ser um link completo começando com https://.';
+
+        return [
+            ...array_fill_keys(
+                array_map(fn ($c) => "{$c}.url", ['website', 'instagram', 'facebook', 'linkedin', 'tiktok', 'youtube', 'competitors.*.url']),
+                $link,
+            ),
+            'colors.*.regex' => 'Cada cor precisa ser um código hexadecimal com #, ex: #b23a6f.',
+            'colors.*.string' => 'Cada cor precisa ser um código hexadecimal com #, ex: #b23a6f.',
+        ];
+    }
 }

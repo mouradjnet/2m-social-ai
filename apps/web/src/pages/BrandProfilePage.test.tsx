@@ -218,3 +218,152 @@ test('fuso fora da lista curada continua visivel', async () => {
   const select = await screen.findByRole('combobox', { name: /fuso em que esta marca publica/i })
   expect(select).toHaveValue('Asia/Tokyo')
 })
+
+// --- Perda silenciosa de dados (C1) ---------------------------------------------
+
+function comPatch(resposta: () => Response) {
+  let chamadas = 0
+  server.use(
+    http.get('/api/v1/projects/1/brand-profile', () => HttpResponse.json(profile())),
+    http.get('/api/v1/projects/1', () => HttpResponse.json(projeto('America/Sao_Paulo'))),
+    http.patch('/api/v1/projects/1/brand-profile', () => {
+      chamadas++
+      return resposta()
+    }),
+  )
+  return () => chamadas
+}
+
+test('Pular com alteração não salva avisa e não descarta', async () => {
+  const user = userEvent.setup()
+  const chamadas = comPatch(() => HttpResponse.json(profile()))
+
+  renderWithProviders(<BrandProfilePage />, ROUTE)
+
+  const nome = await screen.findByRole('textbox', { name: /nome da marca/i })
+  await user.clear(nome)
+  await user.type(nome, '2M Saúde Feminina')
+  await user.click(screen.getByRole('button', { name: /^pular$/i }))
+
+  expect(screen.getByRole('alert')).toHaveTextContent(/alterações não salvas/i)
+  // Continua no passo 1, com o texto digitado.
+  expect(screen.getByRole('textbox', { name: /nome da marca/i })).toHaveValue('2M Saúde Feminina')
+  expect(chamadas()).toBe(0)
+})
+
+test('descartar e pular avança sem salvar; salvar e continuar salva', async () => {
+  const user = userEvent.setup()
+  const chamadas = comPatch(() => HttpResponse.json(profile()))
+
+  renderWithProviders(<BrandProfilePage />, ROUTE)
+
+  await user.type(await screen.findByRole('textbox', { name: /nome da marca/i }), 'X')
+  await user.click(screen.getByRole('button', { name: /^pular$/i }))
+  await user.click(screen.getByRole('button', { name: /descartar e pular/i }))
+  expect(screen.getByRole('textbox', { name: /^público/i })).toBeInTheDocument()
+  expect(chamadas()).toBe(0)
+
+  await user.type(screen.getByRole('textbox', { name: /^público/i }), 'Mulheres')
+  await user.click(screen.getByRole('button', { name: /^pular$/i }))
+  await user.click(screen.getByRole('button', { name: /salvar e continuar/i }))
+  await waitFor(() => expect(chamadas()).toBe(1))
+})
+
+test('Pular sem alteração avança direto', async () => {
+  const user = userEvent.setup()
+  comPatch(() => HttpResponse.json(profile()))
+
+  renderWithProviders(<BrandProfilePage />, ROUTE)
+
+  await user.click(await screen.findByRole('button', { name: /^pular$/i }))
+  expect(screen.getByRole('textbox', { name: /^público/i })).toBeInTheDocument()
+  expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+})
+
+test('trocar de passo pelo Stepper com alteração não salva também avisa', async () => {
+  const user = userEvent.setup()
+  comPatch(() => HttpResponse.json(profile()))
+
+  renderWithProviders(<BrandProfilePage />, ROUTE)
+
+  const nome = await screen.findByRole('textbox', { name: /nome da marca/i })
+  await user.clear(nome)
+  await user.type(nome, 'X')
+  const nav = screen.getByRole('navigation', { name: /progresso/i })
+  await user.click(within(nav).getByRole('button', { name: /links sociais/i }))
+
+  expect(screen.getByRole('alert')).toHaveTextContent(/alterações não salvas/i)
+  expect(screen.getByRole('textbox', { name: /nome da marca/i })).toHaveValue('X')
+})
+
+test('cor sem # é recusada na tela, com o formato certo, sem chamar a API', async () => {
+  const user = userEvent.setup()
+  const chamadas = comPatch(() => HttpResponse.json(profile()))
+
+  renderWithProviders(<BrandProfilePage />, ROUTE)
+
+  await user.type(await screen.findByRole('textbox', { name: /cores da marca/i }), 'b23a6f')
+  await user.click(screen.getByRole('button', { name: /próximo/i }))
+
+  expect(screen.getByRole('textbox', { name: /cores da marca/i })).toHaveAccessibleDescription(
+    /hexadecimal com #/i,
+  )
+  expect(chamadas()).toBe(0)
+})
+
+test('Instagram como @usuario é recusado na tela com o formato certo', async () => {
+  const user = userEvent.setup()
+  const chamadas = comPatch(() => HttpResponse.json(profile()))
+
+  renderWithProviders(<BrandProfilePage />, ROUTE)
+
+  const nav = await screen.findByRole('navigation', { name: /progresso/i })
+  await user.click(within(nav).getByRole('button', { name: /links sociais/i }))
+  await user.type(screen.getByRole('textbox', { name: /instagram/i }), '@2msaudefeminina')
+  await user.click(screen.getByRole('button', { name: /^salvar$/i }))
+
+  expect(screen.getByRole('textbox', { name: /instagram/i })).toHaveAccessibleDescription(
+    /começando com https/i,
+  )
+  expect(chamadas()).toBe(0)
+})
+
+test('erro da API num item de lista aparece no campo, e a mensagem geral também', async () => {
+  const user = userEvent.setup()
+  const msg = 'O campo palavra proibida não pode ter mais de 60 caracteres.'
+  comPatch(() =>
+    HttpResponse.json({ message: msg, errors: { 'forbidden_words.0': [msg] } }, { status: 422 }),
+  )
+
+  renderWithProviders(<BrandProfilePage />, ROUTE)
+
+  const nav = await screen.findByRole('navigation', { name: /progresso/i })
+  await user.click(within(nav).getByRole('button', { name: /vocabulário/i }))
+  await user.type(screen.getByRole('textbox', { name: /proibidas/i }), 'x')
+  await user.click(screen.getByRole('button', { name: /próximo/i }))
+
+  expect(await screen.findByRole('alert')).toHaveTextContent(/não foi salvo/i)
+  expect(screen.getByRole('textbox', { name: /proibidas/i })).toHaveAccessibleDescription(
+    /mais de 60 caracteres/i,
+  )
+  // Nao avancou: o texto digitado continua la.
+  expect(screen.getByRole('textbox', { name: /proibidas/i })).toHaveValue('x')
+})
+
+test('falha ao salvar o fuso é avisada, não fica em silêncio', async () => {
+  const user = userEvent.setup()
+  server.use(
+    http.get('/api/v1/projects/1/brand-profile', () => HttpResponse.json(profile())),
+    http.get('/api/v1/projects/1', () => HttpResponse.json(projeto('America/Sao_Paulo'))),
+    http.patch('/api/v1/projects/1', () =>
+      HttpResponse.json({ message: 'Fuso inválido.' }, { status: 422 }),
+    ),
+  )
+
+  renderWithProviders(<BrandProfilePage />, ROUTE)
+
+  const select = await screen.findByRole('combobox', { name: /fuso em que esta marca publica/i })
+  await user.selectOptions(select, 'Europe/Lisbon')
+
+  expect(await screen.findByText(/não foi possível salvar o fuso/i)).toBeInTheDocument()
+})

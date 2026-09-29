@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useParams } from 'react-router-dom'
 import { Button } from '@/components/ui/Button'
@@ -143,10 +143,51 @@ const FUSOS = [
 
 type Projeto = { data: { id: number; name: string; timezone: string } }
 
+const CAMPOS_LINK = new Set<EditableField>(['website', 'instagram', 'linkedin'])
+const HEX = /^#[0-9a-fA-F]{6}$/
+
+/** As mesmas frases da API (UpdateBrandProfileRequest::messages). */
+const MSG_LINK = (rotulo: string) =>
+  `O campo ${rotulo} deve ser um link completo começando com https://.`
+const MSG_COR = 'Cada cor precisa ser um código hexadecimal com #, ex: #b23a6f.'
+
+function linkValido(texto: string): boolean {
+  if (!texto.startsWith('https://')) return false
+  try {
+    new URL(texto)
+    return true
+  } catch {
+    return false
+  }
+}
+
+/** O que da para conferir sem o servidor: formato de cor e de link. Vazio e valido. */
+function validar(fields: Field[], raws: Record<string, string>): Record<string, string> {
+  const erros: Record<string, string> = {}
+
+  for (const field of fields) {
+    const raw = raws[field.name].trim()
+
+    if (field.name === 'colors' && fromLines(raw).some((cor) => !HEX.test(cor))) {
+      erros.colors = MSG_COR
+    }
+
+    if (CAMPOS_LINK.has(field.name) && raw !== '' && !linkValido(raw)) {
+      erros[field.name] = MSG_LINK(field.label)
+    }
+  }
+
+  return erros
+}
+
 export function BrandProfilePage() {
   const { projectId } = useParams()
   const queryClient = useQueryClient()
   const [currentId, setCurrentId] = useState('identity')
+  const [alterado, setAlterado] = useState(false)
+  const [destinoPendente, setDestinoPendente] = useState<string | null>(null)
+  const [errosLocais, setErrosLocais] = useState<Record<string, string>>({})
+  const formRef = useRef<HTMLFormElement>(null)
 
   const projectKey = ['project', projectId]
   const project = useQuery({
@@ -191,16 +232,44 @@ export function BrandProfilePage() {
 
   const error = save.error instanceof ApiError ? save.error : null
 
+  /** Troca de passo de fato: o formulario remonta, e o que nao foi salvo se perde. */
+  function irPara(id: string) {
+    setCurrentId(id)
+    setAlterado(false)
+    setDestinoPendente(null)
+    setErrosLocais({})
+    save.reset()
+  }
+
+  /**
+   * Pular e o Stepper passam por aqui. Com alteracao nao salva, pergunta antes:
+   * trocar de passo remonta o formulario e o texto digitado sumia sem aviso.
+   */
+  function pedirPara(id: string) {
+    if (id === currentId) return
+    if (alterado) setDestinoPendente(id)
+    else irPara(id)
+  }
+
   function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
     const form = new FormData(event.currentTarget)
+    const raws = Object.fromEntries(
+      step.fields.map((field) => [field.name, String(form.get(field.name) ?? '')]),
+    )
+
+    // O formato errado e recusado aqui, com a mesma frase da API: mandar para ver
+    // voltar 422 so atrasava a resposta.
+    const errosDaTela = validar(step.fields, raws)
+    setErrosLocais(errosDaTela)
+    if (Object.keys(errosDaTela).length > 0) return
 
     // Envia apenas os campos deste passo: o PATCH e um merge parcial.
     // Campos `list` viram array de strings, `competitors` array de {name, url};
     // o resto vai como texto.
     const payload = Object.fromEntries(
       step.fields.map((field) => {
-        const raw = String(form.get(field.name) ?? '')
+        const raw = raws[field.name]
         const value =
           field.kind === 'list'
             ? fromLines(raw)
@@ -211,12 +280,18 @@ export function BrandProfilePage() {
       }),
     ) as Payload
 
+    const destino = destinoPendente ?? nextStep?.id
     save.mutate(payload, {
       onSuccess: () => {
-        if (nextStep) setCurrentId(nextStep.id)
+        if (destino) irPara(destino)
+        else setAlterado(false)
       },
+      // Falhou: fica no passo, com o que foi digitado e o erro a mostra.
+      onError: () => setDestinoPendente(null),
     })
   }
+
+  const naoSalvou = save.isError || Object.keys(errosLocais).length > 0
 
   return (
     <Shell>
@@ -263,13 +338,22 @@ export function BrandProfilePage() {
               </option>
             ))}
           </select>
-          <p className="text-body-sm text-on-surface-variant mt-2" role="status">
-            {salvarFuso.isPending
-              ? 'Salvando…'
-              : salvarFuso.isSuccess
-                ? 'Fuso atualizado. As próximas peças serão agendadas nele.'
-                : 'O agendamento das peças usa este fuso.'}
-          </p>
+          {salvarFuso.isError ? (
+            <p className="text-body-sm text-error mt-2" role="alert">
+              Não foi possível salvar o fuso.{' '}
+              {salvarFuso.error instanceof ApiError
+                ? (salvarFuso.error.message422 ?? 'Tente novamente.')
+                : 'Tente novamente.'}
+            </p>
+          ) : (
+            <p className="text-body-sm text-on-surface-variant mt-2" role="status">
+              {salvarFuso.isPending
+                ? 'Salvando…'
+                : salvarFuso.isSuccess
+                  ? 'Fuso atualizado. As próximas peças serão agendadas nele.'
+                  : 'O agendamento das peças usa este fuso.'}
+            </p>
+          )}
         </div>
       )}
 
@@ -280,7 +364,7 @@ export function BrandProfilePage() {
             currentId={currentId}
             completedIds={completedIds}
             optionalIds={optionalIds}
-            onSelect={setCurrentId}
+            onSelect={pedirPara}
           />
         </div>
 
@@ -297,7 +381,47 @@ export function BrandProfilePage() {
             </CardDescription>
           </div>
 
-          <form onSubmit={submit} className="mt-6 flex flex-col gap-6">
+          {destinoPendente && (
+            <div
+              role="alert"
+              className="mt-6 rounded-control border border-outline-variant bg-surface-container-low p-4"
+            >
+              <p className="text-body-md text-on-surface">
+                Você tem alterações não salvas neste passo.
+              </p>
+              <div className="mt-3 flex flex-wrap gap-3">
+                <Button
+                  type="button"
+                  disabled={save.isPending}
+                  onClick={() => formRef.current?.requestSubmit()}
+                >
+                  Salvar e continuar
+                </Button>
+                <Button type="button" variant="ghost" onClick={() => irPara(destinoPendente)}>
+                  Descartar e pular
+                </Button>
+                <Button type="button" variant="ghost" onClick={() => setDestinoPendente(null)}>
+                  Continuar editando
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {naoSalvou && (
+            <p role="alert" className="text-body-sm text-error mt-6">
+              Este passo não foi salvo.{' '}
+              {Object.keys(errosLocais).length > 0
+                ? 'Corrija os campos destacados.'
+                : (error?.message422 ?? 'Tente novamente.')}
+            </p>
+          )}
+
+          <form
+            ref={formRef}
+            onSubmit={submit}
+            onChange={() => setAlterado(true)}
+            className="mt-6 flex flex-col gap-6"
+          >
             {step.fields.map((field) => {
               const value = data[field.name]
               const props = {
@@ -311,7 +435,7 @@ export function BrandProfilePage() {
                     : field.kind === 'competitors'
                       ? competitorsToLines(value as Competitor[] | null)
                       : ((value as string | null) ?? ''),
-                error: error?.fieldError(field.name),
+                error: errosLocais[field.name] ?? error?.fieldError(field.name),
               }
 
               return field.kind !== 'text' ? (
@@ -323,7 +447,7 @@ export function BrandProfilePage() {
 
             <div className="flex justify-end gap-3">
               {nextStep && (
-                <Button type="button" variant="ghost" onClick={() => setCurrentId(nextStep.id)}>
+                <Button type="button" variant="ghost" onClick={() => pedirPara(nextStep.id)}>
                   Pular
                 </Button>
               )}

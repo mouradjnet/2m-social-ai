@@ -23,10 +23,18 @@ export class ApiError extends Error {
     this.body = body
   }
 
-  /** Erros de validacao do Laravel: { message, errors: { campo: [msg] } } */
+  /**
+   * Erros de validacao do Laravel: { message, errors: { campo: [msg] } }.
+   * Campo de lista erra no ITEM (`colors.1`, `competitors.0.url`): sem procurar
+   * pelo prefixo, o erro ficava invisivel e o botao parecia nao fazer nada.
+   */
   fieldError(field: string): string | undefined {
     const errors = (this.body as { errors?: Record<string, string[]> })?.errors
-    return errors?.[field]?.[0]
+    if (!errors) return undefined
+    if (errors[field]) return errors[field][0]
+
+    const doItem = Object.keys(errors).find((key) => key.startsWith(`${field}.`))
+    return doItem ? errors[doItem][0] : undefined
   }
 
   get message422(): string | undefined {
