@@ -352,3 +352,31 @@ App Review, seria código que ninguém exercita — o ADR descreve onde cada pe�
 
 **Bloqueio:** integração com Facebook depende do app da Meta do responsável, do fluxo
 *Facebook Login for Business* e de App Review.
+
+## Etapa 5 — Resultados (2026-09-29)
+
+**Decisão do responsável:** incluir o escopo de métricas na conexão. Entrou no
+consentimento como **opcional**: quem desmarcar continua publicando, só sem Resultados.
+
+**Validado na documentação da Meta** (*IG Media Insights*, 29/09/2026): `GET
+/{media-id}/insights` com `instagram_business_manage_insights`; atraso de até 48 h;
+retenção de 2 anos; `impressions` descontinuada para mídia criada depois de
+02/07/2024 (fica de fora). Conjunto usado: `reach, views, likes, comments, saved,
+shares, total_interactions` (+ `ig_reels_avg_watch_time` no Reel). Para o álbum do
+carrossel a documentação é ambígua: pede-se o conjunto do feed e a recusa, se vier,
+fica registrada.
+
+| Sub-etapa | Commit | O quê |
+|---|---|---|
+| 5a | `6f45c3f` | Escopo opcional (`required_scopes` separado), `publication_metrics` (append-only), `instagram:collect-insights` diário às 06:40, posts dos últimos 30 dias. Recusa da Meta vira `error`, **nunca zero**. |
+| 5b | `798cac5` | `GET /projects/{id}/results` + tela **Resultados** (só números da Meta). Insights passa a se dizer **editorial** e aponta para Resultados. Post não medido ou não mensurável aparece como tal e fica fora das médias. |
+| 5c | este commit | 11º agente `results`: lê os números congelados e sugere mudanças no calendário; mínimo de 3 posts medidos; cada sugestão precisa citar um número; relatório separado do editorial (`analytics_reports.kind`). |
+
+**Separação editorial × rede**, como pedido: `Domain\Analytics\Metrics` + agente
+`analytics` + tela Insights = o calendário (volume, cadência, aderência, revisão);
+`Domain\Results\Performance` + agente `results` + tela Resultados = o que a Meta
+mediu. Nenhum dos dois agentes recebe os números do outro.
+
+**Não verificado de ponta a ponta:** nenhuma métrica real foi lida — depende da conta
+conectada com o escopo (bloqueio da Etapa 1). Próximo passo natural, quando houver
+dados: levar os resultados ao `planner` para a semana nascer já corrigida.

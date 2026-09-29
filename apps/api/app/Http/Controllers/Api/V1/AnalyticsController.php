@@ -22,7 +22,7 @@ class AnalyticsController extends Controller
         Gate::authorize('view', $project);
 
         return response()->json([
-            'data' => AnalyticsReport::where('project_id', $project->id)->latest('id')->first(),
+            'data' => AnalyticsReport::where('project_id', $project->id)->where('kind', 'editorial')->latest('id')->first(),
             // Os numeros de agora, mesmo sem relatorio: a tela mostra o calendario
             // antes de a IA opinar sobre ele.
             'metrics' => Metrics::for($project),

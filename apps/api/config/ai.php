@@ -92,6 +92,14 @@ return [
             'effort' => 'medium',
             'max_tokens' => 16000,
         ],
+        // Ler resultados reais com cautela e sugerir: `high`, como o analytics.
+        'results' => [
+            'model' => env('AI_MODEL_RESULTS', env('AI_MODEL_DEFAULT', 'claude-opus-4-8')),
+            'effort' => 'high',
+            'max_tokens' => 16000,
+            // Com menos posts medidos que isto, a leitura seria palpite.
+            'min_measured' => 3,
+        ],
         'analytics' => [
             'model' => env('AI_MODEL_ANALYTICS', env('AI_MODEL_DEFAULT', 'claude-opus-4-8')),
             'effort' => 'high',

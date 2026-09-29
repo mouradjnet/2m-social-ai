@@ -311,7 +311,8 @@ POST   /api/v1/contents/{content}/image:generate      usa o image_prompt; 422 se
 POST   /api/v1/contents/{content}/repurpose:generate  {format, channel} — 422 se igual ao da peça ou sem texto, 409, 402
 
 # Resultados REAIS (Etapa 5; qualquer membro). Só números da Meta; separado de /analytics (editorial)
-GET    /api/v1/projects/{project}/results?days=7|30|90  totais, taxa interações/alcance, por pilar/formato, top 3, posts (measured|pending|unavailable) + account.insights_enabled
+GET    /api/v1/projects/{project}/results?days=7|30|90  totais, taxa interações/alcance, por pilar/formato, top 3, posts (measured|pending|unavailable) + account.insights_enabled + report (última leitura)
+POST   /api/v1/projects/{project}/results:generate    leitura por IA dos últimos 30 dias (editor+) → 202; 422 com menos de 3 posts medidos, 409, 402
 
 # Registro de atividade (qualquer membro)
 GET    /api/v1/projects/{project}/activity            50 mais recentes: instagram.connected|disconnected, publication.resolved, asset.deleted

@@ -77,3 +77,42 @@ test('conta sem permissao de metricas pede reconexao, e o periodo muda a consult
   expect(await screen.findByText('Os posts ainda não foram medidos. A coleta roda uma vez por dia e a Meta atrasa até 48 h.')).toBeInTheDocument()
   expect(pedidos).toEqual(['?days=30', '?days=90'])
 })
+
+test('mostra a ultima leitura da IA com o numero e a acao de cada sugestao', async () => {
+  server.use(
+    http.get('/api/v1/projects/1/results', () =>
+      HttpResponse.json({
+        data: resultados(),
+        account: { username: '2msaudefeminina', insights_enabled: true },
+        report: {
+          id: 5,
+          summary: 'Carrossel de Prevenção puxa as interações.',
+          insights: [{ title: 'Carrossel rende mais', detail: 'Média de 96 interações por post.', action: 'Planejar mais carrosséis de Prevenção.' }],
+          created_at: '2026-09-29T12:00:00Z',
+        },
+      }),
+    ),
+  )
+
+  renderWithProviders(<ResultsPage />, ROUTE)
+
+  const leitura = await screen.findByLabelText('Leitura dos resultados')
+  expect(within(leitura).getByText('Média de 96 interações por post.')).toBeInTheDocument()
+  expect(within(leitura).getByText('→ Planejar mais carrosséis de Prevenção.')).toBeInTheDocument()
+})
+
+test('pedir a leitura com poucos posts medidos mostra o motivo do servidor', async () => {
+  server.use(
+    http.get('/api/v1/projects/1/results', () =>
+      HttpResponse.json({ data: resultados(), account: { username: '2msaudefeminina', insights_enabled: true }, report: null }),
+    ),
+    http.post('/api/v1/projects/1/results:generate', () =>
+      HttpResponse.json({ message: 'Só 2 posts têm números da Meta nos últimos 30 dias. Com menos de 3, a leitura seria palpite.' }, { status: 422 }),
+    ),
+  )
+
+  renderWithProviders(<ResultsPage />, ROUTE)
+  await userEvent.setup().click(await screen.findByRole('button', { name: 'Ler resultados com IA' }))
+
+  expect(await screen.findByRole('alert')).toHaveTextContent('a leitura seria palpite')
+})

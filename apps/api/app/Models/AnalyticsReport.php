@@ -15,7 +15,7 @@ class AnalyticsReport extends Model
 {
     public $timestamps = false;
 
-    protected $fillable = ['project_id', 'ai_run_id', 'score', 'summary', 'insights', 'metrics'];
+    protected $fillable = ['project_id', 'ai_run_id', 'kind', 'score', 'summary', 'insights', 'metrics'];
 
     protected function casts(): array
     {

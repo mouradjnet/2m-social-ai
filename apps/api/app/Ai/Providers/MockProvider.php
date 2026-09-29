@@ -232,6 +232,28 @@ class MockProvider implements LlmProvider
             ];
         }
 
+        // Results: `insights` sem `score`. Cita numeros do proprio <context> (o
+        // validate() exige um numero em cada `detail`).
+        if (isset($properties['insights']) && ! isset($properties['score'])) {
+            $r = $this->contextOf($request->userMessage)['metrics'] ?? [];
+
+            return [
+                'summary' => "{$r['measured']} posts medidos, com {$r['engagement_rate']}% de interacoes por alcance.",
+                'insights' => [
+                    [
+                        'title' => 'Um formato puxa as interacoes',
+                        'detail' => 'O melhor formato teve media de '.($r['by_format'][0]['avg_interactions'] ?? 0).' interacoes por post.',
+                        'action' => 'Planejar a proxima semana com mais pecas nesse formato.',
+                    ],
+                    [
+                        'title' => 'Amostra ainda pequena',
+                        'detail' => "So {$r['measured']} posts tem numero da Meta.",
+                        'action' => 'Manter a cadencia e reler em uma semana.',
+                    ],
+                ],
+            ];
+        }
+
         // Analytics: schema com `score` e `insights`. Le o total do proprio <context>
         // para o relatorio do mock nao contradizer os numeros da tela.
         if (isset($properties['score'], $properties['insights'])) {

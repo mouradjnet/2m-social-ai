@@ -22,6 +22,7 @@ class AgentRegistry
         'rewriter' => RewriterAgent::class,
         'planner' => PlannerAgent::class,
         'repurposer' => RepurposerAgent::class,
+        'results' => ResultsAgent::class,
     ];
 
     public function get(string $name): Agent

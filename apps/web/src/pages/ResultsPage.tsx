@@ -2,8 +2,11 @@ import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
 import type { ReactNode } from 'react'
 import { Link, useParams } from 'react-router-dom'
+import { GenerationStatus } from '@/components/strategy/GenerationStatus'
+import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { Shell } from '@/components/ui/Shell'
+import { useGeneration } from '@/hooks/useGeneration'
 import { api } from '@/lib/api'
 import { formatDateTime } from '@/lib/instagram'
 import type { PostMetrics, ResultGroup, Results } from '@/lib/types'
@@ -21,9 +24,20 @@ const COLUNAS: { key: keyof PostMetrics; label: string }[] = [
 const n = (v: number | undefined | null) => (v ?? 0).toLocaleString('pt-BR')
 const pct = (v: number | null) => (v === null ? '—' : `${v.toLocaleString('pt-BR')}%`)
 
+/** Com menos posts medidos, o servidor recusa a leitura (seria palpite). */
+const MINIMO_PARA_LER = 3
+
+interface Relatorio {
+  id: number
+  summary: string
+  insights: { title: string; detail: string; action: string }[]
+  created_at: string
+}
+
 interface Resposta {
   data: Results
   account: { username: string; insights_enabled: boolean } | null
+  report: Relatorio | null
 }
 
 /**
@@ -35,6 +49,13 @@ export function ResultsPage() {
   const { projectId } = useParams()
   const [dias, setDias] = useState(30)
 
+  // A leitura e sempre dos ultimos 30 dias (o servidor congela esses numeros no run).
+  const { state, generate, retry, dismiss } = useGeneration({
+    projectId: projectId!,
+    endpoint: 'results:generate',
+    invalidateKey: ['results', projectId],
+  })
+
   const resultados = useQuery({
     queryKey: ['results', projectId, dias],
     queryFn: () => api<Resposta>(`/projects/${projectId}/results?days=${dias}`),
@@ -43,7 +64,8 @@ export function ResultsPage() {
   if (resultados.isPending) return <Shell>Carregando…</Shell>
   if (resultados.isError) return <Shell>Projeto não encontrado.</Shell>
 
-  const { data: r, account } = resultados.data
+  const { data: r, account, report } = resultados.data
+  const gerando = state.kind === 'starting' || state.kind === 'running'
 
   return (
     <Shell>
@@ -94,6 +116,39 @@ export function ResultsPage() {
         <Numero label="interações por alcance" value={pct(r.engagement_rate)} />
         <Numero label="posts medidos" value={`${r.measured} de ${r.published}`} />
       </div>
+
+      <Card className="mt-6">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="text-label-md text-on-surface">Leitura com IA (últimos 30 dias)</h2>
+            <p className="text-body-sm text-on-surface-variant mt-1">
+              A IA lê só os números acima e sugere o que mudar no calendário. Pede pelo menos {MINIMO_PARA_LER} posts
+              medidos.
+            </p>
+          </div>
+          <Button variant="secondary" disabled={gerando} onClick={() => generate()}>
+            Ler resultados com IA
+          </Button>
+        </div>
+
+        <GenerationStatus state={state} onRetry={retry} onDismiss={dismiss} />
+
+        {report && (
+          <div className="mt-4" aria-label="Leitura dos resultados">
+            <p className="text-body-md text-on-surface">{report.summary}</p>
+            <ol className="mt-3 flex flex-col gap-3">
+              {report.insights.map((i) => (
+                <li key={i.title} className="border-outline-variant rounded border p-3">
+                  <p className="text-label-md text-on-surface">{i.title}</p>
+                  <p className="text-body-sm text-on-surface-variant mt-1">{i.detail}</p>
+                  <p className="text-body-sm text-on-surface mt-1">→ {i.action}</p>
+                </li>
+              ))}
+            </ol>
+            <p className="text-label-sm text-on-surface-variant mt-2">Lido em {formatDateTime(report.created_at)}</p>
+          </div>
+        )}
+      </Card>
 
       {r.measured === 0 ? (
         <p className="text-body-md text-on-surface-variant mt-8">

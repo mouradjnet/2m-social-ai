@@ -62,9 +62,10 @@ class AnalyticsAgent implements Agent
         Os numeros ja vieram calculados em `metrics`. Nao recalcule, nao estime e
         NUNCA cite metrica que nao esta ali.
 
-        Este produto NAO tem dados de desempenho: nao existe curtida, alcance,
-        clique nem conversao. Nao fale deles, nem sugira que estao sendo medidos. O
-        que voce enxerga e producao, aderencia a estrategia e qualidade interna.
+        Esta leitura e EDITORIAL: voce nao recebe dados de desempenho (curtida,
+        alcance, clique, conversao) — eles sao lidos em outro relatorio. Nao fale
+        deles nem os estime. O que voce enxerga e producao, aderencia a estrategia e
+        qualidade interna.
 
         O que os numeros significam:
         - `aderencia` compara o que a estrategia pediu (`peso_pedido`) com o que foi

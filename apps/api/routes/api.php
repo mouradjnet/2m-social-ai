@@ -130,6 +130,7 @@ Route::prefix('v1')->group(function () {
         Route::get('projects/{project}/publications', [PublicationController::class, 'index']);
         // O que a Meta mediu nos posts (Etapa 5). Separado dos indicadores editoriais.
         Route::get('projects/{project}/results', [ResultsController::class, 'show']);
+        Route::post('projects/{project}/results:generate', [ResultsController::class, 'generate']);
         // Quem fez o que nos gestos que nao deixam outro rastro.
         Route::get('projects/{project}/activity', [ActivityController::class, 'index']);
         Route::get('publications/{publication}', [PublicationController::class, 'show']);

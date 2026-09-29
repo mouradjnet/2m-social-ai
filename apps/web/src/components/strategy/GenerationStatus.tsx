@@ -25,6 +25,7 @@ const FRASES: Record<string, string> = {
   image: 'Desenhando a imagem da peça…',
   planner: 'Planejando a semana…',
   repurposer: 'Reaproveitando a peça em outro formato…',
+  results: 'Lendo os resultados do Instagram…',
 }
 
 const GENERICO = 'Gerando…'

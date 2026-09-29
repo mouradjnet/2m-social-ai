@@ -19,6 +19,7 @@ const AGENTES: Record<string, string> = {
   image: 'Imagens',
   planner: 'Planejamento',
   repurposer: 'Reaproveitamento',
+  results: 'Leitura de resultados',
 }
 
 /** Centavos de dolar -> "US$ 0,19". */

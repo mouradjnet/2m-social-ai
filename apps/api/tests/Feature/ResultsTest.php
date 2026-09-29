@@ -2,7 +2,11 @@
 
 namespace Tests\Feature;
 
+use App\Ai\Agents\ResultsAgent;
+use App\Ai\Exceptions\OutputRejectedException;
 use App\Enums\WorkspaceRole;
+use App\Models\AiRun;
+use App\Models\AnalyticsReport;
 use App\Models\Content;
 use App\Models\InstagramAccount;
 use App\Models\Project;
@@ -117,5 +121,68 @@ class ResultsTest extends TestCase
         Sanctum::actingAs($intruso);
 
         $this->getJson("/api/v1/projects/{$this->project->id}/results")->assertNotFound();
+    }
+
+    private function editor(): void
+    {
+        $u = User::factory()->create();
+        WorkspaceMember::create(['workspace_id' => $this->workspace->id, 'user_id' => $u->id, 'role' => WorkspaceRole::Editor, 'joined_at' => now()]);
+        Sanctum::actingAs($u);
+    }
+
+    public function test_ia_le_os_resultados_e_o_relatorio_nao_se_mistura_com_o_editorial(): void
+    {
+        $this->publicado('Papanicolau', 'Prevenção', 'carousel', ['reach' => 1200, 'total_interactions' => 96]);
+        $this->publicado('Ciclo', 'Educação', 'post', ['reach' => 800, 'total_interactions' => 24]);
+        $this->publicado('Mitos', 'Educação', 'reel', ['reach' => 3000, 'total_interactions' => 150]);
+        $this->editor();
+
+        $id = $this->postJson("/api/v1/projects/{$this->project->id}/results:generate")->assertStatus(202)->json('ai_run_id');
+
+        $this->assertSame('succeeded', AiRun::find($id)->status, (string) AiRun::find($id)->error);
+        $relatorio = AnalyticsReport::sole();
+        $this->assertSame('results', $relatorio->kind);
+        $this->assertNull($relatorio->score);
+        // O snapshot: os numeros em que a leitura se baseou.
+        $this->assertSame(3, $relatorio->metrics['measured']);
+
+        $this->getJson("/api/v1/projects/{$this->project->id}/results")
+            ->assertJsonPath('report.id', $relatorio->id)
+            ->assertJsonCount(2, 'report.insights');
+        // A tela Insights (editorial) nao mostra o relatorio de resultados.
+        $this->getJson("/api/v1/projects/{$this->project->id}/analytics")->assertJsonPath('data', null);
+    }
+
+    public function test_com_menos_de_3_posts_medidos_a_leitura_seria_palpite(): void
+    {
+        $this->publicado('Ciclo', 'Educação', 'post', ['reach' => 800, 'total_interactions' => 24]);
+        $this->publicado('Recém', 'Educação', 'post', null);
+        $this->editor();
+
+        $this->postJson("/api/v1/projects/{$this->project->id}/results:generate")
+            ->assertStatus(422)
+            ->assertJsonPath('message', fn ($m) => str_contains($m, 'palpite'));
+        $this->assertSame(0, AiRun::count());
+    }
+
+    public function test_sugestao_sem_numero_ou_sem_acao_e_recusada(): void
+    {
+        $agent = new ResultsAgent;
+        $ok = ['title' => 't', 'detail' => 'Carrossel teve 96 interações', 'action' => 'Planejar mais carrosséis'];
+
+        $agent->validate(['summary' => 's', 'insights' => [$ok, $ok]]);
+
+        foreach ([
+            [$ok],
+            [$ok, [...$ok, 'detail' => 'Carrossel vai melhor']],
+            [$ok, [...$ok, 'action' => ' ']],
+        ] as $insights) {
+            try {
+                $agent->validate(['summary' => 's', 'insights' => $insights]);
+                $this->fail('Devia recusar: '.json_encode($insights));
+            } catch (OutputRejectedException) {
+                $this->addToAssertionCount(1);
+            }
+        }
     }
 }

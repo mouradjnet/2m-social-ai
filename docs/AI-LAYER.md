@@ -51,6 +51,7 @@ Um agente, uma responsabilidade. Nenhum agente chama outro — quem orquestra é
 | `reviewer` | conteúdo + Brand Profile | veredito + lista de violações | `high` |
 | `planner` | estratégia ativa + aderência por pilar + inventário + semana (`week`) | `summary` + `slots` (dia, hora local, pilar, formato, canal, tema) → `content_plans` | `medium` |
 
+| `results` | resultados REAIS (`Domain\Results\Performance`, congelados no input) | `summary` + 2 a 5 `insights` {title, detail com número, action} → `analytics_reports` com `kind = results`, sem score | `high` |
 | `repurposer` | peça de origem (texto inteiro) + formato/canal alvo + inventário | `title`, `caption`, `cta`, `hashtags`, `adaptation_notes` → peça NOVA em `idea` (`repurposed_from_id`) | `medium` |
 
 Com um plano, o `copywriter` recebe `plan_slots` e escreve **uma peça por horário**, sem mudar pilar, formato nem canal (o `validate()` confere cada um); a peça guarda `content_plan_id` e `planned_for`. A imagem por IA (`image`, ADR-15) também grava em `ai_runs`, mas não é agente de LLM.
