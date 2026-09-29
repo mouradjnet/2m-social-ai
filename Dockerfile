@@ -36,7 +36,9 @@ FROM dunglas/frankenphp:1-php8.4
 
 # pdo_pgsql: o banco e Postgres, e o modelo usa jsonb em quase toda tabela.
 # opcache/pcntl: performance e o queue:work.
-RUN install-php-extensions pdo_pgsql opcache pcntl intl zip
+# gd: o ImageProcessor decodifica e reencoda as imagens da biblioteca (sem ele,
+# todo upload de imagem dava 500).
+RUN install-php-extensions pdo_pgsql opcache pcntl intl zip gd
 
 # supervisor: so o modo FREE o usa (um servico rodando servidor + fila no mesmo
 # container, porque o plano free do Render nao tem background worker). No modo pago

@@ -282,4 +282,15 @@ class AssetTest extends TestCase
         $alheio = $this->content(Project::factory()->create(), 'idea');
         $this->putJson("/api/v1/contents/{$alheio->id}/image", ['asset_id' => null])->assertNotFound();
     }
+
+    /**
+     * O ImageProcessor usa o GD. O PHP local tem, a imagem Docker nao tinha: todo
+     * upload de imagem dava 500 em producao com a suite verde (29/09/2026).
+     */
+    public function test_imagem_docker_instala_o_gd(): void
+    {
+        $dockerfile = (string) file_get_contents(base_path('../../Dockerfile'));
+
+        $this->assertMatchesRegularExpression('/^RUN install-php-extensions .*\bgd\b/m', $dockerfile);
+    }
 }
