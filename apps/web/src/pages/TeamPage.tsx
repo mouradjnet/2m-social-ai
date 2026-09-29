@@ -5,11 +5,12 @@ import { Button } from '@/components/ui/Button'
 import { Card, CardDescription, CardTitle } from '@/components/ui/Card'
 import { Input } from '@/components/ui/Input'
 import { Shell } from '@/components/ui/Shell'
+import { useCurrentWorkspace } from '@/hooks/useCurrentWorkspace'
 import { ApiError, api } from '@/lib/api'
 import { copyToClipboard } from '@/lib/copyToClipboard'
 import { PAPEIS, podeConvidar, rotulo } from '@/lib/roles'
 import type { Role } from '@/lib/roles'
-import type { Invitation, Me } from '@/lib/types'
+import type { Invitation } from '@/lib/types'
 
 /** Nao ha mailer: o link e a entrega. Quem convida copia e manda por onde quiser. */
 const linkDoConvite = (token: string) => `${window.location.origin}/convite/${token}`
@@ -39,8 +40,7 @@ export function TeamPage() {
   const [email, setEmail] = useState('')
   const [role, setRole] = useState<Role>('editor')
 
-  const me = useQuery({ queryKey: ['me'], queryFn: () => api<Me>('/me') })
-  const workspace = me.data?.workspaces[0]
+  const { me, workspace } = useCurrentWorkspace()
   const admin = workspace !== undefined && podeConvidar(workspace.role)
 
   const convites = useQuery({

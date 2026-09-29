@@ -2,9 +2,10 @@ import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { Card } from '@/components/ui/Card'
 import { Shell } from '@/components/ui/Shell'
+import { useCurrentWorkspace } from '@/hooks/useCurrentWorkspace'
 import { api } from '@/lib/api'
 import { podeConvidar } from '@/lib/roles'
-import type { Me, Usage } from '@/lib/types'
+import type { Usage } from '@/lib/types'
 
 const AGENTES: Record<string, string> = {
   strategist: 'Estratégia',
@@ -29,8 +30,7 @@ const dolares = (cents: number) =>
  * (`php artisan workspace:budget`), nao de quem administra o workspace.
  */
 export function UsagePage() {
-  const me = useQuery({ queryKey: ['me'], queryFn: () => api<Me>('/me') })
-  const workspace = me.data?.workspaces[0]
+  const { me, workspace } = useCurrentWorkspace()
   const admin = workspace !== undefined && podeConvidar(workspace.role)
 
   const usage = useQuery({

@@ -332,3 +332,23 @@ o container volta `ERROR` e o histórico mostra.
 
 **Não verificado de ponta a ponta:** nenhuma publicação real de carrossel ou Reel —
 depende do app da Meta e da conta conectada (bloqueio da Etapa 1).
+
+## Etapa 4 — Multimarcas (2026-09-29)
+
+**Já existia:** projeto = marca (perfil, estratégia, biblioteca, conta do Instagram e
+publicações próprios), `workspace_id` em toda tabela, 404 para outro tenant,
+credenciais por projeto e criptografadas. Todas as rotas novas das Etapas 1–3
+nasceram com teste de outro tenant (404) e de papel (403).
+
+**Feito:** seletor de espaço de trabalho (`useCurrentWorkspace`): a tela usava sempre
+o primeiro workspace, e quem participava de dois (a agência e um cliente, o próprio e
+o do convite) nunca via o segundo. A escolha fica no navegador; a API segue
+conferindo o papel. Decisão registrada no **ADR-16**: permissão é por workspace, então
+marcas que não podem se enxergar ficam em workspaces separados.
+
+**Adiado com motivo (ADR-16):** papel por projeto (mudança de segurança que merece
+fatia e decisão próprias); código de Facebook e de outros canais (sem credenciais nem
+App Review, seria código que ninguém exercita — o ADR descreve onde cada peça entra).
+
+**Bloqueio:** integração com Facebook depende do app da Meta do responsável, do fluxo
+*Facebook Login for Business* e de App Review.

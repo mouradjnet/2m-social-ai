@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useCurrentWorkspace } from '@/hooks/useCurrentWorkspace'
 import { Link, useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/Button'
 import { Card, CardDescription, CardTitle } from '@/components/ui/Card'
@@ -7,15 +8,14 @@ import { Input } from '@/components/ui/Input'
 import { Shell } from '@/components/ui/Shell'
 import { api, clearToken } from '@/lib/api'
 import { podeConvidar, podeCriarProjeto, rotulo } from '@/lib/roles'
-import type { Me, Project } from '@/lib/types'
+import type { Project } from '@/lib/types'
 
 export function ProjectsPage() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const [name, setName] = useState('')
 
-  const me = useQuery({ queryKey: ['me'], queryFn: () => api<Me>('/me') })
-  const workspace = me.data?.workspaces[0]
+  const { me, workspace, workspaces, select } = useCurrentWorkspace()
 
   const projects = useQuery({
     queryKey: ['projects', workspace?.id],
@@ -82,9 +82,27 @@ export function ProjectsPage() {
       <div className="flex items-start justify-between">
         <div>
           <h1 className="text-headline-lg text-on-surface">Projetos</h1>
-          <p className="text-body-md text-on-surface-variant mt-1">
-            {workspace.name} · você é {rotulo(workspace.role)}
-          </p>
+          {workspaces.length > 1 ? (
+            <div className="text-body-md text-on-surface-variant mt-1 flex items-center gap-2">
+              <select
+                aria-label="Espaço de trabalho"
+                className="border-outline-variant text-on-surface rounded border px-2 py-1"
+                value={workspace.id}
+                onChange={(e) => select(Number(e.target.value))}
+              >
+                {workspaces.map((w) => (
+                  <option key={w.id} value={w.id}>
+                    {w.name}
+                  </option>
+                ))}
+              </select>
+              · você é {rotulo(workspace.role)}
+            </div>
+          ) : (
+            <p className="text-body-md text-on-surface-variant mt-1">
+              {workspace.name} · você é {rotulo(workspace.role)}
+            </p>
+          )}
         </div>
 
         <div className="flex items-center gap-2">

@@ -153,6 +153,17 @@ A Anthropic não gera imagem; o `LlmProvider` não serve. Um `ImageProvider` sep
 
 **Bloqueio registrado:** não há `OPENAI_API_KEY` no projeto. O adaptador é exercitado só com `Http::fake`; a primeira imagem real depende da chave e do aceite do responsável.
 
+### ADR-16 — Multimarcas: projeto é a marca, workspace é a fronteira de permissão
+**Já existia (e não foi recriado):** cada **projeto** é uma marca — perfil, estratégia, calendário, biblioteca, conta social e publicações próprias; toda tabela carrega `workspace_id`; o workspace vem da rota e a `WorkspaceMemberScope` devolve 404 para o que é de outro tenant (ADR-02). A conta do Instagram é **por projeto** (índice único de conta viva), com token criptografado e nunca exposto.
+
+**A regra de permissão é por workspace**, não por projeto: quem é `editor` num workspace edita todas as marcas dele. Por isso, **marcas que não podem se enxergar ficam em workspaces diferentes** (a agência num, cada cliente que precisa entrar no sistema noutro, com convite). O que faltava para isso funcionar era a tela: ela usava sempre o primeiro workspace da pessoa. Agora há um **seletor** (lembrado por navegador; a API continua conferindo o papel em toda rota).
+
+**Considerado e adiado:** papel por projeto (um cliente vendo só a própria marca dentro do workspace da agência). Exige tabela de membros por projeto, mudar a `ProjectPolicy` e a `WorkspaceMemberScope`, e revisar cada rota — o guardião de rotas ajuda, mas é uma mudança de segurança que merece fatia própria e decisão de produto.
+
+**Canais além do Instagram (preparação, sem código especulativo):** o conteúdo já tem `channel` e o `Dispatcher` só cria publicação para `instagram`. Um canal novo entra como: (1) um gateway com o mesmo contrato do `InstagramGateway` (criar container/post, estado, publicar, conferir); (2) uma tabela de conta própria por projeto (as credenciais do Facebook são de **Página**, não de perfil); (3) um ramo no `Dispatcher` por canal. Nada disso foi escrito: sem credenciais e sem App Review, seria código que ninguém exercita.
+
+**Facebook — o que a integração oficial exige** (bloqueio registrado): *Facebook Login for Business* (outro fluxo OAuth que o ADR-14 descartou para o Instagram), permissões `pages_show_list`, `pages_read_engagement` e `pages_manage_posts`, token de Página, e **App Review** da Meta para publicar em Páginas de terceiros — nomes de permissão **a conferir na documentação atual** antes de começar (não foram consultados nesta etapa). Depende do app da Meta do responsável.
+
 ## 3. Camadas
 
 ```
