@@ -163,3 +163,40 @@ atrás do Nginx); agora é relativo. E uma publicação que já teve resultado
 desconhecido podia virar `failed` se a própria conferência falhasse várias vezes,
 o que ofereceria "tentar de novo" sobre um post possivelmente no ar; agora ela fica
 `unknown` até um humano decidir.
+
+---
+
+## Fase 7 — Testes e segurança (2026-09-28)
+
+**Resultado:** PHPUnit **412 testes, verdes** (Postgres real) · vitest **125 testes, verdes** ·
+`tsc -b` sem erros · `pnpm build` ok · Pint sem pendências · `composer audit` e
+`pnpm audit --prod` sem advisories · varredura de segredos nos arquivos versionados
+(chaves Anthropic/Meta/AWS, chaves privadas, `APP_KEY`/senha preenchidos): nada.
+
+**Duas travas novas na suíte:** `Http::preventStrayRequests()` no `TestCase` base
+(nenhum teste fala com a rede — uma requisição real seria um post de verdade ou uma
+chamada paga) e `INSTAGRAM_DRIVER=fake` fixado no `phpunit.xml`.
+
+| Pedido | Onde está provado |
+|---|---|
+| Autenticação | `AuthAndWorkspaceTest`, `AuthThrottleTest`, `InstagramConnectionTest` (state de uso único, forjado, vencido) |
+| Isolamento entre workspaces | `WorkspaceIsolationTest`; 404 para outro tenant em `AssetTest`, `InstagramConnectionTest`, `PublishingTest`, `ContentDraftTest` |
+| Autorização | `RouteAuthorizationTest` — o guardião que reprova rota mutante sem teste (pegou as 4 rotas novas desta retomada); aprovar só `reviewer`+ (`ApprovalTest`); conectar só `admin`+ |
+| Publicação simulada | `PublishingTest` (Graph com `Http::fake`) e o driver `fake` de ponta a ponta |
+| Falhas da API | `GraphInstagramGatewayTest` (classificação), `PublishingTest` (transitória, permanente, token, cota, container lento) |
+| Agendamento | `PublishingTest` (antes da hora, fuso do projeto, atraso máximo), `ContentTransitionTest` (remarcar no fuso certo) |
+| Idempotência | `PublishingTest`: agendador repetido, índice de publicação viva, job duplicado, resultado desconhecido conferido e nunca republicado |
+| Renovação de tokens | `InstagramConnectionTest`: renova perto de vencer, 190 vira `expired`, falha transitória não derruba, vencido sem chamar a Meta |
+| Upload | `AssetTest`: formato, tamanho, largura, proporção, arquivo disfarçado de imagem, remoção protegida |
+
+**Revisão de segurança do que foi escrito:**
+
+| Risco | Tratamento |
+|---|---|
+| CSRF no OAuth (plantar a conta de outro) | `state` de 32 bytes, uso único, 10 min, amarrado a usuário e projeto; papel reconferido na volta |
+| Vazamento de token | Cast `encrypted`; `$hidden`; `access_token=***` em toda mensagem de erro gravada ou logada; token nunca em URL da SPA |
+| Publicar o que não foi aprovado | `PublishGate` na criação **e** revalidação no job; aprovação amarrada ao texto por id de revisão |
+| Post em dobro | Três camadas de idempotência + resultado desconhecido nunca vira `failed` sozinho |
+| Upload malicioso | `finfo` decide o tipo; toda imagem é reencodada (EXIF e qualquer carga somem); nome uuid; Nginx serve `/storage` estático com `nosniff` |
+| Redirect aberto | O callback só redireciona para caminhos fixos da SPA, relativos |
+| Senha do Instagram | Nunca passa pelo sistema: consentimento na própria Meta |

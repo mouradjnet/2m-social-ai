@@ -139,6 +139,21 @@ class AssetTest extends TestCase
             ->assertJsonPath('errors.file.0', 'Envie JPEG, PNG ou WebP.');
     }
 
+    /**
+     * O nome diz .jpg, o conteudo e PHP. Quem decide e o conteudo (finfo), e mesmo
+     * uma imagem valida e reencodada: nada do arquivo original chega a URL publica.
+     */
+    public function test_arquivo_disfarcado_de_imagem_e_recusado(): void
+    {
+        [, $project] = $this->scene();
+        $falso = UploadedFile::fake()->createWithContent('foto.jpg', '<?php system($_GET["c"]); ?>');
+
+        $this->upload($project, $falso)->assertStatus(422);
+
+        $this->assertSame(0, Asset::count());
+        $this->assertSame([], Storage::disk('public')->allFiles());
+    }
+
     public function test_a_mesma_imagem_duas_vezes_nao_duplica(): void
     {
         [, $project] = $this->scene();

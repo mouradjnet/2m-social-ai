@@ -29,6 +29,7 @@
         <env name="DB_DATABASE" value="2m_social_ai_test"/>
         <env name="DB_URL" value=""/>
         <env name="AI_PROVIDER" value="mock"/>
+        <env name="INSTAGRAM_DRIVER" value="fake"/>
         <env name="MAIL_MAILER" value="array"/>
         <env name="QUEUE_CONNECTION" value="sync"/>
         <env name="SESSION_DRIVER" value="array"/>
