@@ -57,6 +57,7 @@ class RouteAuthorizationTest extends TestCase
         'POST api/v1/contents/{content}/schedule' => 'PublishingTest: viewer 403, outro tenant 404, peca nao aprovada 422',
         'POST api/v1/publications/{publication}/retry' => 'PublishingTest: viewer 403, outro tenant 404, publicacao viva 422',
         'POST api/v1/publications/{publication}/resolve' => 'PublishingTest: editor 403 (decidir e de reviewer+), outro tenant 404',
+        'POST api/v1/contents/{content}/repurpose:generate' => 'RepurposeTest: viewer 403, outro tenant 404, sem token 401',
         'POST api/v1/contents/{content}/image:generate' => 'ImageGenerationTest: viewer 403, outro tenant 404, sem token 401',
         'PUT api/v1/contents/{content}/image' => 'AssetTest: viewer 403, outro tenant 404, peca aprovada 422',
     ];

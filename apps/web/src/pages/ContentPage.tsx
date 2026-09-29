@@ -260,6 +260,7 @@ export function ContentPage() {
           content={emEdicao}
           onClose={() => setEditando(null)}
           onGenerateImage={() => generate({ path: `/contents/${emEdicao.id}/image:generate` })}
+          onRepurpose={(alvo) => generate({ path: `/contents/${emEdicao.id}/repurpose:generate`, body: alvo })}
           generatingImage={generating}
         />
       )}

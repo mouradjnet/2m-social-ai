@@ -165,6 +165,8 @@ export interface Content {
   /** O plano da semana de onde a peca saiu, e o horario que ele sugeriu (UTC). */
   content_plan_id?: number | null
   planned_for?: string | null
+  /** A peca de onde esta foi reaproveitada (repurposer). */
+  repurposed_from_id?: number | null
 }
 
 export interface PillarAdherence {

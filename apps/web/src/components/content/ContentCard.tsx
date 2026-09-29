@@ -241,6 +241,12 @@ export function ContentCard({
         </span>
       )}
 
+      {content.repurposed_from_id && (
+        <span className="text-label-sm bg-surface-container text-on-surface-variant mt-3 ml-1 inline-block rounded-full px-2 py-0.5">
+          ↻ Reaproveitada
+        </span>
+      )}
+
       {/*
         * Arquivada, os tres botoes abaixo ficavam TODOS desabilitados: um cartao com
         * tres botoes mortos e nenhuma saida — e o rewriter conserta peca arquivada,

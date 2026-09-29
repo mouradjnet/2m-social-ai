@@ -178,6 +178,7 @@ O coração do sistema.
 | `scheduled_for` | timestamptz null | |
 | `planned_for` | timestamptz null | horário que o plano da semana sugeriu (UTC). Sugestão: agendar continua exigindo aprovação. Desde `2026_09_29_040000` |
 | `content_plan_id` | fk content_plans null (nullOnDelete) | de qual plano a peça saiu |
+| `repurposed_from_id` | fk contents null (nullOnDelete) | a peça de onde esta foi reaproveitada (`repurposer`). Desde `2026_09_29_050000` |
 | `approved_by` | fk users null | quem aprovou (ADR-13). Só `reviewer`+ aprova; devolver para revisão limpa |
 | `approved_at` | timestamptz null | quando aprovou |
 | `published_at` | timestamptz null | preenchido quando a publicação no Instagram é confirmada |

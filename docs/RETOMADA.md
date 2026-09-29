@@ -280,3 +280,28 @@ tabela estava vazia em todo ambiente).
 2. **Deploy na VPS** e restart do nginx do 2M Prev: só com autorização explícita.
 3. **App da Meta** (ID e segredo do Instagram, redirect
    `https://2msocialai.site/api/v1/instagram/callback`) e a primeira publicação real.
+
+## Etapa 2 — Estúdio inteligente (2026-09-29)
+
+**Já existia e foi reaproveitado:** editor de legenda, CTA e hashtags (contador de 30) e a
+prévia do post com contador de 2200 — Fase 5. Nada foi recriado.
+
+| Sub-etapa | Commit | O quê |
+|---|---|---|
+| 2a Custos | `fdbb23e` | `GET /workspaces/{ws}/usage` + tela **/consumo** (gasto × teto, por agente e por projeto). Teto por workspace em `workspaces.monthly_budget_cents`, que **só o operador** muda (`php artisan workspace:budget`) — fora do fillable, sem rota. |
+| 2b Imagem por IA | `82f64c9` | ADR-15. `ImageProvider` com `fake` (padrão) e `openai`; `POST /contents/{id}/image:generate`. Passa pelo `ImageProcessor`, entra na biblioteca, só é anexada antes da aprovação. Mesmo orçamento e mesma trava de concorrência (`ai_runs.agent = image`). |
+| 2c Plano semanal | `fd49c5d` | 9º agente `planner` → `content_plans`. "Escrever as peças do plano" roda o copywriter com uma peça por horário (`planned_for`, `content_plan_id`); o editor oferece "Usar horário do plano". |
+| 2d Reaproveitamento | este commit | 10º agente `repurposer`: `POST /contents/{id}/repurpose:generate {format, channel}` cria uma peça nova em Ideia, ligada à original. |
+
+**Aprovação humana preservada:** imagem gerada não troca a de peça aprovada (relido na
+hora de gravar); peça planejada e peça reaproveitada nascem `idea`; `planned_for` é
+sugestão e agendar continua exigindo aprovação.
+
+**Migrations:** `2026_09_29_020000` (teto do workspace), `030000` (`image` em
+`ai_runs.agent`), `040000` (`planner` + `contents.content_plan_id/planned_for`),
+`050000` (`repurposer` + `contents.repurposed_from_id`). Todas só acrescentam.
+
+**Bloqueios:** sem `OPENAI_API_KEY` o gerador de imagem real só roda contra
+`Http::fake`; o preço por imagem (`IMAGE_COST_CENTS=5`) é estimativa a conferir na
+tabela do provedor. Os agentes novos nunca rodaram com a API real da Anthropic (o
+`AI_PROVIDER` fica `mock` local).

@@ -305,6 +305,9 @@ POST   /api/v1/publications/{publication}/resolve     { outcome: published|faile
 # Imagem por IA (ADR-15; editor+). 202 + polling em /ai-runs/{id}
 POST   /api/v1/contents/{content}/image:generate      usa o image_prompt; 422 sem prompt ou peça aprovada, 409, 402
 
+# Reaproveitamento (repurposer; editor+). Cria uma peça NOVA em `idea`; a original não muda.
+POST   /api/v1/contents/{content}/repurpose:generate  {format, channel} — 422 se igual ao da peça ou sem texto, 409, 402
+
 # Registro de atividade (qualquer membro)
 GET    /api/v1/projects/{project}/activity            50 mais recentes: instagram.connected|disconnected, publication.resolved, asset.deleted
 ```

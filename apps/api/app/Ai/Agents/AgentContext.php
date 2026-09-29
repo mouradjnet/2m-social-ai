@@ -97,6 +97,11 @@ readonly class AgentContext
          * UMA peca por horario, com o pilar, formato e canal que o plano decidiu.
          */
         public ?array $planSlots = null,
+        /**
+         * `{source, target}`: a peca a reaproveitar (texto inteiro) e o formato/canal
+         * da nova. Null fora do repurposer.
+         */
+        public ?array $repurpose = null,
     ) {}
 
     /**
@@ -191,6 +196,9 @@ readonly class AgentContext
             planSlots: isset($input['content_plan_id'])
                 ? self::planSlots($project, (int) $input['content_plan_id'])
                 : null,
+            repurpose: isset($input['repurpose_content_id'], $input['target_format'], $input['target_channel'])
+                ? self::repurpose($project, $input)
+                : null,
         );
     }
 
@@ -246,6 +254,10 @@ readonly class AgentContext
             $data['plan_slots'] = $this->planSlots;
         }
 
+        if ($this->repurpose !== null) {
+            $data['repurpose'] = $this->repurpose;
+        }
+
         return $data;
     }
 
@@ -296,6 +308,17 @@ readonly class AgentContext
             ->first();
 
         return $plano?->slots();
+    }
+
+    /** A peca de origem, se for DESTE projeto (o job roda sem usuario). */
+    private static function repurpose(Project $project, array $input): ?array
+    {
+        $peca = $project->contents()->find((int) $input['repurpose_content_id']);
+
+        return $peca === null ? null : [
+            'source' => $peca->only(['id', 'title', 'caption', 'cta', 'hashtags', 'format', 'channel', 'pillar']),
+            'target' => ['format' => $input['target_format'], 'channel' => $input['target_channel']],
+        ];
     }
 
     /**

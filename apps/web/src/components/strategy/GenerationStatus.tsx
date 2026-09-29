@@ -24,6 +24,7 @@ const FRASES: Record<string, string> = {
   rewriter: 'Reescrevendo a peça reprovada…',
   image: 'Desenhando a imagem da peça…',
   planner: 'Planejando a semana…',
+  repurposer: 'Reaproveitando a peça em outro formato…',
 }
 
 const GENERICO = 'Gerando…'

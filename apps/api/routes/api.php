@@ -16,6 +16,7 @@ use App\Http\Controllers\Api\V1\InstagramController;
 use App\Http\Controllers\Api\V1\InvitationController;
 use App\Http\Controllers\Api\V1\ProjectController;
 use App\Http\Controllers\Api\V1\PublicationController;
+use App\Http\Controllers\Api\V1\RepurposeController;
 use App\Http\Controllers\Api\V1\ReviewController;
 use App\Http\Controllers\Api\V1\RewriteController;
 use App\Http\Controllers\Api\V1\ScheduleController;
@@ -95,6 +96,8 @@ Route::prefix('v1')->group(function () {
         Route::post('contents/{content}/seo:apply', [SeoController::class, 'apply']);
         // Desenha a imagem da peca a partir do prompt do diretor de arte (ADR-15).
         Route::post('contents/{content}/image:generate', [ImageGenerationController::class, 'generate']);
+        // Reaproveita a peca em outro formato/canal: cria uma peca NOVA, em ideia.
+        Route::post('contents/{content}/repurpose:generate', [RepurposeController::class, 'generate']);
         // Conserta a peca reprovada, no lugar. Fecha o ciclo do revisor.
         Route::post('contents/{content}/rewrite:generate', [RewriteController::class, 'generate']);
         Route::get('projects/{project}/contents', [ContentController::class, 'index']);

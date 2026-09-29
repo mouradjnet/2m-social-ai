@@ -119,6 +119,23 @@ class MockProvider implements LlmProvider
             ];
         }
 
+        // Repurposer: tem `adaptation_notes` (o rewriter nao). O titulo leva o formato
+        // e um sufixo do inventario, para nao colidir no validate() em dev.
+        if (isset($properties['adaptation_notes'])) {
+            $context = $this->contextOf($request->userMessage);
+            $origem = $context['repurpose']['source'] ?? [];
+            $alvo = $context['repurpose']['target']['format'] ?? 'post';
+            $unico = substr(md5((string) count($context['existing_contents'] ?? [])), 0, 4);
+
+            return [
+                'title' => ($origem['title'] ?? 'Peca')." em {$alvo} ({$unico})",
+                'caption' => "Versao em {$alvo}: ".($origem['title'] ?? 'o mesmo assunto').'.',
+                'cta' => $origem['cta'] ?? 'Fale com a gente no WhatsApp.',
+                'hashtags' => $origem['hashtags'] ?? ['#marca'],
+                'adaptation_notes' => "Adaptado de {$origem['format']} para {$alvo}.",
+            ];
+        }
+
         // Rewriter: schema plano com `title` + `caption`, sem chave de lote. O
         // validate() recusa legenda IDENTICA a reprovada, entao o fixture nao pode ser
         // constante: le a peca do proprio <context> e devolve outra coisa.

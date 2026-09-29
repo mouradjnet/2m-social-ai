@@ -86,6 +86,12 @@ return [
             'default_posts' => 3,
             'max_posts' => 7,
         ],
+        // Adaptar uma peca pronta a outro formato: mesmo assunto, outra forma.
+        'repurposer' => [
+            'model' => env('AI_MODEL_REPURPOSER', env('AI_MODEL_DEFAULT', 'claude-opus-4-8')),
+            'effort' => 'medium',
+            'max_tokens' => 16000,
+        ],
         'analytics' => [
             'model' => env('AI_MODEL_ANALYTICS', env('AI_MODEL_DEFAULT', 'claude-opus-4-8')),
             'effort' => 'high',

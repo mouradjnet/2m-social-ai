@@ -17,7 +17,7 @@ class Content extends Model
         'image_prompt', 'status', 'assignee_id', 'scheduled_for',
         'source', 'origin_ai_run_id', 'created_by',
         'approved_by', 'approved_at', 'image_asset_id', 'published_at',
-        'content_plan_id', 'planned_for',
+        'content_plan_id', 'planned_for', 'repurposed_from_id',
     ];
 
     protected function casts(): array

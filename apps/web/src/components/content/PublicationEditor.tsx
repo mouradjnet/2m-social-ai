@@ -9,7 +9,7 @@ import { Textarea } from '@/components/ui/Textarea'
 import { api, errorMessage } from '@/lib/api'
 import { cn } from '@/lib/cn'
 import { HASHTAGS_MAX, formatDateTime, parseHashtags } from '@/lib/instagram'
-import type { Asset, Content, InstagramAccount } from '@/lib/types'
+import type { Asset, Content, ContentChannel, ContentFormat, InstagramAccount } from '@/lib/types'
 
 interface Props {
   projectId: string
@@ -18,7 +18,28 @@ interface Props {
   /** Gera a imagem por IA a partir do `image_prompt` (ADR-15). A execucao e da pagina. */
   onGenerateImage?: () => void
   generatingImage?: boolean
+  /** Cria uma peca NOVA, adaptada a outro formato/canal. A execucao e da pagina. */
+  onRepurpose?: (alvo: { format: ContentFormat; channel: ContentChannel }) => void
 }
+
+const FORMATOS: { value: ContentFormat; label: string }[] = [
+  { value: 'post', label: 'Post' },
+  { value: 'carousel', label: 'Carrossel' },
+  { value: 'reel', label: 'Reel' },
+  { value: 'story', label: 'Story' },
+  { value: 'video', label: 'Vídeo' },
+  { value: 'article', label: 'Artigo' },
+  { value: 'thread', label: 'Thread' },
+]
+
+const CANAIS: { value: ContentChannel; label: string }[] = [
+  { value: 'instagram', label: 'Instagram' },
+  { value: 'facebook', label: 'Facebook' },
+  { value: 'linkedin', label: 'LinkedIn' },
+  { value: 'tiktok', label: 'TikTok' },
+  { value: 'youtube', label: 'YouTube' },
+  { value: 'blog', label: 'Blog' },
+]
 
 /** Depois de aprovada, a peca tem o texto e a imagem congelados (ADR-13). */
 const EDITAVEIS: Content['status'][] = ['idea', 'production', 'review']
@@ -27,7 +48,7 @@ const EDITAVEIS: Content['status'][] = ['idea', 'production', 'review']
  * O editor de publicacao: texto, imagem e a previa do post, lado a lado. Aprovada, a
  * peca vira somente leitura — o que muda e so a data, e agendar e feito aqui.
  */
-export function PublicationEditor({ projectId, content, onClose, onGenerateImage, generatingImage = false }: Props) {
+export function PublicationEditor({ projectId, content, onClose, onGenerateImage, generatingImage = false, onRepurpose }: Props) {
   const queryClient = useQueryClient()
   const editavel = EDITAVEIS.includes(content.status)
 
@@ -38,6 +59,8 @@ export function PublicationEditor({ projectId, content, onClose, onGenerateImage
   const [imageId, setImageId] = useState<number | null>(content.image?.id ?? content.image_asset_id ?? null)
   const imagemDoServidor = content.image?.id ?? content.image_asset_id ?? null
   const [when, setWhen] = useState('')
+  const [formato, setFormato] = useState<ContentFormat>(content.format === 'carousel' ? 'reel' : 'carousel')
+  const [canal, setCanal] = useState<ContentChannel>(content.channel)
 
   const assets = useQuery({
     queryKey: ['assets', projectId],
@@ -207,6 +230,49 @@ export function PublicationEditor({ projectId, content, onClose, onGenerateImage
                   {errorMessage(salvar.error)}
                 </p>
               )}
+            </div>
+          )}
+
+          {onRepurpose && content.caption && (
+            <div className="border-outline-variant flex flex-wrap items-end gap-3 border-t pt-4">
+              <label className="text-label-sm text-on-surface flex flex-col gap-1">
+                Reaproveitar como
+                <select
+                  className="border-outline-variant rounded border px-2 py-1"
+                  value={formato}
+                  onChange={(e) => setFormato(e.target.value as ContentFormat)}
+                >
+                  {FORMATOS.map((f) => (
+                    <option key={f.value} value={f.value}>
+                      {f.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="text-label-sm text-on-surface flex flex-col gap-1">
+                no canal
+                <select
+                  className="border-outline-variant rounded border px-2 py-1"
+                  value={canal}
+                  onChange={(e) => setCanal(e.target.value as ContentChannel)}
+                >
+                  {CANAIS.map((c) => (
+                    <option key={c.value} value={c.value}>
+                      {c.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <Button
+                variant="secondary"
+                disabled={generatingImage || (formato === content.format && canal === content.channel)}
+                onClick={() => onRepurpose({ format: formato, channel: canal })}
+              >
+                Reaproveitar com IA
+              </Button>
+              <p className="text-body-sm text-on-surface-variant w-full">
+                Cria uma peça nova, em Ideia, com o mesmo assunto adaptado. Esta peça não muda.
+              </p>
             </div>
           )}
 

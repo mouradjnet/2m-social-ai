@@ -219,3 +219,23 @@ test('peca aprovada que veio do plano agenda no horario do plano', async () => {
 
   await vi.waitFor(() => expect(agendado).toEqual({ scheduled_for: '2026-10-06T22:00:00.000000Z' }))
 })
+
+test('reaproveitar pede outro formato e nao deixa repetir o mesmo', async () => {
+  servidor()
+  const onRepurpose = vi.fn()
+
+  renderWithProviders(
+    <PublicationEditor projectId="1" content={peca({ status: 'published' })} onClose={() => {}} onRepurpose={onRepurpose} />,
+    ROUTE,
+  )
+  const user = userEvent.setup()
+
+  const botao = await screen.findByRole('button', { name: 'Reaproveitar com IA' })
+  await user.selectOptions(screen.getByLabelText('Reaproveitar como'), 'post')
+  // post + instagram e o que a peca ja e: nao ha o que adaptar.
+  expect(botao).toBeDisabled()
+
+  await user.selectOptions(screen.getByLabelText('Reaproveitar como'), 'reel')
+  await user.click(botao)
+  expect(onRepurpose).toHaveBeenCalledWith({ format: 'reel', channel: 'instagram' })
+})
