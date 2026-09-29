@@ -8,7 +8,13 @@ import { Shell } from '@/components/ui/Shell'
 import { Stepper, type Step } from '@/components/ui/Stepper'
 import { Textarea } from '@/components/ui/Textarea'
 import { ApiError, api } from '@/lib/api'
-import { fromLines, toLines } from '@/lib/listField'
+import {
+  type Competitor,
+  competitorsFromLines,
+  competitorsToLines,
+  fromLines,
+  toLines,
+} from '@/lib/listField'
 import type { BrandProfileResponse } from '@/lib/types'
 
 /** So os campos que o wizard edita — `id` e `project_id` ficam de fora. */
@@ -29,10 +35,13 @@ type EditableField =
   | 'instagram'
   | 'linkedin'
 
+type Payload = Partial<Record<EditableField, string | string[] | Competitor[]>>
+
 type Field = {
   name: EditableField
   label: string
-  kind: 'text' | 'textarea' | 'list'
+  /** `competitors`: lista de {name, url}, nao de strings (ver listField). */
+  kind: 'text' | 'textarea' | 'list' | 'competitors'
   placeholder?: string
   hint?: string
 }
@@ -92,7 +101,12 @@ const STEPS: Array<Step & { fields: Field[]; description?: string }> = [
     title: 'Vocabulário e Concorrência',
     description: 'Influencia o texto gerado. Palavras proibidas nunca aparecerão nas peças.',
     fields: [
-      { name: 'competitors', label: 'Concorrentes', kind: 'list', hint: 'Um por linha' },
+      {
+        name: 'competitors',
+        label: 'Concorrentes',
+        kind: 'competitors',
+        hint: 'Um por linha. Link opcional depois do nome, ex: Clínica X https://clinicax.com.br',
+      },
       { name: 'required_words', label: 'Palavras obrigatórias', kind: 'list', hint: 'Uma por linha' },
       { name: 'forbidden_words', label: 'Palavras proibidas', kind: 'list', hint: 'Uma por linha' },
     ],
@@ -156,7 +170,7 @@ export function BrandProfilePage() {
   })
 
   const save = useMutation({
-    mutationFn: (payload: Partial<Record<EditableField, string | string[]>>) =>
+    mutationFn: (payload: Payload) =>
       api<BrandProfileResponse>(`/projects/${projectId}/brand-profile`, {
         method: 'PATCH',
         body: JSON.stringify(payload),
@@ -182,13 +196,20 @@ export function BrandProfilePage() {
     const form = new FormData(event.currentTarget)
 
     // Envia apenas os campos deste passo: o PATCH e um merge parcial.
-    // Campos `list` viram array de strings; o resto vai como texto.
+    // Campos `list` viram array de strings, `competitors` array de {name, url};
+    // o resto vai como texto.
     const payload = Object.fromEntries(
       step.fields.map((field) => {
         const raw = String(form.get(field.name) ?? '')
-        return [field.name, field.kind === 'list' ? fromLines(raw) : raw]
+        const value =
+          field.kind === 'list'
+            ? fromLines(raw)
+            : field.kind === 'competitors'
+              ? competitorsFromLines(raw)
+              : raw
+        return [field.name, value]
       }),
-    ) as Partial<Record<EditableField, string | string[]>>
+    ) as Payload
 
     save.mutate(payload, {
       onSuccess: () => {
@@ -285,11 +306,15 @@ export function BrandProfilePage() {
                 placeholder: field.placeholder,
                 hint: field.hint,
                 defaultValue:
-                  field.kind === 'list' ? toLines(value as string[] | null) : (value ?? ''),
+                  field.kind === 'list'
+                    ? toLines(value as string[] | null)
+                    : field.kind === 'competitors'
+                      ? competitorsToLines(value as Competitor[] | null)
+                      : ((value as string | null) ?? ''),
                 error: error?.fieldError(field.name),
               }
 
-              return field.kind === 'textarea' || field.kind === 'list' ? (
+              return field.kind !== 'text' ? (
                 <Textarea key={field.name} {...props} />
               ) : (
                 <Input key={field.name} {...props} />

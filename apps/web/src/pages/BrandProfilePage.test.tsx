@@ -97,6 +97,43 @@ test('ao salvar o passo Oferta, o campo de lista vai como array', async () => {
   })
 })
 
+test('ao salvar o passo Vocabulário, concorrente vai como {name, url} e as palavras como array', async () => {
+  const user = userEvent.setup()
+  let recebido: unknown = null
+
+  server.use(
+    http.get('/api/v1/projects/1/brand-profile', () =>
+      HttpResponse.json(profile({ competitors: [{ name: 'Rival', url: 'https://rival.com' }] })),
+    ),
+    http.patch('/api/v1/projects/1/brand-profile', async ({ request }) => {
+      recebido = await request.json()
+      return HttpResponse.json(profile())
+    }),
+  )
+
+  renderWithProviders(<BrandProfilePage />, ROUTE)
+
+  await user.click(await screen.findByRole('button', { name: /vocabulário/i }))
+
+  const concorrentes = screen.getByRole('textbox', { name: /concorrentes/i })
+  // O que veio do servidor aparece legivel, nao "[object Object]".
+  expect(concorrentes).toHaveValue('Rival https://rival.com')
+  await user.type(concorrentes, '{Enter}Outra Marca')
+  await user.type(screen.getByRole('textbox', { name: /proibidas/i }), 'milagre')
+
+  await user.click(screen.getByRole('button', { name: /salvar|próximo/i }))
+
+  await waitFor(() => expect(recebido).not.toBeNull())
+  expect(recebido).toEqual({
+    competitors: [
+      { name: 'Rival', url: 'https://rival.com' },
+      { name: 'Outra Marca', url: null },
+    ],
+    required_words: [],
+    forbidden_words: ['milagre'],
+  })
+})
+
 test('o Stepper marca os passos opcionais', async () => {
   server.use(http.get('/api/v1/projects/1/brand-profile', () => HttpResponse.json(profile())))
 

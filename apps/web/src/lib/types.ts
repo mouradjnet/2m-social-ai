@@ -43,7 +43,7 @@ export interface BrandProfileData {
   differentiators: string | null
   products: string[] | null
   services: string[] | null
-  competitors: string[] | null
+  competitors: Array<{ name: string; url: string | null }> | null
   required_words: string[] | null
   forbidden_words: string[] | null
   /** Hex, ex: ['#006c49']. Quem le e o designer, no prompt de imagem. */

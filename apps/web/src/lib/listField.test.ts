@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest'
-import { fromLines, toLines } from './listField'
+import { competitorsFromLines, competitorsToLines, fromLines, toLines } from './listField'
 
 test('toLines junta os itens com quebra de linha', () => {
   expect(toLines(['Carros', 'Motos'])).toBe('Carros\nMotos')
@@ -22,4 +22,27 @@ test('fromLines de string vazia devolve array vazio', () => {
 test('ida-e-volta preserva a lista', () => {
   const xs = ['Compra Segura', 'Negociação e Troca', 'Financiamento']
   expect(fromLines(toLines(xs))).toEqual(xs)
+})
+
+test('concorrente: cada linha vira {name, url}; o link https no fim e opcional', () => {
+  expect(competitorsFromLines('Clínica Rival https://rival.com.br\n  Outra Marca  \n\n')).toEqual([
+    { name: 'Clínica Rival', url: 'https://rival.com.br' },
+    { name: 'Outra Marca', url: null },
+  ])
+})
+
+test('concorrente so com o link usa o link como nome', () => {
+  expect(competitorsFromLines('https://rival.com.br')).toEqual([
+    { name: 'https://rival.com.br', url: 'https://rival.com.br' },
+  ])
+})
+
+test('concorrentes do servidor voltam como linhas, e a ida-e-volta preserva', () => {
+  const xs = [
+    { name: 'Clínica Rival', url: 'https://rival.com.br' },
+    { name: 'Outra Marca', url: null },
+  ]
+  expect(competitorsToLines(xs)).toBe('Clínica Rival https://rival.com.br\nOutra Marca')
+  expect(competitorsFromLines(competitorsToLines(xs))).toEqual(xs)
+  expect(competitorsToLines(null)).toBe('')
 })
