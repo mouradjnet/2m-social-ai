@@ -5,12 +5,14 @@ namespace App\Http\Controllers\Api\V1;
 use App\Domain\Media\ImageProcessor;
 use App\Domain\Media\InvalidImageException;
 use App\Http\Controllers\Controller;
+use App\Models\ActivityLog;
 use App\Models\Asset;
 use App\Models\Project;
 use App\Models\Publication;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -99,7 +101,7 @@ class AssetController extends Controller
      * some — seria trocar, por baixo, o que o humano aprovou. Presa so a rascunhos,
      * ela sai e os rascunhos ficam sem imagem (a FK anula).
      */
-    public function destroy(Asset $asset): Response|JsonResponse
+    public function destroy(Request $request, Asset $asset): Response|JsonResponse
     {
         Gate::authorize('update', $asset->project);
 
@@ -118,7 +120,12 @@ class AssetController extends Controller
 
         [$disk, $path] = [$asset->disk, $asset->path];
 
-        $asset->delete();
+        DB::transaction(function () use ($request, $asset) {
+            $asset->delete();
+            ActivityLog::record($request->user(), $asset->project, 'asset.deleted', $asset, [
+                'original_name' => $asset->original_name,
+            ]);
+        });
 
         // Depois do delete: se apagar o arquivo falhar, sobra um arquivo orfao, nunca
         // uma linha apontando para o nada.

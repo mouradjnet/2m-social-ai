@@ -6,9 +6,9 @@ import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { Shell } from '@/components/ui/Shell'
 import { api, errorMessage } from '@/lib/api'
-import { formatDateTime } from '@/lib/instagram'
+import { describeActivity, formatDateTime } from '@/lib/instagram'
 import { navegar } from '@/lib/navegar'
-import type { InstagramAccount, Publication } from '@/lib/types'
+import type { ActivityEntry, InstagramAccount, Publication } from '@/lib/types'
 
 /**
  * A conexao do projeto com o Instagram e o historico do que o sistema publicou.
@@ -32,6 +32,11 @@ export function InstagramPage() {
     queryFn: () => api<{ data: Publication[] }>(`/projects/${projectId}/publications`),
   })
 
+  const atividade = useQuery({
+    queryKey: ['activity', projectId],
+    queryFn: () => api<{ data: ActivityEntry[] }>(`/projects/${projectId}/activity`),
+  })
+
   const conectar = useMutation({
     mutationFn: () =>
       api<{ authorize_url: string }>(`/projects/${projectId}/instagram:connect`, { method: 'POST' }),
@@ -42,7 +47,10 @@ export function InstagramPage() {
     mutationFn: () => api(`/projects/${projectId}/instagram`, { method: 'DELETE' }),
     onSuccess: () => {
       setDesconectando(false)
-      return queryClient.invalidateQueries({ queryKey: ['instagram', projectId] })
+      return Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['instagram', projectId] }),
+        queryClient.invalidateQueries({ queryKey: ['activity', projectId] }),
+      ])
     },
   })
 
@@ -50,6 +58,7 @@ export function InstagramPage() {
     Promise.all([
       queryClient.invalidateQueries({ queryKey: ['publications', projectId] }),
       queryClient.invalidateQueries({ queryKey: ['contents', projectId] }),
+      queryClient.invalidateQueries({ queryKey: ['activity', projectId] }),
     ])
 
   const retry = useMutation({
@@ -228,6 +237,25 @@ export function InstagramPage() {
             </li>
           ))}
         </ul>
+      )}
+
+      {(atividade.data?.data.length ?? 0) > 0 && (
+        <section className="mt-10" aria-labelledby="atividade">
+          <h2 id="atividade" className="text-headline-md font-display text-on-surface">
+            Atividade
+          </h2>
+          <p className="text-body-sm text-on-surface-variant mt-1">
+            Quem conectou, desconectou, decidiu publicações ou removeu imagens neste projeto.
+          </p>
+          <ul className="mt-4 flex flex-col gap-2">
+            {atividade.data?.data.map((a) => (
+              <li key={a.id} className="text-body-sm text-on-surface">
+                {describeActivity(a)}{' '}
+                <span className="text-on-surface-variant">· {formatDateTime(a.created_at)}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
       )}
     </Shell>
   )

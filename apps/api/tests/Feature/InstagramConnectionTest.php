@@ -229,7 +229,7 @@ class InstagramConnectionTest extends TestCase
 
     public function test_desconectar_apaga_o_token_e_guarda_a_linha(): void
     {
-        [$project] = $this->scene();
+        [$project, $user] = $this->scene();
         $this->fakeMeta();
         $this->get('/api/v1/instagram/callback?code=a&state='.$this->pedirConexao($project));
 
@@ -239,6 +239,16 @@ class InstagramConnectionTest extends TestCase
         $this->assertSame('disconnected', $conta->status);
         $this->assertNull($conta->access_token);
         $this->getJson("/api/v1/projects/{$project->id}/instagram")->assertJsonPath('data', null);
+
+        // Conectar e desconectar ficam no registro, com quem fez: a conta so guarda
+        // quem conectou, e desconectar e o gesto que para toda publicacao.
+        $this->getJson("/api/v1/projects/{$project->id}/activity")
+            ->assertOk()
+            ->assertJsonCount(2, 'data')
+            ->assertJsonPath('data.0.action', 'instagram.disconnected')
+            ->assertJsonPath('data.0.user.id', $user->id)
+            ->assertJsonPath('data.0.meta.username', '2msaudefeminina')
+            ->assertJsonPath('data.1.action', 'instagram.connected');
     }
 
     public function test_editor_nao_desconecta_e_outro_tenant_nao_existe(): void
@@ -249,6 +259,7 @@ class InstagramConnectionTest extends TestCase
         $alheio = Project::factory()->create();
         $this->getJson("/api/v1/projects/{$alheio->id}/instagram")->assertNotFound();
         $this->deleteJson("/api/v1/projects/{$alheio->id}/instagram")->assertNotFound();
+        $this->getJson("/api/v1/projects/{$alheio->id}/activity")->assertNotFound();
     }
 
     private function conta(Project $project, array $attrs = []): InstagramAccount

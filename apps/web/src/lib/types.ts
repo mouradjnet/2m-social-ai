@@ -301,3 +301,15 @@ export interface Publication {
   approver?: { id: number; name: string } | null
   attempts_log?: PublicationAttempt[]
 }
+
+/** Um gesto humano que nao deixa rastro em outro lugar (ActivityLog no backend). */
+export interface ActivityEntry {
+  id: number
+  /** instagram.connected | instagram.disconnected | publication.resolved | asset.deleted */
+  action: string
+  subject_type: string
+  subject_id: number
+  meta: Record<string, string>
+  created_at: string
+  user: { id: number; name: string } | null
+}

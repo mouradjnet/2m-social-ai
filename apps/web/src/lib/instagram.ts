@@ -1,4 +1,4 @@
-import type { Content, PublicationStatus } from '@/lib/types'
+import type { ActivityEntry, Content, PublicationStatus } from '@/lib/types'
 
 /** Os limites da Meta para a legenda. O servidor confere de novo antes de publicar. */
 export const CAPTION_MAX = 2200
@@ -17,6 +17,25 @@ export function composeCaption(content: Pick<Content, 'caption' | 'cta' | 'hasht
   return [content.caption?.trim() ?? '', content.cta?.trim() ?? '', hashtags]
     .filter(Boolean)
     .join('\n\n')
+}
+
+/** Uma linha do registro de atividade, em portugues. Acao desconhecida sai crua. */
+export function describeActivity(entry: ActivityEntry): string {
+  const quem = entry.user?.name ?? 'Alguém'
+  const { meta } = entry
+
+  switch (entry.action) {
+    case 'instagram.connected':
+      return `${quem} conectou @${meta.username}`
+    case 'instagram.disconnected':
+      return `${quem} desconectou @${meta.username}`
+    case 'publication.resolved':
+      return `${quem} decidiu que "${meta.content_title}" ${meta.outcome === 'published' ? 'está no ar' : 'não saiu'}`
+    case 'asset.deleted':
+      return `${quem} removeu a imagem ${meta.original_name ?? ''}`.trimEnd()
+    default:
+      return `${quem}: ${entry.action}`
+  }
 }
 
 /** "#saude bem_estar, #rotina" -> ['#saude', '#bem_estar', '#rotina'] */

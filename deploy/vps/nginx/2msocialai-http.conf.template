@@ -1,0 +1,16 @@
+# ETAPA A (docs/DEPLOY-VPS.md, passo 4): so a porta 80, para emitir o certificado.
+# Vai para /opt/2m-prev/deploy/nginx/templates/ do 2M Prev. Sem variaveis
+# ${...}: o envsubst daquele container so troca APP_DOMAIN (o dominio DELE), o
+# resto passa intacto.
+server {
+    listen 80;
+    server_name 2msocialai.site www.2msocialai.site;
+
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+
+    location / {
+        return 301 https://2msocialai.site$request_uri;
+    }
+}

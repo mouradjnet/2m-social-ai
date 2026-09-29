@@ -4,12 +4,10 @@
 #
 #   sh deploy/vps/scripts/audit-vps.sh > auditoria-vps-$(date +%F).txt 2>&1
 #
-# O que ela responde: quem ocupa 80/443 (o proxy que NAO vamos tocar), se a porta
-# local escolhida (HTTP_PORT) esta livre, que containers/volumes/redes ja existem
-# (para nao colidir de nome), quanto disco e memoria sobram, e qual e a config do
-# Nginx em uso.
+# O que ela responde: quem ocupa 80/443 (o proxy que NAO vamos tocar), se a rede
+# 2m-prev_internal existe, que containers/volumes/redes ja existem (para nao
+# colidir de nome), quanto disco e memoria sobram, e qual e a config do Nginx.
 
-porta=${HTTP_PORT:-8090}
 secao() { printf '\n===== %s =====\n' "$1"; }
 
 secao "Sistema"
@@ -21,10 +19,11 @@ free -h; df -h / /var/lib/docker 2>/dev/null
 secao "CPU"
 nproc
 
-secao "Portas em escuta (quem ocupa 80, 443 e ${porta})"
+secao "Portas em escuta (quem ocupa 80 e 443)"
 ss -tlnp 2>/dev/null || netstat -tlnp 2>/dev/null
-printf '\n-> porta %s: ' "$porta"
-if ss -tln 2>/dev/null | grep -q ":${porta} "; then echo "OCUPADA — escolha outra HTTP_PORT"; else echo "livre"; fi
+
+secao "Rede do proxy (a stack entra nela como externa)"
+docker network inspect 2m-prev_internal --format '{{.Name}}: existe' 2>/dev/null || echo "2m-prev_internal NAO existe — o compose nao sobe"
 
 secao "Docker"
 docker version --format '{{.Server.Version}}' 2>/dev/null
@@ -45,10 +44,12 @@ docker network ls
 secao "Uso de recursos agora"
 docker stats --no-stream --format 'table {{.Name}}\t{{.CPUPerc}}\t{{.MemUsage}}' 2>/dev/null
 
-secao "Colisao de nomes com esta stack (2m-social*)"
-docker ps -a --format '{{.Names}}' | grep -i '2m-social' || echo "nenhum container 2m-social"
-docker volume ls --format '{{.Name}}' | grep -i '2m-social' || echo "nenhum volume 2m-social"
-docker network ls --format '{{.Name}}' | grep -i '2m-social' || echo "nenhuma rede 2m-social"
+secao "Colisao de nomes com esta stack (2m-social-ai*, apelido social-ai-web)"
+# O 2M Social Vendas (2m-social-vendas*) mora na mesma VPS: nao e colisao.
+docker ps -a --format '{{.Names}}' | grep -i '2m-social-ai' || echo "nenhum container 2m-social-ai"
+docker volume ls --format '{{.Name}}' | grep -i '2m-social-ai' || echo "nenhum volume 2m-social-ai"
+docker network ls --format '{{.Name}}' | grep -i '2m-social-ai' || echo "nenhuma rede 2m-social-ai"
+docker network inspect 2m-prev_internal --format '{{range .Containers}}{{.Name}} {{end}}' 2>/dev/null
 
 secao "Proxy reverso: Nginx do host"
 if command -v nginx >/dev/null 2>&1; then

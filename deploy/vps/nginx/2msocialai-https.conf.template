@@ -1,0 +1,58 @@
+# ETAPA C (docs/DEPLOY-VPS.md, passo 4): so depois que o certificado existir. Sem
+# o arquivo do certificado o nginx nao inicia — e derruba o 2M Prev junto.
+# Substitui o arquivo da etapa A (o bloco :80 esta aqui tambem).
+server {
+    listen 80;
+    server_name 2msocialai.site www.2msocialai.site;
+
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+
+    location / {
+        return 301 https://2msocialai.site$request_uri;
+    }
+}
+
+server {
+    listen 443 ssl;
+    http2 on;
+    server_name www.2msocialai.site;
+
+    ssl_certificate     /etc/letsencrypt/live/2msocialai.site/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/2msocialai.site/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+
+    return 301 https://2msocialai.site$request_uri;
+}
+
+server {
+    listen 443 ssl;
+    http2 on;
+    server_name 2msocialai.site;
+
+    ssl_certificate     /etc/letsencrypt/live/2msocialai.site/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/2msocialai.site/privkey.pem;
+    # Mesmo padrao do bloco do 2M Prev.
+    ssl_protocols TLSv1.2 TLSv1.3;
+
+    # Upload da biblioteca: 8 MB e o teto da Meta; a folga cobre o multipart.
+    client_max_body_size 10m;
+
+    location / {
+        # Resolve pelo DNS do Docker a cada requisicao: se o nginx da stack
+        # reiniciar e mudar de IP, este nao fica apontando para o IP velho. E se a
+        # stack estiver parada, so este site da 502 — o 2M Prev segue no ar (um
+        # proxy_pass com nome fixo impediria o nginx inteiro de subir).
+        resolver 127.0.0.11 valid=10s;
+        set $social_ai_upstream http://social-ai-web:80;
+        proxy_pass $social_ai_upstream;
+
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 60s;
+    }
+}

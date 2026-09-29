@@ -166,6 +166,18 @@ o que ofereceria "tentar de novo" sobre um post possivelmente no ar; agora ela f
 
 ---
 
+## Fase 6 — Stack da VPS (2026-09-28)
+
+Docker Compose próprio em `deploy/vps/` (app, worker, scheduler, nginx, db, backup),
+com healthchecks (o do agendador por batimento), `restart: unless-stopped`, limites
+de memória e logs rotacionados. Script de auditoria somente leitura, backup diário
+com retenção, restauração com confirmação e `status.sh`. A imagem ganhou os papéis
+`worker`/`scheduler` e a fila `publishing` passa na frente da `default`. Guia em
+[DEPLOY-VPS.md](DEPLOY-VPS.md). O encaixe no proxy foi refeito na Etapa 1 do
+roadmap (abaixo), depois da auditoria real.
+
+---
+
 ## Fase 7 — Testes e segurança (2026-09-28)
 
 **Resultado:** PHPUnit **412 testes, verdes** (Postgres real) · vitest **125 testes, verdes** ·
@@ -218,3 +230,53 @@ Guia do piloto — testes com o driver `fake`, app da Meta, conexão e primeira
 publicação autorizada: [PILOTO-2M-SAUDE-FEMININA.md](PILOTO-2M-SAUDE-FEMININA.md).
 
 **Suíte final:** PHPUnit 415 testes / 1221 asserções, verdes; vitest 125, verdes.
+
+---
+
+# Roadmap de evolução (a partir de 2026-09-29)
+
+Cinco etapas pedidas pelo responsável: Instagram e infraestrutura → estúdio
+inteligente → carrosséis e Reels → multimarcas → resultados. Domínio definitivo:
+**https://2msocialai.site**. Conta inicial: @2msaudefeminina.
+
+## Etapa 1 — Instagram e infraestrutura (2026-09-29)
+
+**O que já estava feito (Fases 1–8):** biblioteca de imagens, OAuth com a Meta,
+publicação automática depois da aprovação humana, agendamento persistente, worker e
+scheduler, histórico de publicações, stack Docker e testes.
+
+**Auditoria real da VPS** (somente leitura, script enviado por SSH, nada gravado lá):
+80/443 são do container `2m-prev-nginx-1`; **não há nginx nem certbot no host**; a
+rede `2m-prev_internal` existe; o 2M Social Vendas já roda ali com o mesmo encaixe;
+6,4 GB de RAM e 78 GB de disco livres; ufw libera 22/80/443.
+
+**O que isso mudou no deploy.** O guia antigo supunha um Nginx no host e uma porta em
+`127.0.0.1` — nesta VPS, o proxy é um container e não alcançaria essa porta. Agora:
+
+- a stack se chama `2m-social-ai` (o `2m-social` ficava colado no `2m-social-vendas`);
+- não publica porta nenhuma; só o nginx dela entra na `2m-prev_internal`, com o
+  apelido `social-ai-web`;
+- `deploy/vps/nginx/2msocialai-{http,https}.conf.template` são os arquivos novos
+  para o nginx do 2M Prev, em três etapas (A: porta 80 + ACME, B: certificado pelo
+  certbot do 2M Prev, C: 443), cada uma ensaiada num nginx descartável antes do
+  restart. O `proxy_pass` resolve o nome por requisição: se esta stack cair, só este
+  site dá 502 — o nginx do 2M Prev continua subindo;
+- `host-vhost.conf.example` saiu (não se aplica); `status.sh` confere o `/up` de
+  dentro do nginx da stack; `audit-vps.sh` confere a rede e o apelido.
+
+**Auditoria de ações humanas.** A tabela `activity_logs` existia desde a fundação e
+ninguém escrevia nela. Três gestos não deixavam rastro de quem os fez — desconectar
+o Instagram, apagar uma imagem e decidir à mão uma publicação de resultado
+desconhecido (este só num texto livre da tentativa). Agora os três, mais conectar,
+gravam `ActivityLog::record`; `GET /projects/{id}/activity` lista os 50 mais recentes
+e a tela Instagram mostra a seção **Atividade**. Migration
+`2026_09_29_010000_add_project_id_to_activity_logs` (coluna nullable + índice; a
+tabela estava vazia em todo ambiente).
+
+**Bloqueios (dependem do responsável, registrados e não contornados):**
+
+1. **DNS.** `2msocialai.site` e `www` apontam para `2.57.91.91` (hospedagem da
+   Hostinger), não para a VPS `179.197.238.122`. Sem isso não há certificado.
+2. **Deploy na VPS** e restart do nginx do 2M Prev: só com autorização explícita.
+3. **App da Meta** (ID e segredo do Instagram, redirect
+   `https://2msocialai.site/api/v1/instagram/callback`) e a primeira publicação real.

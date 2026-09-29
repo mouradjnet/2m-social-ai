@@ -632,6 +632,12 @@ class PublishingTest extends TestCase
 
         $this->assertSame('published', $content->fresh()->status);
         $this->assertSame('resolve', $p->attemptsLog()->get()->last()->step);
+
+        $this->getJson("/api/v1/projects/{$this->project->id}/activity")
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.action', 'publication.resolved')
+            ->assertJsonPath('data.0.user.id', $this->reviewer->id)
+            ->assertJsonPath('data.0.meta.outcome', 'published');
     }
 
     public function test_historico_lista_as_publicacoes_do_projeto_e_esconde_as_alheias(): void

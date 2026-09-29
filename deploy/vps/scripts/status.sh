@@ -6,8 +6,9 @@ set -u
 
 docker compose ps --format 'table {{.Service}}\t{{.Status}}'
 
-printf '\n/up local: '
-curl -fsS -o /dev/null -w '%{http_code}\n' "http://127.0.0.1:${HTTP_PORT:-8090}/up" || echo "FALHOU"
+# A stack nao publica porta: o /up e conferido de dentro do nginx dela.
+printf '\n/up (nginx da stack): '
+docker compose exec -T nginx wget -q -O /dev/null http://127.0.0.1/up && echo 200 || echo "FALHOU"
 
 printf '\nPublicacoes (24 h):\n'
 docker compose exec -T db sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Atc "

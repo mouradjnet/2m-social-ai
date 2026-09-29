@@ -197,6 +197,11 @@ class AssetTest extends TestCase
 
         Storage::disk('public')->assertMissing($asset->path);
         $this->assertNull($rascunho->fresh()->image_asset_id);
+
+        $this->getJson("/api/v1/projects/{$project->id}/activity")
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.action', 'asset.deleted')
+            ->assertJsonPath('data.0.meta.original_name', 'a.jpg');
     }
 
     public function test_nao_remove_imagem_de_peca_aprovada(): void

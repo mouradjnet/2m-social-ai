@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\V1;
 use App\Domain\Publishing\Dispatcher;
 use App\Enums\WorkspaceRole;
 use App\Http\Controllers\Controller;
+use App\Models\ActivityLog;
 use App\Models\ContentRevision;
 use App\Models\Project;
 use App\Models\Publication;
@@ -129,6 +130,11 @@ class PublicationController extends Controller
                 'step' => 'resolve',
                 'outcome' => $publicada ? 'success' : 'refused',
                 'message' => "Decidido por {$request->user()->name}: ".($publicada ? 'está no ar.' : 'não saiu.'),
+            ]);
+
+            ActivityLog::record($request->user(), $content->project, 'publication.resolved', $publication, [
+                'outcome' => $data['outcome'],
+                'content_title' => $content->title,
             ]);
 
             if ($publicada && $content->status === 'scheduled') {

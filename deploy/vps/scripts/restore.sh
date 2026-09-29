@@ -27,7 +27,7 @@ if [ -n "$midia" ]; then
   # O volume do projeto se chama <projeto>_media. O servico `backup` o monta so
   # leitura; aqui ele entra gravavel em /restaurar, num container de uma vez so.
   docker compose run --rm -T --no-deps \
-    -v "${COMPOSE_PROJECT_NAME:-2m-social}_media:/restaurar" --entrypoint sh backup \
+    -v "${COMPOSE_PROJECT_NAME:-2m-social-ai}_media:/restaurar" --entrypoint sh backup \
     -c 'find /restaurar -mindepth 1 -delete && tar -xzf - -C /restaurar' < "$midia"
 fi
 

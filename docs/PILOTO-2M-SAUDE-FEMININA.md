@@ -91,7 +91,7 @@ Fluxo: **Instagram API with Instagram Login** (ADR-14). Passos no painel da Meta
 1. **A conta @2msaudefeminina precisa ser profissional** (Empresa ou Criador de conteúdo). No app do Instagram: Configurações → Tipo de conta.
 2. Em **developers.facebook.com**, crie um app e adicione o caso de uso de **API do Instagram com login do Instagram**.
 3. Na configuração da API do Instagram, anote o **ID do app do Instagram** e a **chave secreta do app do Instagram** (são diferentes do ID do app do Facebook) → `INSTAGRAM_APP_ID` e `INSTAGRAM_APP_SECRET` no `deploy/vps/.env`.
-4. Em **Configurações de login da empresa**, cadastre a URI de redirecionamento OAuth, **idêntica**: `https://SEU.DOMINIO/api/v1/instagram/callback`.
+4. Em **Configurações de login da empresa**, cadastre a URI de redirecionamento OAuth, **idêntica**: `https://2msocialai.site/api/v1/instagram/callback`.
 5. Permissões usadas: `instagram_business_basic` e `instagram_business_content_publish` — nada mais.
 6. **Papel no app:** adicione a conta @2msaudefeminina como testadora do Instagram (Funções do app) e aceite o convite no Instagram (Configurações → Apps e sites → Convites de testador). Para publicar **na própria conta**, com papel no app, o acesso padrão costuma bastar sem App Review — **confirme na documentação atual da Meta** antes de contar com isso. Publicar para contas de terceiros exige App Review e acesso avançado.
 7. A imagem precisa estar numa URL **pública em HTTPS**: faça o teste do passo 5 do `DEPLOY-VPS.md` (abrir `/storage/...` numa janela anônima).

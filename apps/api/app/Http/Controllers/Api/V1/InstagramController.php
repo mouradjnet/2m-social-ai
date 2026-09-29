@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Instagram\AccountConnector;
 use App\Instagram\InstagramException;
 use App\Instagram\InstagramGateway;
+use App\Models\ActivityLog;
 use App\Models\InstagramAccount;
 use App\Models\Project;
 use App\Models\User;
@@ -97,6 +98,8 @@ class InstagramController extends Controller
                 : 'O Instagram não respondeu. Tente de novo em alguns minutos.');
         }
 
+        ActivityLog::record($user, $project, 'instagram.connected', $conta, ['username' => $conta->username]);
+
         return $this->voltar($destino, 'conectado', "@{$conta->username}");
     }
 
@@ -113,6 +116,7 @@ class InstagramController extends Controller
         }
 
         $connector->disconnect($conta);
+        ActivityLog::record($request->user(), $project, 'instagram.disconnected', $conta, ['username' => $conta->username]);
 
         return response()->noContent();
     }

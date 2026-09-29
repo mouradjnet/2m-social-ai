@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\V1\ActivityController;
 use App\Http\Controllers\Api\V1\AiRunController;
 use App\Http\Controllers\Api\V1\AnalyticsController;
 use App\Http\Controllers\Api\V1\AssetController;
@@ -107,6 +108,8 @@ Route::prefix('v1')->group(function () {
         Route::post('contents/{content}/schedule', [ContentController::class, 'schedule']);
         // O historico da publicacao automatica (ADR-13) e os dois gestos humanos sobre ele.
         Route::get('projects/{project}/publications', [PublicationController::class, 'index']);
+        // Quem fez o que nos gestos que nao deixam outro rastro.
+        Route::get('projects/{project}/activity', [ActivityController::class, 'index']);
         Route::get('publications/{publication}', [PublicationController::class, 'show']);
         Route::post('publications/{publication}/retry', [PublicationController::class, 'retry']);
         Route::post('publications/{publication}/resolve', [PublicationController::class, 'resolve']);

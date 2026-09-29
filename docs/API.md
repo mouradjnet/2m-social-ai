@@ -299,6 +299,9 @@ GET    /api/v1/projects/{project}/publications        histórico (100 mais recen
 GET    /api/v1/publications/{publication}             com attempts_log
 POST   /api/v1/publications/{publication}/retry       falhou → remarca a peça para agora (editor+)
 POST   /api/v1/publications/{publication}/resolve     { outcome: published|failed, permalink? } — só `unknown` (reviewer+)
+
+# Registro de atividade (qualquer membro)
+GET    /api/v1/projects/{project}/activity            50 mais recentes: instagram.connected|disconnected, publication.resolved, asset.deleted
 ```
 
 **Aprovar** (`PATCH /contents/{id} {status: approved}` a partir de `review`) exige `reviewer`+ e grava `approved_by`/`approved_at`. Com publicação em andamento (`pending`/`publishing`/`unknown`), a peça não muda de status nem de hora (`409`).

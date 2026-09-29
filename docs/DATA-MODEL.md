@@ -278,9 +278,9 @@ Tabela central da camada de IA. Toda chamada a um modelo passa por aqui.
 > **LGPD:** `input` e `output` contêm texto do usuário. Job agendado purga registros com mais de 90 dias. Definir antes do primeiro usuário real.
 
 ### `activity_logs`
-`workspace_id`, `user_id` **not null**, `subject_type`, `subject_id`, `action`, `meta` jsonb, `created_at`.
+`workspace_id`, `project_id` (nullable, desde `2026_09_29_010000`), `user_id` **not null**, `subject_type`, `subject_id`, `action`, `meta` jsonb, `created_at`. Índice `(project_id, id)`.
 
-Alimenta "Atividades recentes" do Dashboard. `user_id` é obrigatório de propósito: **não existe ator "sistema"** (ADR-11). Toda linha do feed tem um humano responsável.
+Guarda os gestos humanos que não deixam rastro em outra tabela: `instagram.connected`, `instagram.disconnected`, `publication.resolved`, `asset.deleted` (`ActivityLog::record`). Aprovar, mover no fluxo e falar com a Meta **não** entram aqui — já vivem em `contents.approved_by`, `content_revisions` e `publication_attempts`. A tela Instagram do projeto mostra as 50 mais recentes. `user_id` é obrigatório de propósito: **não existe ator "sistema"** (ADR-11). Toda linha do feed tem um humano responsável.
 
 ### `notifications`
 Tabela padrão do Laravel (`notifications`), com `notifiable_type/id`.

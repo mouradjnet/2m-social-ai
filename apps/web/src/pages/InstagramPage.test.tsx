@@ -4,7 +4,7 @@ import { HttpResponse, http } from 'msw'
 import { expect, test, vi } from 'vitest'
 import { server } from '@/test/server'
 import { renderWithProviders } from '@/test/utils'
-import type { InstagramAccount, Publication } from '@/lib/types'
+import type { ActivityEntry, InstagramAccount, Publication } from '@/lib/types'
 import { navegar } from '@/lib/navegar'
 import { InstagramPage } from './InstagramPage'
 
@@ -51,10 +51,11 @@ function publicacao(overrides: Partial<Publication>): Publication {
   }
 }
 
-function servidor(account: InstagramAccount | null, publicacoes: Publication[] = []) {
+function servidor(account: InstagramAccount | null, publicacoes: Publication[] = [], atividade: ActivityEntry[] = []) {
   server.use(
     http.get('/api/v1/projects/1/instagram', () => HttpResponse.json({ data: account })),
     http.get('/api/v1/projects/1/publications', () => HttpResponse.json({ data: publicacoes })),
+    http.get('/api/v1/projects/1/activity', () => HttpResponse.json({ data: atividade })),
   )
 }
 
@@ -191,4 +192,28 @@ test('resultado desconhecido parado pede a decisao humana, sem "tentar de novo"'
 
   await userEvent.setup().click(screen.getByRole('button', { name: 'Está no ar' }))
   await vi.waitFor(() => expect(decisao).toEqual({ outcome: 'published' }))
+})
+
+test('atividade mostra quem fez cada gesto, em portugues', async () => {
+  const gesto = (id: number, action: string, meta: Record<string, string>): ActivityEntry => ({
+    id,
+    action,
+    subject_type: 'X',
+    subject_id: 1,
+    meta,
+    created_at: '2026-09-29T12:00:00Z',
+    user: { id: 1, name: 'Djair' },
+  })
+  servidor(conta(), [], [
+    gesto(3, 'publication.resolved', { outcome: 'published', content_title: 'Menopausa' }),
+    gesto(2, 'asset.deleted', { original_name: 'capa.jpg' }),
+    gesto(1, 'instagram.disconnected', { username: 'conta_de_teste' }),
+  ])
+
+  renderWithProviders(<InstagramPage />, ROUTE)
+
+  const secao = await screen.findByRole('region', { name: 'Atividade' })
+  expect(within(secao).getByText(/Djair decidiu que "Menopausa" está no ar/)).toBeInTheDocument()
+  expect(within(secao).getByText(/Djair removeu a imagem capa.jpg/)).toBeInTheDocument()
+  expect(within(secao).getByText(/Djair desconectou @conta_de_teste/)).toBeInTheDocument()
 })
