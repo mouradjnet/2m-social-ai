@@ -397,5 +397,13 @@ social-vendas-app — o `proxy_pass http://app:8080` caía no outro sistema. Fix
 `f526ec7` (apelido `social-ai-app`; a auditoria lista apelidos). Etapas A/B/C
 rodadas pelo responsável (o auto mode barra mexer no nginx do 2M Prev); certificado
 até 28/12/2026. `.env` e 1º backup copiados para `E:ackupsm-social-ai\`.
-Falta: login + imagem pública em `/storage`, restauração testada, app da Meta.
+Falta: login + imagem pública em `/storage`, app da Meta.
+
+**Restauração testada (29/09/2026):** backup `20260929-1730` feito na VPS, copiado
+para `E:\backups\2m-social-ai\vps\` e restaurado com as opções do `restore.sh`
+(`--clean --if-exists --no-owner`, mais `--exit-on-error`) num banco descartável do
+PG16 local: zero erros, contagem das 37 tabelas idêntica à de produção, 35
+migrations aplicadas e nenhuma pendente. O `APP_KEY` da cópia em `vps-segredos\`
+bate com o da VPS (hash). Não provado: imagens (o tar ainda só tem o `.gitignore`)
+e decifrar token do Instagram (não há conexão real); refazer quando houver.
 
