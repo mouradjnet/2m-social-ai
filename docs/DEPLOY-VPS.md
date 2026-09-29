@@ -173,14 +173,14 @@ O worker termina o job em andamento antes de sair; uma publicação interrompida
 ## Checklist de deploy
 
 - [x] Auditoria rodada e lida (29/09/2026)
-- [ ] DNS de `2msocialai.site` e `www` apontado para a VPS
-- [ ] `deploy/vps/.env` preenchido, `chmod 600`; `APP_KEY` e `DB_PASSWORD` guardados fora da VPS
-- [ ] `docker compose config --quiet` sem erro; `docker compose build app` ok
-- [ ] `docker compose up -d`; todos `healthy`; `status.sh` mostra `/up` 200
-- [ ] Etapa A (ensaio → restart) e 2M Prev + Social Vendas no ar
-- [ ] Etapa B (certificado, `--dry-run` antes)
-- [ ] Etapa C (ensaio → restart) e os três sites no ar
-- [ ] `https://2msocialai.site/up` 200; login; imagem em `/storage/...` abre em janela anônima
-- [ ] Backup manual rodado; arquivo copiado para fora da VPS
+- [x] DNS de `2msocialai.site` (A) e `www` (CNAME) apontado para a VPS (29/09/2026)
+- [x] `deploy/vps/.env` preenchido, `chmod 600`; `APP_KEY` e `DB_PASSWORD` guardados fora da VPS
+- [x] `docker compose config --quiet` sem erro; `docker compose build app` ok
+- [x] `docker compose up -d`; todos `healthy` (depois do fix do apelido `social-ai-app`)
+- [x] Etapa A (ensaio → restart) e 2M Prev + Social Vendas no ar
+- [x] Etapa B (certificado, `--dry-run` antes) — vence em 28/12/2026, renovação pelo loop do certbot do 2M Prev
+- [x] Etapa C (ensaio → restart) e os três sites no ar
+- [ ] `https://2msocialai.site/up` 200 ✔; falta: login; imagem em `/storage/...` abre em janela anônima
+- [x] Backup manual rodado; arquivo copiado para fora da VPS (`E:ackupsm-social-aips`)
 - [ ] Restauração testada numa cópia
 - [ ] Só então: app da Meta, `INSTAGRAM_DRIVER=graph`, e a conexão do @2msaudefeminina (`docs/PILOTO-2M-SAUDE-FEMININA.md`)

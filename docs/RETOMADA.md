@@ -387,3 +387,15 @@ por formato + os 3 melhores posts, sem a lista post a post), só com o mesmo mí
 agente `results` (3 posts medidos). O prompt trata como pista, não prova; o pilar
 mais atrasado continua com horário garantido pelo `validate()`. Não há guard que
 confira a preferência por formato — preferência não é verificável; só o prompt.
+
+## Deploy na VPS (2026-09-29)
+
+No ar em **https://2msocialai.site** (stack `/opt/2m-social-ai`, `AI_PROVIDER=mock`,
+`INSTAGRAM_DRIVER=fake`, cadastro só do responsável). Achado no deploy: o nginx da
+stack está também na `2m-prev_internal`, onde `app` é o apelido do
+social-vendas-app — o `proxy_pass http://app:8080` caía no outro sistema. Fix
+`f526ec7` (apelido `social-ai-app`; a auditoria lista apelidos). Etapas A/B/C
+rodadas pelo responsável (o auto mode barra mexer no nginx do 2M Prev); certificado
+até 28/12/2026. `.env` e 1º backup copiados para `E:ackupsm-social-ai\`.
+Falta: login + imagem pública em `/storage`, restauração testada, app da Meta.
+
