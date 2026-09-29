@@ -239,3 +239,66 @@ test('reaproveitar pede outro formato e nao deixa repetir o mesmo', async () => 
   await user.click(botao)
   expect(onRepurpose).toHaveBeenCalledWith({ format: 'reel', channel: 'instagram' })
 })
+
+test('carrossel: monta os slides na ordem e salva a ordem escolhida', async () => {
+  const outra: Asset = { ...foto, id: 10, original_name: 'outra.jpg', url: 'https://x.test/storage/media/outra.jpg' }
+  const terceira: Asset = { ...foto, id: 11, original_name: 'terceira.jpg', url: 'https://x.test/storage/media/3.jpg' }
+  let slides: unknown = null
+  server.use(
+    http.get('/api/v1/projects/1/assets', () => HttpResponse.json({ data: [foto, outra, terceira] })),
+    http.get('/api/v1/projects/1/instagram', () => HttpResponse.json({ data: null })),
+    http.patch('/api/v1/contents/1/draft', () => HttpResponse.json({ data: peca() })),
+    http.put('/api/v1/contents/1/slides', async ({ request }) => {
+      slides = await request.json()
+      return HttpResponse.json({ data: peca() })
+    }),
+  )
+
+  renderWithProviders(
+    <PublicationEditor projectId="1" content={peca({ format: 'carousel', slides: [] })} onClose={() => {}} />,
+    ROUTE,
+  )
+  const user = userEvent.setup()
+
+  expect(await screen.findByText('O Instagram exige pelo menos 2 imagens.')).toBeInTheDocument()
+  await user.click(await screen.findByRole('button', { name: 'Adicionar foto.jpg' }))
+  await user.click(screen.getByRole('button', { name: 'Adicionar outra.jpg' }))
+  await user.click(screen.getByRole('button', { name: 'Adicionar terceira.jpg' }))
+  // A terceira passa para o comeco.
+  await user.click(screen.getByRole('button', { name: 'Subir slide 3' }))
+  await user.click(screen.getByRole('button', { name: 'Subir slide 2' }))
+
+  expect(screen.getByRole('figure', { name: 'Prévia do post' })).toHaveTextContent('Carrossel · 3 imagens')
+  expect(screen.getByRole('img', { name: 'Imagem do post' })).toHaveAttribute('src', terceira.url)
+
+  await user.click(screen.getByRole('button', { name: 'Salvar' }))
+  await vi.waitFor(() => expect(slides).toEqual({ asset_ids: [11, 9, 10] }))
+})
+
+test('reel: escolhe o video, a imagem vira capa e a previa mostra o video', async () => {
+  const reel: Asset = { ...foto, id: 20, type: 'video', mime: 'video/mp4', original_name: 'reel.mp4', duration_ms: 20_000, url: 'https://x.test/storage/media/reel.mp4' }
+  let video: unknown = null
+  server.use(
+    http.get('/api/v1/projects/1/assets', () => HttpResponse.json({ data: [foto, reel] })),
+    http.get('/api/v1/projects/1/instagram', () => HttpResponse.json({ data: null })),
+    http.patch('/api/v1/contents/1/draft', () => HttpResponse.json({ data: peca() })),
+    http.put('/api/v1/contents/1/video', async ({ request }) => {
+      video = await request.json()
+      return HttpResponse.json({ data: peca() })
+    }),
+  )
+
+  renderWithProviders(<PublicationEditor projectId="1" content={peca({ format: 'reel' })} onClose={() => {}} />, ROUTE)
+  const user = userEvent.setup()
+
+  expect(await screen.findByText('Capa do Reel (opcional)')).toBeInTheDocument()
+  expect(screen.getByText('Sem vídeo. O Reel não é publicado sem vídeo.')).toBeInTheDocument()
+  // O video nao aparece como opcao de imagem.
+  expect(screen.queryByRole('button', { name: 'reel.mp4' })).not.toBeInTheDocument()
+
+  await user.click(await screen.findByRole('button', { name: /reel\.mp4 · 20 s/ }))
+  expect(screen.getByLabelText('Vídeo do Reel')).toHaveAttribute('src', reel.url)
+
+  await user.click(screen.getByRole('button', { name: 'Salvar' }))
+  await vi.waitFor(() => expect(video).toEqual({ asset_id: 20 }))
+})

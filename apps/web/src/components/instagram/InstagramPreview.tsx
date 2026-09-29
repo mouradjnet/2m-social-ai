@@ -7,13 +7,17 @@ interface Props {
   content: Pick<Content, 'caption' | 'cta' | 'hashtags'>
   imageUrl: string | null
   username: string | null
+  /** Reel: o video (a imagem vira o poster). `undefined` = nao e Reel. */
+  videoUrl?: string | null
+  /** "Carrossel · 3 imagens", "Reel". */
+  badge?: string
 }
 
 /**
  * A previa do post como aparece no feed: imagem, @ e a legenda cortada em "mais". Nao
  * imita a marca do Instagram — mostra o que vai ao ar, e o que falta para ir.
  */
-export function InstagramPreview({ content, imageUrl, username }: Props) {
+export function InstagramPreview({ content, imageUrl, username, videoUrl, badge }: Props) {
   const [inteira, setInteira] = useState(false)
   const legenda = composeCaption(content)
   const passou = legenda.length > CAPTION_MAX
@@ -30,7 +34,25 @@ export function InstagramPreview({ content, imageUrl, username }: Props) {
         <span className="text-label-md text-on-surface">{username ? `@${username}` : 'Conta não conectada'}</span>
       </div>
 
-      {imageUrl ? (
+      {badge && <p className="text-label-sm text-on-surface-variant px-3 pb-2">{badge}</p>}
+
+      {videoUrl !== undefined ? (
+        videoUrl ? (
+          <video
+            src={videoUrl}
+            poster={imageUrl ?? undefined}
+            aria-label="Vídeo do Reel"
+            className="aspect-[9/16] max-h-[28rem] w-full bg-black object-contain"
+            controls
+            muted
+            preload="metadata"
+          />
+        ) : (
+          <div className="bg-surface-container text-body-sm text-on-surface-variant flex aspect-[9/16] max-h-[28rem] w-full items-center justify-center p-6 text-center">
+            Sem vídeo. O Reel não é publicado sem vídeo.
+          </div>
+        )
+      ) : imageUrl ? (
         <img src={imageUrl} alt="Imagem do post" className="aspect-square w-full object-cover" />
       ) : (
         <div className="bg-surface-container text-body-sm text-on-surface-variant flex aspect-square w-full items-center justify-center p-6 text-center">

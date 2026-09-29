@@ -305,3 +305,30 @@ sugestão e agendar continua exigindo aprovação.
 `Http::fake`; o preço por imagem (`IMAGE_COST_CENTS=5`) é estimativa a conferir na
 tabela do provedor. Os agentes novos nunca rodaram com a API real da Anthropic (o
 `AI_PROVIDER` fica `mock` local).
+
+## Etapa 3 — Carrosséis e Reels (2026-09-29)
+
+**Limitações validadas antes de escrever código** (documentação da Meta — *Content
+Publishing* e *IG User Media* —, consultada em 29/09/2026):
+
+| | Regra da Meta | Onde o sistema confere |
+|---|---|---|
+| Carrossel | 2 a 10 itens; cada item é um container `is_carousel_item`; o carrossel (`media_type=CAROUSEL`, `children`) leva a legenda; recorte pelo 1º item; **conta como um post** | `PUT /slides` (máx. 10, só imagens do projeto) e `Dispatcher` (2 a 10) |
+| Reel | `media_type=REELS` + `video_url`; MP4/MOV com moov no início e sem edit list; H.264/HEVC; AAC; 3 s a 15 min; até 1920 px de largura; até 300 MB; capa JPEG opcional (`cover_url`); `share_to_feed` | `Mp4Inspector` + `VideoRules` no **upload**; `Dispatcher` exige o vídeo |
+| Processamento | O container de vídeo fica `IN_PROGRESS`; a Meta recomenda consultar 1×/min | `max_container_polls_video = 30` |
+| Cota | 100 posts por 24 h | já conferida antes de cada container (Fase 4) |
+| Permissões | `instagram_business_basic` + `instagram_business_content_publish` — as mesmas | nada novo a pedir no app da Meta |
+
+| Sub-etapa | Commit | O quê |
+|---|---|---|
+| 3a | `70af28c` | Vídeo na biblioteca, conferido no upload, guardado sem reencodar. **Defeito latente corrigido:** o PHP da imagem Docker ficava nos 2 MB padrão (`docker/php-uploads.ini`). |
+| 3b | `0869c5f` | `content_slides`, `contents.video_asset_id`, `publications.media_type/media`; publicador cria itens + carrossel ou o container de Reel. Formato não publicável (story, vídeo, artigo...) nasce `failed` com o motivo — antes saía como post de imagem. |
+| 3c | este commit | Editor: slides em ordem (↑ ↓ ✕), vídeo do Reel e capa, prévia com vídeo e selo do formato; biblioteca mostra vídeo e duração. |
+
+**Fora desta versão (registrado):** carrossel misto com vídeo; Stories (a API os
+aceita, mas não entraram no escopo); legenda por slide (a Meta não tem). O que a
+estrutura do arquivo não revela (GOP fechado, bitrate real, 4:2:0) fica com a Meta:
+o container volta `ERROR` e o histórico mostra.
+
+**Não verificado de ponta a ponta:** nenhuma publicação real de carrossel ou Reel —
+depende do app da Meta e da conta conectada (bloqueio da Etapa 1).

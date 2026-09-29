@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { SlidesPicker, VideoPicker } from '@/components/content/MediaPickers'
 import { InstagramPreview } from '@/components/instagram/InstagramPreview'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
@@ -59,6 +60,10 @@ export function PublicationEditor({ projectId, content, onClose, onGenerateImage
   const [imageId, setImageId] = useState<number | null>(content.image?.id ?? content.image_asset_id ?? null)
   const imagemDoServidor = content.image?.id ?? content.image_asset_id ?? null
   const [when, setWhen] = useState('')
+  const slidesDoServidor = (content.slides ?? []).map((a) => a.id)
+  const [slideIds, setSlideIds] = useState<number[]>(slidesDoServidor)
+  const videoDoServidor = content.video?.id ?? content.video_asset_id ?? null
+  const [videoId, setVideoId] = useState<number | null>(videoDoServidor)
   const [formato, setFormato] = useState<ContentFormat>(content.format === 'carousel' ? 'reel' : 'carousel')
   const [canal, setCanal] = useState<ContentChannel>(content.channel)
 
@@ -94,6 +99,14 @@ export function PublicationEditor({ projectId, content, onClose, onGenerateImage
           body: JSON.stringify({ asset_id: imageId }),
         })
       }
+
+      if (content.format === 'carousel' && slideIds.join(',') !== slidesDoServidor.join(',')) {
+        await api(`/contents/${content.id}/slides`, { method: 'PUT', body: JSON.stringify({ asset_ids: slideIds }) })
+      }
+
+      if (content.format === 'reel' && videoId !== videoDoServidor) {
+        await api(`/contents/${content.id}/video`, { method: 'PUT', body: JSON.stringify({ asset_id: videoId }) })
+      }
     },
     onSuccess: async () => {
       await invalidate()
@@ -115,7 +128,12 @@ export function PublicationEditor({ projectId, content, onClose, onGenerateImage
 
   // A imagem do post (ou a capa do Reel) so pode ser imagem.
   const lista = (assets.data?.data ?? []).filter((a) => a.type !== 'video')
+  const videos = (assets.data?.data ?? []).filter((a) => a.type === 'video')
   const imagem = lista.find((a) => a.id === imageId) ?? content.image ?? null
+  const carrossel = content.format === 'carousel'
+  const reel = content.format === 'reel'
+  const primeiroSlide = lista.find((a) => a.id === slideIds[0]) ?? content.slides?.[0] ?? null
+  const video = videos.find((v) => v.id === videoId) ?? content.video ?? null
   const tags = parseHashtags(hashtags)
 
   return (
@@ -162,8 +180,12 @@ export function PublicationEditor({ projectId, content, onClose, onGenerateImage
             onChange={(e) => setHashtags(e.target.value)}
           />
 
-          <fieldset disabled={!editavel}>
-            <legend className="text-label-md text-on-surface">Imagem</legend>
+          {carrossel && <SlidesPicker images={lista} value={slideIds} onChange={setSlideIds} disabled={!editavel} />}
+
+          {reel && <VideoPicker videos={videos} value={videoId} onChange={setVideoId} disabled={!editavel} />}
+
+          <fieldset disabled={!editavel} hidden={carrossel}>
+            <legend className="text-label-md text-on-surface">{reel ? 'Capa do Reel (opcional)' : 'Imagem'}</legend>
 
             {onGenerateImage && (
               <div className="mt-2 flex flex-wrap items-center gap-3">
@@ -311,7 +333,9 @@ export function PublicationEditor({ projectId, content, onClose, onGenerateImage
 
         <InstagramPreview
           content={{ caption, cta, hashtags: tags }}
-          imageUrl={imagem?.url ?? null}
+          imageUrl={carrossel ? (primeiroSlide?.url ?? null) : (imagem?.url ?? null)}
+          videoUrl={reel ? (video?.url ?? null) : undefined}
+          badge={carrossel ? `Carrossel · ${slideIds.length} ${slideIds.length === 1 ? 'imagem' : 'imagens'}` : reel ? 'Reel' : undefined}
           username={conta.data?.data?.username ?? null}
         />
       </div>

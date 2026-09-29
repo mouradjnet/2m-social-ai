@@ -167,6 +167,11 @@ export interface Content {
   planned_for?: string | null
   /** A peca de onde esta foi reaproveitada (repurposer). */
   repurposed_from_id?: number | null
+  /** Carrossel: as imagens, na ordem (2 a 10). */
+  slides?: Asset[]
+  /** Reel: o video. A `image` e a capa. */
+  video_asset_id?: number | null
+  video?: Asset | null
 }
 
 export interface PillarAdherence {
