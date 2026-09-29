@@ -22,6 +22,7 @@ const FRASES: Record<string, string> = {
   reviewer: 'Revisando suas peças…',
   analytics: 'Analisando seu calendário…',
   rewriter: 'Reescrevendo a peça reprovada…',
+  image: 'Desenhando a imagem da peça…',
 }
 
 const GENERICO = 'Gerando…'

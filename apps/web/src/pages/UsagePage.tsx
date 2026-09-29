@@ -15,6 +15,7 @@ const AGENTES: Record<string, string> = {
   seo: 'SEO',
   analytics: 'Insights',
   rewriter: 'Reescrita',
+  image: 'Imagens',
 }
 
 /** Centavos de dolar -> "US$ 0,19". */

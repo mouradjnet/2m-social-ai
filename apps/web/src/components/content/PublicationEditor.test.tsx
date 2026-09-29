@@ -1,6 +1,7 @@
 import { screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { HttpResponse, http } from 'msw'
+import { useState } from 'react'
 import { expect, test, vi } from 'vitest'
 import { server } from '@/test/server'
 import { renderWithProviders } from '@/test/utils'
@@ -132,4 +133,65 @@ test('peca aprovada fica somente leitura, mostra quem aprovou e agenda', async (
   await user.click(screen.getByRole('button', { name: 'Agendar' }))
 
   await vi.waitFor(() => expect(agendado).toEqual({ scheduled_for: '2026-10-01T08:30' }))
+})
+
+test('gerar imagem com IA pede a geracao so quando ha prompt', async () => {
+  servidor()
+  const onGenerateImage = vi.fn()
+
+  const { unmount } = renderWithProviders(
+    <PublicationEditor projectId="1" content={peca()} onClose={() => {}} onGenerateImage={onGenerateImage} />,
+    ROUTE,
+  )
+  expect(await screen.findByRole('button', { name: 'Gerar imagem com IA' })).toBeDisabled()
+  unmount()
+
+  renderWithProviders(
+    <PublicationEditor
+      projectId="1"
+      content={peca({ image_prompt: 'A calm flat illustration' })}
+      onClose={() => {}}
+      onGenerateImage={onGenerateImage}
+    />,
+    ROUTE,
+  )
+  await userEvent.setup().click(await screen.findByRole('button', { name: 'Gerar imagem com IA' }))
+  expect(onGenerateImage).toHaveBeenCalledOnce()
+})
+
+test('imagem desenhada pela IA vira a selecao, e salvar nao a desfaz', async () => {
+  servidor()
+  let trocouImagem = 0
+  server.use(
+    http.patch('/api/v1/contents/1/draft', () => HttpResponse.json({ data: peca() })),
+    http.put('/api/v1/contents/1/image', () => {
+      trocouImagem++
+      return HttpResponse.json({ data: peca() })
+    }),
+  )
+
+  // A pagina rele a peca quando a geracao termina; aqui, um botao faz esse papel.
+  function Pagina() {
+    const [content, setContent] = useState(peca({ image_prompt: 'x' }))
+
+    return (
+      <>
+        <button type="button" onClick={() => setContent(peca({ image_prompt: 'x', image_asset_id: 9, image: foto }))}>
+          geracao terminou
+        </button>
+        <PublicationEditor projectId="1" content={content} onClose={() => {}} onGenerateImage={() => {}} />
+      </>
+    )
+  }
+
+  renderWithProviders(<Pagina />, ROUTE)
+  const user = userEvent.setup()
+  await screen.findByRole('button', { name: 'foto.jpg' })
+
+  await user.click(screen.getByRole('button', { name: 'geracao terminou' }))
+  expect(screen.getByRole('button', { name: 'foto.jpg' })).toHaveAttribute('aria-pressed', 'true')
+
+  await user.click(screen.getByRole('button', { name: 'Salvar' }))
+  await vi.waitFor(() => expect(screen.getByRole('button', { name: 'Salvar' })).toBeEnabled())
+  expect(trocouImagem).toBe(0)
 })

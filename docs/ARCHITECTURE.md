@@ -134,6 +134,25 @@ O spec pede "Laravel 12 (API REST)". O instalador entrega **13.19** — o spec d
 
 **Segurança:** o `state` do OAuth é aleatório (32 bytes), de uso único, expira em 10 minutos e está amarrado a quem pediu e ao projeto — sem isso, um callback forjado plantaria a conta de outra pessoa no projeto. O papel é conferido de novo na volta. O token é criptografado com o cast `encrypted` (depende do `APP_KEY`: trocar a chave sem `APP_PREVIOUS_KEYS` desconecta as contas), fica fora de todo JSON, e as mensagens de erro passam por um filtro que troca `access_token=` por `***`. A senha do Instagram nunca passa pelo sistema.
 
+### ADR-15 — Imagem por IA com provedor trocável, dentro do mesmo orçamento
+A Anthropic não gera imagem; o `LlmProvider` não serve. Um `ImageProvider` separado (`app/Ai/Images/`) recebe o `image_prompt` que o diretor de arte já escreve e devolve **bytes** — nada mais sai dele.
+
+| Opção | A favor | Contra |
+|---|---|---|
+| **OpenAI Images API** (`gpt-image-1`) ✅ primeiro adaptador | Resposta em base64 (sem URL temporária para buscar), filtro de conteúdo com código de erro próprio, preço por imagem | Mais uma chave e um fornecedor |
+| Google (Imagen/Gemini) | Qualidade comparável | Mesmo custo de integração; fica como segundo adaptador se preciso |
+| Replicate / fal | Muitos modelos | Latência e preço variam por modelo; mais um intermediário |
+
+**Decidido:** interface + `fake` (padrão; desenha uma imagem lisa sem rede, custo 0) + `openai`. Trocar de provedor é escrever um adaptador e mudar `IMAGE_PROVIDER` — o resto só vê bytes.
+
+**Regras que valem para qualquer provedor:**
+1. A imagem entra na biblioteca pelo **mesmo `ImageProcessor` do upload**: JPEG, proporção do Instagram, sem metadado. Imagem fora da proporção é recusada (e fica cobrada: o provedor já cobrou).
+2. **Só é anexada à peça se ela ainda não foi aprovada** — relido na hora de gravar, porque alguém pode aprovar durante a geração. Se foi, a imagem fica só na biblioteca (ADR-13).
+3. Grava em `ai_runs` com `agent = image`: **mesmo orçamento** (402), mesma trava de concorrência por projeto (409), mesma tela de consumo. O custo por imagem é **configurado** (`IMAGE_COST_CENTS`), porque a API cobra por imagem e não devolve o valor — conferir a tabela do provedor antes de ligar.
+4. Filtro de conteúdo do provedor vira `error_code = refused` (o prompt é que precisa mudar; a tela não oferece "tentar de novo").
+
+**Bloqueio registrado:** não há `OPENAI_API_KEY` no projeto. O adaptador é exercitado só com `Http::fake`; a primeira imagem real depende da chave e do aceite do responsável.
+
 ## 3. Camadas
 
 ```

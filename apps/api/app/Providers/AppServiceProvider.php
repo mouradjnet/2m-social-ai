@@ -5,6 +5,9 @@ namespace App\Providers;
 use Anthropic\Client;
 use App\Ai\Agents\CopywriterAgent;
 use App\Ai\Exceptions\LlmFailedException;
+use App\Ai\Images\FakeImageProvider;
+use App\Ai\Images\ImageProvider;
+use App\Ai\Images\OpenAiImageProvider;
 use App\Ai\Providers\AnthropicProvider;
 use App\Ai\Providers\LlmProvider;
 use App\Ai\Providers\MockProvider;
@@ -43,6 +46,20 @@ class AppServiceProvider extends ServiceProvider
             ),
             'fake' => new FakeInstagramGateway,
             default => throw new \RuntimeException('INSTAGRAM_DRIVER invalido: '.config('instagram.driver')),
+        });
+
+        // ADR-15: `fake` por padrao; `openai` so com a chave, sem a qual nem monta.
+        $this->app->bind(ImageProvider::class, fn () => match (config('images.provider')) {
+            'openai' => new OpenAiImageProvider(
+                (string) config('images.openai.api_key') ?: throw new \RuntimeException('OPENAI_API_KEY nao configurado.'),
+                (string) config('images.openai.model'),
+                (string) config('images.openai.size'),
+                (string) config('images.openai.quality'),
+                (int) config('images.openai.timeout_seconds'),
+                (int) config('images.cost_cents_per_image'),
+            ),
+            'fake' => new FakeImageProvider,
+            default => throw new \RuntimeException('IMAGE_PROVIDER invalido: '.config('images.provider')),
         });
 
         // O batch_size do copywriter e canonico no config; injetado aqui para

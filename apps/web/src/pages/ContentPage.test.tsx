@@ -249,7 +249,7 @@ test('agendar: manda a janela para schedule:generate, não para copy:generate', 
   expect((recebido as { starts_on: string }).starts_on).toMatch(/^\d{4}-\d{2}-\d{2}$/)
 })
 
-test('gerar imagens: manda POST para design:generate', async () => {
+test('gerar prompts de imagem: manda POST para design:generate', async () => {
   const user = setup()
   let chamado = false
 
@@ -267,19 +267,19 @@ test('gerar imagens: manda POST para design:generate', async () => {
 
   renderWithProviders(<ContentPage />, ROUTE)
 
-  await user.click(await screen.findByRole('button', { name: /gerar imagens \(1\)/i }))
+  await user.click(await screen.findByRole('button', { name: /gerar prompts de imagem \(1\)/i }))
 
   await waitFor(() => expect(chamado).toBe(true))
 })
 
-test('sem peça em produção o botão de gerar imagens fica desabilitado', async () => {
+test('sem peça em produção o botão de gerar prompts de imagem fica desabilitado', async () => {
   server.use(
     http.get('/api/v1/projects/1/contents', () => HttpResponse.json({ data: [content(1, 'idea')] })),
   )
 
   renderWithProviders(<ContentPage />, ROUTE)
 
-  expect(await screen.findByRole('button', { name: /gerar imagens \(0\)/i })).toBeDisabled()
+  expect(await screen.findByRole('button', { name: /gerar prompts de imagem \(0\)/i })).toBeDisabled()
 })
 
 test('otimizar SEO: manda POST para seo:generate', async () => {

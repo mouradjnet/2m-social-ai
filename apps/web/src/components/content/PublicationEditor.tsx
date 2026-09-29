@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { InstagramPreview } from '@/components/instagram/InstagramPreview'
 import { Button } from '@/components/ui/Button'
@@ -15,6 +15,9 @@ interface Props {
   projectId: string
   content: Content
   onClose: () => void
+  /** Gera a imagem por IA a partir do `image_prompt` (ADR-15). A execucao e da pagina. */
+  onGenerateImage?: () => void
+  generatingImage?: boolean
 }
 
 /** Depois de aprovada, a peca tem o texto e a imagem congelados (ADR-13). */
@@ -24,7 +27,7 @@ const EDITAVEIS: Content['status'][] = ['idea', 'production', 'review']
  * O editor de publicacao: texto, imagem e a previa do post, lado a lado. Aprovada, a
  * peca vira somente leitura — o que muda e so a data, e agendar e feito aqui.
  */
-export function PublicationEditor({ projectId, content, onClose }: Props) {
+export function PublicationEditor({ projectId, content, onClose, onGenerateImage, generatingImage = false }: Props) {
   const queryClient = useQueryClient()
   const editavel = EDITAVEIS.includes(content.status)
 
@@ -33,6 +36,7 @@ export function PublicationEditor({ projectId, content, onClose }: Props) {
   const [cta, setCta] = useState(content.cta ?? '')
   const [hashtags, setHashtags] = useState(content.hashtags.join(' '))
   const [imageId, setImageId] = useState<number | null>(content.image?.id ?? content.image_asset_id ?? null)
+  const imagemDoServidor = content.image?.id ?? content.image_asset_id ?? null
   const [when, setWhen] = useState('')
 
   const assets = useQuery({
@@ -47,6 +51,13 @@ export function PublicationEditor({ projectId, content, onClose }: Props) {
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ['contents', projectId] })
 
+  // A imagem mudou no servidor (a IA desenhou uma): a selecao acompanha, e a
+  // biblioteca e relida. Sem isto, "Salvar" mandaria de volta a imagem antiga.
+  useEffect(() => {
+    setImageId(imagemDoServidor)
+    void queryClient.invalidateQueries({ queryKey: ['assets', projectId] })
+  }, [imagemDoServidor, projectId, queryClient])
+
   const salvar = useMutation({
     mutationFn: async () => {
       await api(`/contents/${content.id}/draft`, {
@@ -54,7 +65,7 @@ export function PublicationEditor({ projectId, content, onClose }: Props) {
         body: JSON.stringify({ title, caption, cta, hashtags: parseHashtags(hashtags) }),
       })
 
-      if (imageId !== (content.image?.id ?? content.image_asset_id ?? null)) {
+      if (imageId !== imagemDoServidor) {
         await api(`/contents/${content.id}/image`, {
           method: 'PUT',
           body: JSON.stringify({ asset_id: imageId }),
@@ -129,6 +140,24 @@ export function PublicationEditor({ projectId, content, onClose }: Props) {
 
           <fieldset disabled={!editavel}>
             <legend className="text-label-md text-on-surface">Imagem</legend>
+
+            {onGenerateImage && (
+              <div className="mt-2 flex flex-wrap items-center gap-3">
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  disabled={!content.image_prompt || generatingImage}
+                  onClick={onGenerateImage}
+                >
+                  {generatingImage ? 'Gerando imagem…' : 'Gerar imagem com IA'}
+                </Button>
+                <span className="text-body-sm text-on-surface-variant">
+                  {content.image_prompt
+                    ? 'Usa o prompt do diretor de arte. A imagem entra na biblioteca e fica selecionada.'
+                    : 'Sem prompt de imagem: rode "Gerar prompts de imagem" com a peça em Produção.'}
+                </span>
+              </div>
+            )}
 
             {lista.length === 0 ? (
               <p className="text-body-sm text-on-surface-variant mt-2">

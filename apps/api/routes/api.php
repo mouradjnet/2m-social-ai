@@ -11,6 +11,7 @@ use App\Http\Controllers\Api\V1\ContentImageController;
 use App\Http\Controllers\Api\V1\CopyController;
 use App\Http\Controllers\Api\V1\DesignController;
 use App\Http\Controllers\Api\V1\ExportController;
+use App\Http\Controllers\Api\V1\ImageGenerationController;
 use App\Http\Controllers\Api\V1\InstagramController;
 use App\Http\Controllers\Api\V1\InvitationController;
 use App\Http\Controllers\Api\V1\ProjectController;
@@ -88,6 +89,8 @@ Route::prefix('v1')->group(function () {
         Route::post('projects/{project}/analytics:generate', [AnalyticsController::class, 'generate']);
         // A IA propoe; aplicar e do humano.
         Route::post('contents/{content}/seo:apply', [SeoController::class, 'apply']);
+        // Desenha a imagem da peca a partir do prompt do diretor de arte (ADR-15).
+        Route::post('contents/{content}/image:generate', [ImageGenerationController::class, 'generate']);
         // Conserta a peca reprovada, no lugar. Fecha o ciclo do revisor.
         Route::post('contents/{content}/rewrite:generate', [RewriteController::class, 'generate']);
         Route::get('projects/{project}/contents', [ContentController::class, 'index']);

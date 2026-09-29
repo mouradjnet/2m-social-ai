@@ -301,6 +301,9 @@ GET    /api/v1/publications/{publication}             com attempts_log
 POST   /api/v1/publications/{publication}/retry       falhou → remarca a peça para agora (editor+)
 POST   /api/v1/publications/{publication}/resolve     { outcome: published|failed, permalink? } — só `unknown` (reviewer+)
 
+# Imagem por IA (ADR-15; editor+). 202 + polling em /ai-runs/{id}
+POST   /api/v1/contents/{content}/image:generate      usa o image_prompt; 422 sem prompt ou peça aprovada, 409, 402
+
 # Registro de atividade (qualquer membro)
 GET    /api/v1/projects/{project}/activity            50 mais recentes: instagram.connected|disconnected, publication.resolved, asset.deleted
 ```

@@ -203,7 +203,7 @@ export function ContentPage() {
           disabled={generating || emProducao === 0}
           onClick={() => generate({ endpoint: 'design:generate' })}
         >
-          Gerar imagens ({emProducao})
+          Gerar prompts de imagem ({emProducao})
         </Button>
 
         <Button
@@ -251,6 +251,8 @@ export function ContentPage() {
           projectId={projectId!}
           content={emEdicao}
           onClose={() => setEditando(null)}
+          onGenerateImage={() => generate({ path: `/contents/${emEdicao.id}/image:generate` })}
+          generatingImage={generating}
         />
       )}
 
