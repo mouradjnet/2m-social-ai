@@ -162,6 +162,9 @@ export interface Content {
   image?: Asset | null
   /** A publicacao mais recente no Instagram. */
   latest_publication?: Publication | null
+  /** O plano da semana de onde a peca saiu, e o horario que ele sugeriu (UTC). */
+  content_plan_id?: number | null
+  planned_for?: string | null
 }
 
 export interface PillarAdherence {
@@ -322,4 +325,27 @@ export interface Usage {
   limit_source: 'default' | 'workspace'
   by_agent: { agent: string; runs: number; cost_cents: number }[]
   by_project: { project_id: number | null; name: string | null; runs: number; cost_cents: number }[]
+}
+
+/** Um horario do plano da semana. Data e hora LOCAIS, no fuso do projeto. */
+export interface PlanSlot {
+  date: string
+  time: string
+  pillar: string
+  format: ContentFormat
+  channel: ContentChannel
+  theme: string
+  rationale: string
+}
+
+/** O plano de uma semana, proposto pelo planner (GET /projects/{id}/week-plan). */
+export interface WeekPlan {
+  id: number
+  period_start: string
+  period_end: string
+  posts_count: number
+  distribution: { summary: string; slots: PlanSlot[] }
+  /** Quantas pecas ja foram escritas a partir dele. */
+  contents_count: number
+  created_at: string
 }

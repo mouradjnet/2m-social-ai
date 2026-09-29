@@ -195,3 +195,27 @@ test('imagem desenhada pela IA vira a selecao, e salvar nao a desfaz', async () 
   await vi.waitFor(() => expect(screen.getByRole('button', { name: 'Salvar' })).toBeEnabled())
   expect(trocouImagem).toBe(0)
 })
+
+test('peca aprovada que veio do plano agenda no horario do plano', async () => {
+  servidor()
+  let agendado: unknown = null
+  server.use(
+    http.post('/api/v1/contents/1/schedule', async ({ request }) => {
+      agendado = await request.json()
+      return HttpResponse.json({ data: peca({ status: 'scheduled' }) })
+    }),
+  )
+
+  renderWithProviders(
+    <PublicationEditor
+      projectId="1"
+      content={peca({ status: 'approved', planned_for: '2026-10-06T22:00:00.000000Z' })}
+      onClose={() => {}}
+    />,
+    ROUTE,
+  )
+
+  await userEvent.setup().click(await screen.findByRole('button', { name: /Usar horário do plano/ }))
+
+  await vi.waitFor(() => expect(agendado).toEqual({ scheduled_for: '2026-10-06T22:00:00.000000Z' }))
+})

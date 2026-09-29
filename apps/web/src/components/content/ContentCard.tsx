@@ -123,6 +123,11 @@ export function ContentCard({
         <p className="text-label-sm text-on-surface mt-2">📅 {formatWhen(content.scheduled_for)}</p>
       )}
 
+      {/* O horario que o plano da semana sugeriu. Sugestao: agendar e outro gesto. */}
+      {!content.scheduled_for && content.planned_for && (
+        <p className="text-label-sm text-on-surface-variant mt-2">🗓 Plano: {formatWhen(content.planned_for)}</p>
+      )}
+
       {seo && (
         <div className="border-outline-variant mt-3 rounded border p-2">
           <p className="text-label-sm text-on-surface-variant">

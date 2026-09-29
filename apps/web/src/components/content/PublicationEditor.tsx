@@ -79,10 +79,10 @@ export function PublicationEditor({ projectId, content, onClose, onGenerateImage
   })
 
   const agendar = useMutation({
-    mutationFn: () =>
+    mutationFn: (quando: string) =>
       api(`/contents/${content.id}/schedule`, {
         method: 'POST',
-        body: JSON.stringify({ scheduled_for: when }),
+        body: JSON.stringify({ scheduled_for: quando }),
       }),
     onSuccess: async () => {
       await invalidate()
@@ -218,9 +218,20 @@ export function PublicationEditor({ projectId, content, onClose, onGenerateImage
                 value={when}
                 onChange={(e) => setWhen(e.target.value)}
               />
-              <Button disabled={when === '' || agendar.isPending} onClick={() => agendar.mutate()}>
+              <Button disabled={when === '' || agendar.isPending} onClick={() => agendar.mutate(when)}>
                 Agendar
               </Button>
+
+              {/* A hora vai em UTC com o `Z`: o servidor respeita o offset. */}
+              {content.planned_for && (
+                <Button
+                  variant="secondary"
+                  disabled={agendar.isPending}
+                  onClick={() => agendar.mutate(content.planned_for!)}
+                >
+                  Usar horário do plano ({formatDateTime(content.planned_for)})
+                </Button>
+              )}
 
               {agendar.isError && (
                 <p role="alert" className="text-body-sm text-error w-full">

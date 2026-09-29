@@ -22,6 +22,7 @@ use App\Http\Controllers\Api\V1\ScheduleController;
 use App\Http\Controllers\Api\V1\SeoController;
 use App\Http\Controllers\Api\V1\StrategyController;
 use App\Http\Controllers\Api\V1\UsageController;
+use App\Http\Controllers\Api\V1\WeekPlanController;
 use App\Http\Controllers\Api\V1\WorkspaceController;
 use Illuminate\Support\Facades\Route;
 
@@ -81,6 +82,9 @@ Route::prefix('v1')->group(function () {
         Route::get('projects/{project}/strategies', [StrategyController::class, 'index']);
         Route::post('projects/{project}/strategies:generate', [StrategyController::class, 'generate']);
         Route::post('projects/{project}/copy:generate', [CopyController::class, 'generate']);
+        // O plano da semana (planner): o humano ve dia, hora e tema antes do texto.
+        Route::get('projects/{project}/week-plan', [WeekPlanController::class, 'show']);
+        Route::post('projects/{project}/week-plan:generate', [WeekPlanController::class, 'generate']);
         Route::post('projects/{project}/schedule:generate', [ScheduleController::class, 'generate']);
         Route::post('projects/{project}/review:generate', [ReviewController::class, 'generate']);
         Route::post('projects/{project}/design:generate', [DesignController::class, 'generate']);

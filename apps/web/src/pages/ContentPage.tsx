@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { ContentBoard } from '@/components/content/ContentBoard'
 import { PublicationEditor } from '@/components/content/PublicationEditor'
+import { WeekPlanPanel } from '@/components/content/WeekPlanPanel'
 import { InstagramBanner } from '@/components/instagram/InstagramBanner'
 import { GenerationStatus } from '@/components/strategy/GenerationStatus'
 import { Button } from '@/components/ui/Button'
@@ -236,6 +237,13 @@ export function ContentPage() {
       </div>
 
       <InstagramBanner projectId={projectId!} />
+
+      <WeekPlanPanel
+        projectId={projectId!}
+        generating={generating}
+        onPlan={(body) => generate({ endpoint: 'week-plan:generate', body })}
+        onWrite={(planId) => generate({ body: { content_plan_id: planId } })}
+      />
 
       <GenerationStatus state={state} onRetry={retry} onDismiss={dismiss} />
 

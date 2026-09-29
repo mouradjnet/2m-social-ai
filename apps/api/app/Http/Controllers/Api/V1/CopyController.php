@@ -6,6 +6,7 @@ use App\Ai\Budget;
 use App\Http\Controllers\Controller;
 use App\Jobs\RunAgentJob;
 use App\Models\AiRun;
+use App\Models\ContentPlan;
 use App\Models\Project;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\JsonResponse;
@@ -41,6 +42,34 @@ class CopyController extends Controller
                     'message' => 'Esse pilar não existe na estratégia ativa.',
                     'pillars' => $pilares,
                 ], 422);
+            }
+        }
+
+        // Escrever a partir do plano da semana: uma peca por horario (planner).
+        $planoId = request()->input('content_plan_id');
+        if ($planoId !== null) {
+            if ($pillar !== null) {
+                return response()->json(['message' => 'Com plano, o pilar de cada peça vem do plano.'], 422);
+            }
+
+            $plano = ContentPlan::query()
+                ->whereKey((int) $planoId)
+                ->whereIn('strategy_id', $project->strategies()->select('id'))
+                ->withCount('contents')
+                ->first();
+
+            if ($plano === null) {
+                return response()->json(['message' => 'Plano não encontrado neste projeto.'], 422);
+            }
+
+            // Os pilares do plano sao os da estrategia que o gerou. Outra estrategia
+            // aprovada depois pode nao ter esses pilares.
+            if ($plano->strategy_id !== $strategy->id) {
+                return response()->json(['message' => 'Este plano é de uma estratégia que não está mais ativa. Planeje a semana de novo.'], 422);
+            }
+
+            if ($plano->contents_count > 0) {
+                return response()->json(['message' => 'As peças deste plano já foram escritas.'], 409);
             }
         }
 
@@ -84,6 +113,7 @@ class CopyController extends Controller
                     // analise -> producao.
                     'with_pillar_adherence' => true,
                     'pillar' => $pillar,
+                    'content_plan_id' => $planoId === null ? null : (int) $planoId,
                 ], fn ($v) => $v !== null),
                 'created_by' => request()->user()->id,
             ]);

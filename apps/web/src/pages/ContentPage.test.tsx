@@ -48,6 +48,8 @@ function run(overrides: Partial<AiRun>): AiRun {
 
 beforeEach(() => {
   vi.useFakeTimers({ shouldAdvanceTime: true })
+  // O painel do plano da semana le isto em toda renderizacao da pagina.
+  server.use(http.get('/api/v1/projects/1/week-plan', () => HttpResponse.json({ data: null })))
 })
 
 afterEach(() => {
@@ -560,4 +562,27 @@ test('exportar baixa o zip com o nome que o servidor mandou', async () => {
   expect(link.download).toBe('2f-autoshop-conteudo-2026-07-13.zip')
 
   click.mockRestore()
+})
+
+test('planejar a semana manda a semana e o numero de pecas para o planner', async () => {
+  let corpo: unknown = null
+  server.use(
+    http.get('/api/v1/projects/1/contents', () => HttpResponse.json({ data: [] })),
+    http.post('/api/v1/projects/1/week-plan:generate', async ({ request }) => {
+      corpo = await request.json()
+      return HttpResponse.json({ ai_run_id: 77 }, { status: 202 })
+    }),
+    http.get('/api/v1/ai-runs/77', () => HttpResponse.json(run({ id: 77, agent: 'planner', status: 'running' }))),
+  )
+
+  renderWithProviders(<ContentPage />, ROUTE)
+  const user = setup()
+
+  const semana = await screen.findByLabelText('Semana começa em')
+  await user.clear(semana)
+  await user.type(semana, '2026-10-05')
+  await user.click(screen.getByRole('button', { name: 'Planejar semana com IA' }))
+
+  await vi.waitFor(() => expect(corpo).toEqual({ starts_on: '2026-10-05', posts: 3 }))
+  expect(await screen.findByText('Planejando a semana…')).toBeInTheDocument()
 })

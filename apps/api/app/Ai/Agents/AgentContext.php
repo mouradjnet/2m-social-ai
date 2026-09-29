@@ -3,8 +3,10 @@
 namespace App\Ai\Agents;
 
 use App\Domain\Analytics\Metrics;
+use App\Models\ContentPlan;
 use App\Models\ContentReview;
 use App\Models\Project;
+use Carbon\CarbonImmutable;
 
 /**
  * Snapshot do projeto no momento da execucao, nao a entidade viva: uma geracao
@@ -85,6 +87,16 @@ readonly class AgentContext
          * reescrita as cegas.
          */
         public ?array $rewriteTarget = null,
+        /**
+         * A semana a planejar: `{starts_on, ends_on, posts, timezone}`. Datas e horas
+         * que o planner devolver sao LOCAIS, nesse fuso. Null fora do planner.
+         */
+        public ?array $weekWindow = null,
+        /**
+         * Os horarios de um plano ja proposto, na ordem. Com eles o copywriter escreve
+         * UMA peca por horario, com o pilar, formato e canal que o plano decidiu.
+         */
+        public ?array $planSlots = null,
     ) {}
 
     /**
@@ -168,6 +180,17 @@ readonly class AgentContext
             rewriteTarget: isset($input['rewrite_content_id'])
                 ? self::rewriteTarget($project, (int) $input['rewrite_content_id'])
                 : null,
+            weekWindow: isset($input['week_starts_on'], $input['posts'])
+                ? [
+                    'starts_on' => $input['week_starts_on'],
+                    'ends_on' => CarbonImmutable::parse($input['week_starts_on'])->addDays(6)->toDateString(),
+                    'posts' => (int) $input['posts'],
+                    'timezone' => $project->timezone,
+                ]
+                : null,
+            planSlots: isset($input['content_plan_id'])
+                ? self::planSlots($project, (int) $input['content_plan_id'])
+                : null,
         );
     }
 
@@ -215,6 +238,14 @@ readonly class AgentContext
             $data['rewrite_target'] = $this->rewriteTarget;
         }
 
+        if ($this->weekWindow !== null) {
+            $data['week'] = $this->weekWindow;
+        }
+
+        if ($this->planSlots !== null) {
+            $data['plan_slots'] = $this->planSlots;
+        }
+
         return $data;
     }
 
@@ -251,6 +282,20 @@ readonly class AgentContext
             // Com o trecho: e o proprio texto sendo consertado (ver o campo).
             'violations' => $review?->violations ?? [],
         ];
+    }
+
+    /**
+     * Os horarios do plano, se ele for DESTE projeto. O job roda sem usuario: o
+     * filtro pela estrategia do projeto e o que impede ler o plano de outro tenant.
+     */
+    private static function planSlots(Project $project, int $planId): ?array
+    {
+        $plano = ContentPlan::query()
+            ->whereKey($planId)
+            ->whereIn('strategy_id', $project->strategies()->select('id'))
+            ->first();
+
+        return $plano?->slots();
     }
 
     /**

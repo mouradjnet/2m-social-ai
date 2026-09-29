@@ -134,14 +134,14 @@ Duradoura — a linha editorial do projeto.
 `workspace_id`, `project_id`, `title`, `summary` text, `editorial_line` text, `pillars` jsonb (`[{name, weight, description}]`), `status` enum (`draft` `active` `archived`), `ai_run_id` null.
 
 ### `content_plans`
-Periódica — o "planejamento" do spec (quantos posts, quando, de que tipo).
+Periódica — o plano de UMA semana, escrito pelo `planner` (Etapa 2c; antes a tabela existia e ninguém escrevia). `distribution` guarda `{summary, slots: [{date, time, pillar, format, channel, theme, rationale}]}`, com data e hora **locais** (fuso do projeto), em ordem cronológica.
 
 | coluna | tipo |
 |---|---|
 | `strategy_id` | fk |
 | `period_start` `period_end` | date |
 | `posts_count` | smallint |
-| `distribution` | jsonb — `{channel: count}` |
+| `distribution` | jsonb — `{summary, slots[]}` |
 | `best_days` | jsonb — array de weekday |
 | `best_times` | jsonb — array de `"HH:MM"` |
 | `format_mix` | jsonb — `{format: count}` |
@@ -176,6 +176,8 @@ O coração do sistema.
 | `status` | enum | ver máquina de estados abaixo |
 | `assignee_id` | fk users null | |
 | `scheduled_for` | timestamptz null | |
+| `planned_for` | timestamptz null | horário que o plano da semana sugeriu (UTC). Sugestão: agendar continua exigindo aprovação. Desde `2026_09_29_040000` |
+| `content_plan_id` | fk content_plans null (nullOnDelete) | de qual plano a peça saiu |
 | `approved_by` | fk users null | quem aprovou (ADR-13). Só `reviewer`+ aprova; devolver para revisão limpa |
 | `approved_at` | timestamptz null | quando aprovou |
 | `published_at` | timestamptz null | preenchido quando a publicação no Instagram é confirmada |

@@ -23,6 +23,7 @@ const FRASES: Record<string, string> = {
   analytics: 'Analisando seu calendário…',
   rewriter: 'Reescrevendo a peça reprovada…',
   image: 'Desenhando a imagem da peça…',
+  planner: 'Planejando a semana…',
 }
 
 const GENERICO = 'Gerando…'

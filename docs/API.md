@@ -111,8 +111,9 @@ GET    /api/v1/projects/{project}/strategies
 POST   /api/v1/projects/{project}/strategies:generate     → 202 {ai_run_id}
 GET    /api/v1/strategies/{strategy}
 PATCH  /api/v1/strategies/{strategy}                      edição humana
-POST   /api/v1/strategies/{strategy}/plans:generate       {period_start, period_end} → 202
-GET    /api/v1/content-plans/{plan}
+GET    /api/v1/projects/{project}/week-plan             o plano mais recente (+ contents_count) ou null
+POST   /api/v1/projects/{project}/week-plan:generate    {starts_on (Y-m-d, hoje ou depois no fuso do projeto), posts? 1-7} → 202
+POST   /api/v1/projects/{project}/copy:generate         {content_plan_id} → uma peça por horário do plano (409 se já escrito; 422 se o plano é de estratégia que saiu)
 ```
 
 ## Campanhas

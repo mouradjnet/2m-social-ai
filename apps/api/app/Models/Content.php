@@ -17,6 +17,7 @@ class Content extends Model
         'image_prompt', 'status', 'assignee_id', 'scheduled_for',
         'source', 'origin_ai_run_id', 'created_by',
         'approved_by', 'approved_at', 'image_asset_id', 'published_at',
+        'content_plan_id', 'planned_for',
     ];
 
     protected function casts(): array
@@ -24,6 +25,7 @@ class Content extends Model
         return [
             'hashtags' => 'array',
             'scheduled_for' => 'datetime',
+            'planned_for' => 'datetime',
             'published_at' => 'datetime',
             'approved_at' => 'datetime',
         ];

@@ -77,6 +77,15 @@ return [
             'effort' => 'high',
             'max_tokens' => 16000,
         ],
+        // Montar a semana: le estrategia, aderencia e o que ja existe, e decide
+        // dia, hora, pilar e formato. Nao escreve texto: `medium`.
+        'planner' => [
+            'model' => env('AI_MODEL_PLANNER', env('AI_MODEL_DEFAULT', 'claude-opus-4-8')),
+            'effort' => 'medium',
+            'max_tokens' => 16000,
+            'default_posts' => 3,
+            'max_posts' => 7,
+        ],
         'analytics' => [
             'model' => env('AI_MODEL_ANALYTICS', env('AI_MODEL_DEFAULT', 'claude-opus-4-8')),
             'effort' => 'high',

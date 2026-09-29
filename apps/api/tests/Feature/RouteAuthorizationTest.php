@@ -67,6 +67,7 @@ class RouteAuthorizationTest extends TestCase
         return [
             'gerar estrategia' => ['post', 'strategies:generate'],
             'gerar copy' => ['post', 'copy:generate'],
+            'planejar semana' => ['post', 'week-plan:generate'],
             'agendar' => ['post', 'schedule:generate'],
             'revisar' => ['post', 'review:generate'],
             'gerar imagem' => ['post', 'design:generate'],

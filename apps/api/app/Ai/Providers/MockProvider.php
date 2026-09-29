@@ -61,6 +61,22 @@ class MockProvider implements LlmProvider
             // a geracao falharia em dev sem motivo. A primeira peca cobre o buraco.
             $atrasado = $alvo === null ? $this->pilarMaisAtrasado($context) : null;
 
+            // Com plano, uma peca por horario, com pilar/formato/canal do horario: o
+            // validate() confere cada um.
+            if (isset($context['plan_slots'])) {
+                return [
+                    'pieces' => array_map(fn (int $i, array $slot) => [
+                        'title' => "{$slot['theme']} ({$unico}{$i})",
+                        'caption' => "Legenda sobre {$slot['theme']}, no tom da marca.",
+                        'cta' => 'Fale com a gente no WhatsApp.',
+                        'hashtags' => ['#marca', '#conteudo'],
+                        'format' => $slot['format'],
+                        'channel' => $slot['channel'],
+                        'pillar' => $slot['pillar'],
+                    ], array_keys($context['plan_slots']), $context['plan_slots']),
+                ];
+            }
+
             return [
                 'pieces' => array_map(function (int $i) use ($alvo, $atrasado, $daEstrategia, $unico) {
                     $pilar = $alvo
@@ -77,6 +93,29 @@ class MockProvider implements LlmProvider
                         'pillar' => $pilar,
                     ];
                 }, range(0, 4)),
+            ];
+        }
+
+        // Planner: schema com `slots`. Um horario por dia a partir do inicio da semana,
+        // as 19:00 locais; o primeiro cobre o pilar mais atrasado (o validate() exige).
+        if (isset($properties['slots'])) {
+            $context = $this->contextOf($request->userMessage);
+            $semana = $context['week'];
+            $pilares = array_column($context['active_strategy']['pillars'] ?? [], 'name');
+            $atrasado = $this->pilarMaisAtrasado($context);
+            $inicio = CarbonImmutable::parse($semana['starts_on']);
+
+            return [
+                'summary' => 'Semana equilibrada entre os pilares, com prioridade para o que esta atrasado.',
+                'slots' => array_map(fn (int $i) => [
+                    'date' => $inicio->addDays($i % 7)->toDateString(),
+                    'time' => '19:00',
+                    'pillar' => ($i === 0 ? $atrasado : null) ?? ($pilares[$i % max(count($pilares), 1)] ?? 'Pilar'),
+                    'format' => $i % 2 === 0 ? 'post' : 'carousel',
+                    'channel' => 'instagram',
+                    'theme' => "Tema {$i} da semana de {$semana['starts_on']}",
+                    'rationale' => 'Horario de maior presenca do publico no Instagram.',
+                ], range(0, (int) $semana['posts'] - 1)),
             ];
         }
 
