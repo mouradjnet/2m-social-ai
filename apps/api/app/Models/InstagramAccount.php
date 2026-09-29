@@ -22,7 +22,7 @@ class InstagramAccount extends Model
 
     protected $hidden = ['access_token'];
 
-    protected $appends = ['expires_in_days'];
+    protected $appends = ['expires_in_days', 'insights_enabled'];
 
     protected function casts(): array
     {
@@ -46,12 +46,23 @@ class InstagramAccount extends Model
         return $this->belongsTo(User::class, 'connected_by')->select(['id', 'name']);
     }
 
+    public function getInsightsEnabledAttribute(): bool
+    {
+        return $this->hasInsights();
+    }
+
     /** Dias inteiros ate o token vencer. Negativo = ja venceu. A tela avisa abaixo de 7. */
     public function getExpiresInDaysAttribute(): ?int
     {
         return $this->token_expires_at === null
             ? null
             : (int) floor(now()->diffInDays($this->token_expires_at, false));
+    }
+
+    /** A marca autorizou ler as metricas dos posts? (opcional na conexao) */
+    public function hasInsights(): bool
+    {
+        return in_array(config('instagram.insights_scope'), $this->scopes ?? [], true);
     }
 
     /** Pode publicar agora? Status ativo, token presente e ainda valido. */

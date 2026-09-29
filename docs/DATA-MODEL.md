@@ -249,6 +249,9 @@ Um "post reutilizável" é um `template` de `kind = content` — não um `conten
 O que o sistema fez em nome de quem aprovou. Guarda o **snapshot** aprovado: `caption` (legenda + CTA + hashtags, como foi ao ar), `image_url`, `account_username`, `approved_by`, `approved_at`, `scheduled_for`. E o resultado: `status` enum (`pending` `publishing` `published` `failed` `unknown` `cancelled`), `container_id`, `media_id` (o id que a Meta devolveu), `permalink`, `published_at`, `attempts`, `next_attempt_at`, `error_kind`, `last_error`.
 **Etapa 3:** `media_type` (`IMAGE` `CAROUSEL` `REELS`, do formato da peça: post/carousel/reel) e `media` jsonb — `{images: [urls na ordem]}` no carrossel, `{video_url, cover_url}` no Reel. Outros formatos nascem `failed` com o motivo (antes um `story` saía como post de imagem).
 
+### `publication_metrics` (Etapa 5)
+`publication_id` (cascade), `metrics` jsonb (`{reach, views, likes, comments, saved, shares, total_interactions[, ig_reels_avg_watch_time]}` — só o que a Meta devolveu), `error` text null (recusa da Meta: nunca vira zero), `collected_at`. Append-only; o resultado de um post é a coleta mais recente. Preenchida por `instagram:collect-insights` (diário, 06:40) para posts publicados nos últimos 30 dias por conta ativa **com** o escopo `instagram_business_manage_insights`. Separada de propósito das métricas editoriais (`Domain\Analytics\Metrics`).
+
 ### `content_slides` (Etapa 3)
 `content_id` (cascade), `asset_id` (cascade — só rascunho perde o slide; peça aprovada não deixa apagar a imagem), `position`; único `(content_id, position)`. As imagens do carrossel. `contents.video_asset_id` (nullOnDelete) é o vídeo do Reel; a `image_asset_id` da peça é a capa.
 

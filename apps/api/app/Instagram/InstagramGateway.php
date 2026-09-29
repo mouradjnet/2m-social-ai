@@ -71,6 +71,15 @@ interface InstagramGateway
      */
     public function recentMedia(string $igUserId, string $token, int $limit = 10): array;
 
+    /**
+     * As metricas de UMA midia publicada (`GET /{media-id}/insights`). Exige o escopo
+     * `instagram_business_manage_insights`.
+     *
+     * @param  list<string>  $metrics
+     * @return array<string, int|float> nome => valor
+     */
+    public function mediaInsights(string $mediaId, string $token, array $metrics): array;
+
     /** @return array{usage: int, total: int} publicacoes nas ultimas 24 h e o teto */
     public function publishingQuota(string $igUserId, string $token): array;
 }

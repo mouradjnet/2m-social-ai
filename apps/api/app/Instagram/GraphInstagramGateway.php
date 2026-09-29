@@ -156,6 +156,27 @@ class GraphInstagramGateway implements InstagramGateway
         return (string) $json['id'];
     }
 
+    public function mediaInsights(string $mediaId, string $token, array $metrics): array
+    {
+        $json = $this->send(fn () => $this->http()->get($this->graph("{$mediaId}/insights"), [
+            'metric' => implode(',', $metrics),
+            'access_token' => $token,
+        ]));
+
+        $valores = [];
+
+        foreach ($json['data'] ?? [] as $linha) {
+            // Metricas de ciclo de vida vem em `values[0].value`; as agregadas, em `total_value`.
+            $valor = $linha['values'][0]['value'] ?? $linha['total_value']['value'] ?? null;
+
+            if (isset($linha['name']) && is_numeric($valor)) {
+                $valores[$linha['name']] = $valor + 0;
+            }
+        }
+
+        return $valores;
+    }
+
     public function containerStatus(string $containerId, string $token): string
     {
         $json = $this->send(fn () => $this->http()->get($this->graph($containerId), [

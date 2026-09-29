@@ -25,8 +25,36 @@ return [
     // Confira a versao corrente em developers.facebook.com/docs/graph-api/changelog.
     'graph_version' => env('INSTAGRAM_GRAPH_VERSION', 'v23.0'),
 
-    // O minimo para publicar: ler o perfil e publicar. Nada de comentarios, DMs ou insights.
-    'scopes' => ['instagram_business_basic', 'instagram_business_content_publish'],
+    // O que se PEDE no consentimento: ler o perfil, publicar e ler as metricas dos
+    // posts (Etapa 5). Nada de comentarios nem DMs.
+    'scopes' => [
+        'instagram_business_basic',
+        'instagram_business_content_publish',
+        'instagram_business_manage_insights',
+    ],
+
+    // O que a conexao EXIGE. Insights e opcional: quem desmarcar na tela da Meta
+    // continua publicando, so sem a tela de Resultados.
+    'required_scopes' => ['instagram_business_basic', 'instagram_business_content_publish'],
+
+    'insights_scope' => 'instagram_business_manage_insights',
+
+    /*
+     | Metricas por tipo de midia (IG Media Insights, consultado em 29/09/2026).
+     | `impressions` foi descontinuada para midia criada depois de 02/07/2024 e fica
+     | de fora. A Meta atrasa os numeros em ate 48 h e os guarda por 2 anos. Para o
+     | carrossel a documentacao nao diz se o album (o post, nao os itens) tem
+     | metricas: pede-se o conjunto do feed e, se a Meta recusar, fica registrado.
+     */
+    'insights_metrics' => [
+        'IMAGE' => ['reach', 'views', 'likes', 'comments', 'saved', 'shares', 'total_interactions'],
+        'CAROUSEL' => ['reach', 'views', 'likes', 'comments', 'saved', 'shares', 'total_interactions'],
+        'REELS' => ['reach', 'views', 'likes', 'comments', 'saved', 'shares', 'total_interactions', 'ig_reels_avg_watch_time'],
+    ],
+
+    // Por quantos dias depois de publicado o post continua sendo medido. Depois, o
+    // ultimo numero coletado fica como o resultado dele.
+    'insights_days' => 30,
 
     // O token longo vale 60 dias e so renova depois de 24 h de vida. Renovar com
     // folga: um token vencido e uma publicacao que nao sai de madrugada.

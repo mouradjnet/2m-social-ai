@@ -29,7 +29,7 @@ class AccountConnector
 
         // O usuario pode desmarcar permissoes na tela da Meta. Sem publicar, a conta
         // conectada seria uma promessa que falha na primeira publicacao.
-        $faltando = array_diff(config('instagram.scopes'), $grant['permissions']);
+        $faltando = array_diff(config('instagram.required_scopes'), $grant['permissions']);
 
         if ($faltando !== []) {
             throw new InstagramException(

@@ -21,3 +21,6 @@ Schedule::command('publications:dispatch')->everyMinute()->withoutOverlapping(5)
 Schedule::call(fn () => touch(storage_path('framework/scheduler-heartbeat')))->everyMinute()->name('heartbeat');
 
 Schedule::command('instagram:refresh-tokens')->dailyAt('03:17')->withoutOverlapping();
+
+// Metricas reais dos posts (Etapa 5). Uma vez por dia: a Meta atrasa ate 48 h.
+Schedule::command('instagram:collect-insights')->dailyAt('06:40')->withoutOverlapping();

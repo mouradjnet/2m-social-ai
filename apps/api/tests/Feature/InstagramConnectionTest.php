@@ -91,7 +91,7 @@ class InstagramConnectionTest extends TestCase
         return $query['state'];
     }
 
-    public function test_url_de_consentimento_pede_so_os_escopos_de_publicar(): void
+    public function test_url_de_consentimento_pede_publicar_e_metricas_e_nada_mais(): void
     {
         [$project] = $this->scene();
 
@@ -100,7 +100,8 @@ class InstagramConnectionTest extends TestCase
         $this->assertStringStartsWith('https://www.instagram.com/oauth/authorize?', $url);
         parse_str((string) parse_url($url, PHP_URL_QUERY), $query);
         $this->assertSame('app-123', $query['client_id']);
-        $this->assertSame('instagram_business_basic,instagram_business_content_publish', $query['scope']);
+        // Etapa 5: metricas dos posts entram no pedido. Comentarios e DMs, nao.
+        $this->assertSame('instagram_business_basic,instagram_business_content_publish,instagram_business_manage_insights', $query['scope']);
         $this->assertSame(64, strlen($query['state']));
     }
 
@@ -165,6 +166,29 @@ class InstagramConnectionTest extends TestCase
             ->assertRedirectContains('instagram=erro');
 
         $this->assertSame(1, InstagramAccount::withoutGlobalScopes()->count());
+    }
+
+    public function test_quem_desmarca_as_metricas_conecta_e_publica_sem_resultados(): void
+    {
+        [$project] = $this->scene();
+        $this->fakeMeta(['instagram_business_basic', 'instagram_business_content_publish']);
+
+        $this->get('/api/v1/instagram/callback?code=abc&state='.$this->pedirConexao($project))
+            ->assertRedirectContains('instagram=conectado');
+
+        $this->getJson("/api/v1/projects/{$project->id}/instagram")
+            ->assertJsonPath('data.status', 'active')
+            ->assertJsonPath('data.insights_enabled', false);
+    }
+
+    public function test_com_as_metricas_autorizadas_a_conta_diz_que_mede(): void
+    {
+        [$project] = $this->scene();
+        $this->fakeMeta(['instagram_business_basic', 'instagram_business_content_publish', 'instagram_business_manage_insights']);
+
+        $this->get('/api/v1/instagram/callback?code=abc&state='.$this->pedirConexao($project));
+
+        $this->getJson("/api/v1/projects/{$project->id}/instagram")->assertJsonPath('data.insights_enabled', true);
     }
 
     public function test_sem_permissao_de_publicar_nao_conecta(): void

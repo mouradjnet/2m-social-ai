@@ -81,6 +81,16 @@ class FakeInstagramGateway implements InstagramGateway
         return $id;
     }
 
+    /** Numeros estaveis por midia (o mesmo id da os mesmos numeros), sem sair da maquina. */
+    public function mediaInsights(string $mediaId, string $token, array $metrics): array
+    {
+        $base = crc32($mediaId) % 900 + 100;
+
+        return collect($metrics)->mapWithKeys(fn (string $m, int $i) => [
+            $m => $m === 'ig_reels_avg_watch_time' ? 4200 : (int) round($base / ($i + 1)),
+        ])->all();
+    }
+
     public function containerStatus(string $containerId, string $token): string
     {
         return Cache::get("instagram-fake:{$containerId}")['status'] ?? 'EXPIRED';
