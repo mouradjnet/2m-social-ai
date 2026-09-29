@@ -2,13 +2,15 @@
 
 Plataforma SaaS de planejamento estratégico de conteúdo com Inteligência Artificial.
 
-> **Estado atual (2026-09-18): MVP completo e no ar em <https://twom-social-ai.onrender.com>.**
-> Os oito agentes funcionam de ponta a ponta e foram validados com a IA real em produção. Em repouso, produção roda com `AI_PROVIDER=mock` — o serviço é público e a chave é paga.
-> Suíte: **309 testes no backend** (Postgres real) e **88 no frontend** (vitest).
+> **Estado atual (2026-09-28): publicação automática no Instagram implementada; deploy na VPS preparado, não executado.**
+> A IA propõe, o humano aprova e o sistema publica (ADR-13), pela API oficial da Meta (ADR-14). O driver padrão é `fake`: nada vai ao Instagram de verdade até alguém configurar o app da Meta e trocar para `graph`.
+> O MVP anterior segue no ar em <https://twom-social-ai.onrender.com> (demonstração).
+> Suíte: **415 testes no backend** (Postgres real, rede bloqueada) e **125 no frontend** (vitest).
+> O que foi feito na retomada, fase a fase: [docs/RETOMADA.md](docs/RETOMADA.md).
 
 ## O que o produto faz
 
-Perfil da Marca → Estratégia → Conteúdo → Revisão → Calendário → Exportação, com uma camada de IA em cada passo. **A IA propõe; o humano aprova.**
+Perfil da Marca → Estratégia → Conteúdo → Revisão → Aprovação → Calendário → **Publicação no Instagram**, com uma camada de IA em cada passo. **A IA propõe, o humano aprova e o sistema publica.**
 
 | Agente | O que faz |
 |---|---|
@@ -21,7 +23,7 @@ Perfil da Marca → Estratégia → Conteúdo → Revisão → Calendário → E
 | `seo` | Propõe título, keywords e hashtags; aplicar é do humano |
 | `analytics` | Lê os números do projeto e diz o que o calendário está contando |
 
-A entrega é um **zip**: um `.md` por peça aprovada/agendada e um `calendario.csv`. Não há integração com as redes sociais.
+**Publicação:** a peça aprovada por um `reviewer`+ e agendada é publicada no Instagram na hora marcada, com a imagem da biblioteca do projeto. Cada publicação guarda o que foi aprovado, por quem, para qual conta, quando, e o id que a Meta devolveu. Para as outras redes, a entrega continua sendo o **zip** (um `.md` por peça e um `calendario.csv`).
 
 O trabalho é em equipe: workspaces com papéis e **convite por link** — o admin gera em `/equipe`, o convidado aceita em `/convite/{token}`. Não há envio de e-mail: o link é copiado e mandado por fora.
 
@@ -35,24 +37,28 @@ O trabalho é em equipe: workspaces com papéis e **convite por link** — o adm
 | [docs/AI-LAYER.md](docs/AI-LAYER.md) | Agentes, providers, structured output, custo, guardrails |
 | [docs/DESIGN-SYSTEM.md](docs/DESIGN-SYSTEM.md) | Tokens do Stitch, componentes, contradições com o spec |
 | [docs/ROADMAP.md](docs/ROADMAP.md) | Fases, cada uma com critério de verificação |
-| [docs/DEPLOY.md](docs/DEPLOY.md) | Render (web + fila no mesmo container no free), banco no Neon |
+| [docs/DEPLOY-VPS.md](docs/DEPLOY-VPS.md) | **A hospedagem definitiva:** Docker Compose na VPS, atrás do proxy existente; backup, restauração, checklist |
+| [docs/PILOTO-2M-SAUDE-FEMININA.md](docs/PILOTO-2M-SAUDE-FEMININA.md) | O piloto @2msaudefeminina: regras de saúde, app da Meta, primeira publicação |
+| [docs/RETOMADA.md](docs/RETOMADA.md) | O diário da retomada de setembro/2026, fase a fase |
+| [docs/DEPLOY.md](docs/DEPLOY.md) | Render (demonstração), banco no Neon |
 | [docs/superpowers/](docs/superpowers/) | Specs e planos de cada fatia |
 
 ## Decisões travadas
 
 - **Tenancy:** Workspace com papéis (`owner` `admin` `editor` `reviewer` `viewer`), `workspace_id` em toda tabela desde a primeira migration. O workspace vem da rota, não da sessão.
-- **Publicação no MVP:** agendar e exportar. Sem API das redes sociais — e portanto sem Analytics de desempenho (só produtividade e aderência aos pilares).
+- **Publicação:** Instagram pela API oficial (Instagram Login, ADR-14), só o que um `reviewer`+ aprovou (ADR-13), com idempotência e reconciliação quando a Meta não confirma. Demais redes: agendar e exportar. Analytics de desempenho ainda não lê a Meta.
 - **IA:** Anthropic Claude (`claude-opus-4-8`) como único provider real, atrás da interface `LlmProvider`. Toda geração é um job: `202` + polling em `/ai-runs/{id}`.
 - **Custo:** teto mensal por workspace (`AI_WORKSPACE_MONTHLY_BUDGET_CENTS`), conferido antes de enfileirar — estourou, `402`. Toda chamada paga entra na conta, inclusive as rejeitadas.
 - **Cadastro fechado:** só entra quem está em `REGISTRATION_ALLOWED_EMAILS`. Login limitado a 5 tentativas por minuto por email; token expira em 7 dias.
-- **Fora do MVP, de propósito:** Redis, Reverb, S3, Stripe, Mercado Pago, geração de imagem, integração com redes.
+- **Fora, de propósito:** Redis, Reverb, S3/R2 (o disco é um volume da VPS; trocar é uma variável), Stripe, Mercado Pago, geração de imagem, carrossel/Reels, redes além do Instagram.
 
 ## Stack
 
 **Frontend** React 19 · TypeScript · Vite · Tailwind 4 · TanStack Query
 **Backend** Laravel 13 · PostgreSQL 16 · fila e cache em `database`
 **IA** Anthropic SDK para PHP (`anthropic-ai/sdk`)
-**Deploy** Render (Docker, FrankenPHP) · Postgres no Neon
+**Instagram** Graph API (graph.instagram.com) atrás de `InstagramGateway`, com adaptador `fake`
+**Deploy** VPS com Docker Compose (FrankenPHP, Nginx, Postgres 16, worker, scheduler, backup) · Render para demonstração
 
 ## Ambiente local
 
@@ -77,7 +83,8 @@ pg_ctl -D C:\Users\mysho\pgdata\16 -l C:\Users\mysho\pgdata\pg16.log start
 cd apps\api
 php artisan test         # suíte inteira contra o Postgres de teste
 php artisan serve        # http://localhost:8000
-php artisan queue:work   # sem isto, nenhuma geração de IA sai da fila
+php artisan queue:work --queue=publishing,default   # sem isto, nenhuma geração de IA nem publicação sai da fila
+php artisan schedule:work                           # sem isto, nada é publicado na hora marcada
 ```
 
 Testes rodam contra `2m_social_ai_test` no Postgres, **não** em SQLite — `jsonb`, `timestamptz`, enums e índices parciais não existem lá. Com `AI_PROVIDER=mock` a suíte roda sem chave de API.

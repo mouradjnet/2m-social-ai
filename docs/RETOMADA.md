@@ -200,3 +200,21 @@ chamada paga) e `INSTAGRAM_DRIVER=fake` fixado no `phpunit.xml`.
 | Upload malicioso | `finfo` decide o tipo; toda imagem é reencodada (EXIF e qualquer carga somem); nome uuid; Nginx serve `/storage` estático com `nosniff` |
 | Redirect aberto | O callback só redireciona para caminhos fixos da SPA, relativos |
 | Senha do Instagram | Nunca passa pelo sistema: consentimento na própria Meta |
+
+---
+
+## Fase 8 — Preparação do piloto (2026-09-28)
+
+`php artisan pilot:2m-saude-feminina {workspace} --owner=`: projeto, perfil da marca
+com as regras de saúde e beleza, estratégia ativa com 5 pilares (as categorias) e
+12 ideias do primeiro mês. Idempotente e conservador (não sobrescreve o que foi
+editado na tela), e não aprova, não agenda, não conecta e não publica.
+
+Rodado no banco local, no workspace "2M Negocios" do responsável (projeto #6). O
+que não se sabe da marca ficou marcado "A CONFIRMAR". O usuário e os dados
+descartáveis usados na verificação da Fase 5 foram apagados.
+
+Guia do piloto — testes com o driver `fake`, app da Meta, conexão e primeira
+publicação autorizada: [PILOTO-2M-SAUDE-FEMININA.md](PILOTO-2M-SAUDE-FEMININA.md).
+
+**Suíte final:** PHPUnit 415 testes / 1221 asserções, verdes; vitest 125, verdes.
