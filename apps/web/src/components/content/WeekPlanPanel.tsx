@@ -15,7 +15,7 @@ interface Props {
 }
 
 /** A chave mora sob ['contents', projectId]: o sucesso de qualquer geracao da pagina a invalida junto. */
-export const weekPlanKey = (projectId: string) => ['contents', projectId, 'week-plan']
+const weekPlanKey = (projectId: string) => ['contents', projectId, 'week-plan']
 
 const FORMATOS: Record<string, string> = {
   post: 'Post',
