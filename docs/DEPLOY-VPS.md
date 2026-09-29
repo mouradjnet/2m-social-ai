@@ -180,7 +180,7 @@ O worker termina o job em andamento antes de sair; uma publicação interrompida
 - [x] Etapa A (ensaio → restart) e 2M Prev + Social Vendas no ar
 - [x] Etapa B (certificado, `--dry-run` antes) — vence em 28/12/2026, renovação pelo loop do certbot do 2M Prev
 - [x] Etapa C (ensaio → restart) e os três sites no ar
-- [ ] `https://2msocialai.site/up` 200 ✔; falta: login; imagem em `/storage/...` abre em janela anônima
+- [x] `https://2msocialai.site/up` 200; login ok; imagem em `/storage/...` abre sem login (200 `image/jpeg`) — 29/09/2026, depois do fix do GD (`e3b6dc3`: sem ele todo upload dava 500)
 - [x] Backup manual rodado; arquivo copiado para fora da VPS (`E:ackupsm-social-aips`)
-- [ ] Restauração testada numa cópia
+- [x] Restauração testada numa cópia (29/09/2026, ver `docs/RETOMADA.md`); backup de imagens já inclui a 1ª imagem
 - [ ] Só então: app da Meta, `INSTAGRAM_DRIVER=graph`, e a conexão do @2msaudefeminina (`docs/PILOTO-2M-SAUDE-FEMININA.md`)
