@@ -243,6 +243,9 @@ export interface Asset {
   size_bytes: number
   width: number | null
   height: number | null
+  /** `video` so para Reels (Etapa 3); o resto e `image`. Ausente = imagem (fixtures antigos). */
+  type?: 'image' | 'video'
+  duration_ms?: number | null
   url: string
   /** Quantas pecas usam esta imagem. */
   contents_count?: number

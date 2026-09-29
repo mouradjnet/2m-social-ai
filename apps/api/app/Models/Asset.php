@@ -18,7 +18,7 @@ class Asset extends Model
 {
     protected $fillable = [
         'workspace_id', 'project_id', 'type', 'disk', 'path', 'original_name',
-        'mime', 'size_bytes', 'width', 'height', 'checksum', 'created_by',
+        'mime', 'size_bytes', 'width', 'height', 'duration_ms', 'checksum', 'created_by',
     ];
 
     protected $appends = ['url'];

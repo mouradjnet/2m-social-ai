@@ -36,8 +36,8 @@ server {
     # Mesmo padrao do bloco do 2M Prev.
     ssl_protocols TLSv1.2 TLSv1.3;
 
-    # Upload da biblioteca: 8 MB e o teto da Meta; a folga cobre o multipart.
-    client_max_body_size 10m;
+    # Upload da biblioteca: ate 300 MB (video de Reel) + folga do multipart.
+    client_max_body_size 310m;
 
     location / {
         # Resolve pelo DNS do Docker a cada requisicao: se o nginx da stack

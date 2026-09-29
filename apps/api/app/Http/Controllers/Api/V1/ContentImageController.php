@@ -36,7 +36,7 @@ class ContentImageController extends Controller
         // So imagem do MESMO projeto. O escopo de tenant ja esconde as de outro
         // workspace; esta checagem esconde as de outro projeto do mesmo workspace.
         if ($data['asset_id'] !== null
-            && ! Asset::where('project_id', $content->project_id)->whereKey($data['asset_id'])->exists()) {
+            && ! Asset::where('project_id', $content->project_id)->where('type', 'image')->whereKey($data['asset_id'])->exists()) {
             return response()->json([
                 'message' => 'Imagem não encontrada neste projeto.',
                 'errors' => ['asset_id' => ['Imagem não encontrada neste projeto.']],

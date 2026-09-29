@@ -82,3 +82,25 @@ test('remover pede confirmacao e mostra o conflito do servidor', async () => {
   await vi.waitFor(() => expect(removeu).toBe(1))
   expect(await screen.findByRole('alert')).toHaveTextContent('peça aprovada')
 })
+
+test('video de Reel aparece como video, com a duracao', async () => {
+  const reel: Asset = {
+    ...capa,
+    id: 10,
+    original_name: 'reel.mp4',
+    mime: 'video/mp4',
+    type: 'video',
+    duration_ms: 42_500,
+    width: 1080,
+    height: 1920,
+    url: 'https://x.test/storage/media/uuid.mp4',
+    contents_count: 0,
+  }
+  server.use(http.get('/api/v1/projects/1/assets', () => HttpResponse.json({ data: [reel] })))
+
+  const { container } = renderWithProviders(<LibraryPage />, ROUTE)
+
+  expect(await screen.findByText(/🎬 0:43 · 1080×1920/)).toBeInTheDocument()
+  expect(container.querySelector('video')).toHaveAttribute('src', reel.url)
+  expect(screen.queryByRole('img')).not.toBeInTheDocument()
+})

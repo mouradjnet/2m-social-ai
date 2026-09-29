@@ -113,7 +113,8 @@ export function PublicationEditor({ projectId, content, onClose, onGenerateImage
     },
   })
 
-  const lista = assets.data?.data ?? []
+  // A imagem do post (ou a capa do Reel) so pode ser imagem.
+  const lista = (assets.data?.data ?? []).filter((a) => a.type !== 'video')
   const imagem = lista.find((a) => a.id === imageId) ?? content.image ?? null
   const tags = parseHashtags(hashtags)
 

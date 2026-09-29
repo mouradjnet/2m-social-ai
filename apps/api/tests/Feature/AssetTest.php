@@ -136,7 +136,7 @@ class AssetTest extends TestCase
 
         $this->upload($project, UploadedFile::fake()->create('nota.pdf', 10, 'application/pdf'))
             ->assertStatus(422)
-            ->assertJsonPath('errors.file.0', 'Envie JPEG, PNG ou WebP.');
+            ->assertJsonPath('errors.file.0', 'Envie JPEG, PNG ou WebP — ou MP4/MOV para Reels.');
     }
 
     /**

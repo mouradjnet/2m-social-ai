@@ -7,6 +7,13 @@ import { Shell } from '@/components/ui/Shell'
 import { ApiError, api, errorMessage, upload } from '@/lib/api'
 import type { Asset } from '@/lib/types'
 
+/** 42500 -> "0:42" */
+function duracao(ms: number): string {
+  const s = Math.round(ms / 1000)
+
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
+}
+
 function kb(bytes: number): string {
   return bytes >= 1024 * 1024 ? `${(bytes / 1024 / 1024).toFixed(1)} MB` : `${Math.round(bytes / 1024)} KB`
 }
@@ -63,12 +70,15 @@ export function LibraryPage() {
           <p className="text-body-sm text-on-surface-variant mt-2">
             JPEG, PNG ou WebP até 8 MB. Proporção entre 4:5 (retrato) e 1.91:1 (paisagem).
           </p>
+          <p className="text-body-sm text-on-surface-variant mt-1">
+            Vídeo de Reel: MP4 ou MOV em H.264, de 3 s a 15 min, até 300 MB, exportado com “otimizar para web”.
+          </p>
         </div>
 
         <input
           ref={input}
           type="file"
-          accept="image/jpeg,image/png,image/webp"
+          accept="image/jpeg,image/png,image/webp,video/mp4,video/quicktime"
           className="hidden"
           aria-label="Arquivo de imagem"
           onChange={(e) => {
@@ -78,7 +88,7 @@ export function LibraryPage() {
           }}
         />
         <Button disabled={subir.isPending} onClick={() => input.current?.click()}>
-          {subir.isPending ? 'Enviando…' : 'Subir imagem'}
+          {subir.isPending ? 'Enviando…' : 'Subir imagem ou vídeo'}
         </Button>
       </div>
 
@@ -101,15 +111,27 @@ export function LibraryPage() {
           {lista.map((asset) => (
             <li key={asset.id}>
               <Card className="p-3">
-                <img
-                  src={asset.url}
-                  alt={asset.original_name ?? `Imagem ${asset.id}`}
-                  className="aspect-square w-full rounded object-cover"
-                />
+                {asset.type === 'video' ? (
+                  <video
+                    src={asset.url}
+                    aria-label={asset.original_name ?? `Vídeo ${asset.id}`}
+                    className="aspect-square w-full rounded bg-black object-cover"
+                    preload="metadata"
+                    muted
+                    controls
+                  />
+                ) : (
+                  <img
+                    src={asset.url}
+                    alt={asset.original_name ?? `Imagem ${asset.id}`}
+                    className="aspect-square w-full rounded object-cover"
+                  />
+                )}
                 <p className="text-label-sm text-on-surface mt-2 truncate" title={asset.original_name ?? undefined}>
                   {asset.original_name ?? `Imagem ${asset.id}`}
                 </p>
                 <p className="text-label-sm text-on-surface-variant mt-1">
+                  {asset.type === 'video' && asset.duration_ms ? `🎬 ${duracao(asset.duration_ms)} · ` : ''}
                   {asset.width}×{asset.height} · {kb(asset.size_bytes)}
                   {asset.contents_count ? ` · em ${asset.contents_count} ${asset.contents_count === 1 ? 'peça' : 'peças'}` : ''}
                 </p>

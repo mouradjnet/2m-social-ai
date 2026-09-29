@@ -28,4 +28,19 @@ return [
 
     'jpeg_quality' => 90,
 
+    /*
+     | Video do Reel (Etapa 3), conforme a documentacao da Meta (IG User Media,
+     | consultada em 29/09/2026): MP4/MOV com o moov no inicio e sem edit list,
+     | H.264 ou HEVC, audio AAC, de 3 s a 15 min, ate 1920 px de largura, ate
+     | 300 MB. O arquivo NAO e reencodado (nao ha ffmpeg): ou cumpre, ou e recusado.
+     */
+    'video' => [
+        'max_bytes' => (int) env('MEDIA_VIDEO_MAX_BYTES', 300 * 1024 * 1024),
+        'min_ms' => 3_000,
+        'max_ms' => 15 * 60 * 1000,
+        'max_width' => 1920,
+        'video_codecs' => ['avc1', 'avc3', 'hvc1', 'hev1'],
+        'audio_codecs' => ['mp4a'],
+    ],
+
 ];

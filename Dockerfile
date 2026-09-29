@@ -55,6 +55,9 @@ COPY docker/supervisord.conf /etc/supervisor/conf.d/app.conf
 # binario vira um executavel comum e roda.
 RUN setcap -r /usr/local/bin/frankenphp
 
+# Upload: sem isto valem os 2 MB padrao do PHP (ver o proprio arquivo).
+COPY docker/php-uploads.ini /usr/local/etc/php/conf.d/zz-uploads.ini
+
 WORKDIR /app
 
 COPY apps/api/ ./

@@ -225,7 +225,9 @@ O "Histórico" do spec. Append-only.
 *"Posts, Imagens, Campanhas, Hashtags, CTAs, Prompts, Templates, Vídeos, Documentos. Tudo reutilizável."* — três tabelas cobrem os nove tipos.
 
 ### `assets` — imagens, vídeos, documentos
-`workspace_id`, `project_id` null (null = compartilhado no workspace), `type` enum (`image` `video` `document`), `disk`, `path`, `mime`, `size_bytes`, `width` null, `height` null, `checksum` (sha256, para deduplicar), `created_by`.
+`workspace_id`, `project_id` null (null = compartilhado no workspace), `type` enum (`image` `video` `document`), `disk`, `path`, `mime`, `size_bytes`, `width` null, `height` null, `duration_ms` null (vídeo, desde `2026_09_29_060000`), `checksum` (sha256, para deduplicar), `created_by`.
+
+**Vídeo (Etapa 3):** MP4/MOV do Reel, conferido no upload pelo `Mp4Inspector` (lê as caixas, sem ffmpeg) contra as regras da Meta — `VideoRules`: H.264/HEVC, AAC, 3 s a 15 min, até 1920 px de largura, moov no início, sem edit list, até 300 MB. Guardado **sem reencodar**. Não pode ser imagem de post (`PUT /contents/{id}/image` recusa).
 
 ### `snippets` — hashtags, CTAs, prompts, legendas
 `workspace_id`, `project_id` null, `kind` enum (`hashtag_set` `cta` `prompt` `caption`), `title`, `body` text, `tags` jsonb, `usage_count` int default 0.
