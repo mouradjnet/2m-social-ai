@@ -44,12 +44,16 @@ docker network ls
 secao "Uso de recursos agora"
 docker stats --no-stream --format 'table {{.Name}}\t{{.CPUPerc}}\t{{.MemUsage}}' 2>/dev/null
 
-secao "Colisao de nomes com esta stack (2m-social-ai*, apelido social-ai-web)"
+secao "Colisao de nomes com esta stack (2m-social-ai*, apelidos social-ai-web e social-ai-app)"
 # O 2M Social Vendas (2m-social-vendas*) mora na mesma VPS: nao e colisao.
 docker ps -a --format '{{.Names}}' | grep -i '2m-social-ai' || echo "nenhum container 2m-social-ai"
 docker volume ls --format '{{.Name}}' | grep -i '2m-social-ai' || echo "nenhum volume 2m-social-ai"
 docker network ls --format '{{.Name}}' | grep -i '2m-social-ai' || echo "nenhuma rede 2m-social-ai"
-docker network inspect 2m-prev_internal --format '{{range .Containers}}{{.Name}} {{end}}' 2>/dev/null
+# Os APELIDOS de cada container na rede do proxy: o nginx desta stack resolve nomes
+# nela. So o nome do container escondeu que `app` ja era o social-vendas-app.
+for c in $(docker network inspect 2m-prev_internal --format '{{range .Containers}}{{.Name}} {{end}}' 2>/dev/null); do
+  echo "$c: $(docker inspect "$c" --format '{{with index .NetworkSettings.Networks "2m-prev_internal"}}{{.Aliases}}{{end}}')"
+done
 
 secao "Proxy reverso: Nginx do host"
 if command -v nginx >/dev/null 2>&1; then
