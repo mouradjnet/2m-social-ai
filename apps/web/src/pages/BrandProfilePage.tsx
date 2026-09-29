@@ -175,6 +175,11 @@ function validar(fields: Field[], raws: Record<string, string>): Record<string, 
     if (CAMPOS_LINK.has(field.name) && raw !== '' && !linkValido(raw)) {
       erros[field.name] = MSG_LINK(field.label)
     }
+
+    // O parser so reconhece link https: um http:// virava parte do nome, sem aviso.
+    if (field.name === 'competitors' && /(^|\s)http:\/\//i.test(raw)) {
+      erros.competitors = MSG_LINK('link do concorrente')
+    }
   }
 
   return erros

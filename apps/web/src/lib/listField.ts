@@ -31,7 +31,11 @@ export function competitorsFromLines(text: string): Competitor[] {
 
     if (!ultima.startsWith('https://')) return { name: line, url: null }
 
-    const nome = partes.slice(0, -1).join(' ')
+    // "Clínica X - https://…" e "Clínica X: https://…": o separador nao e do nome.
+    const nome = partes
+      .slice(0, -1)
+      .join(' ')
+      .replace(/\s*[-–—|:]$/, '')
     return { name: nome || ultima, url: ultima }
   })
 }

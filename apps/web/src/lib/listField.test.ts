@@ -46,3 +46,17 @@ test('concorrentes do servidor voltam como linhas, e a ida-e-volta preserva', ()
   expect(competitorsFromLines(competitorsToLines(xs))).toEqual(xs)
   expect(competitorsToLines(null)).toBe('')
 })
+
+test('concorrente: separador antes do link nao entra no nome', () => {
+  for (const sep of ['-', '–', '—', '|', ':']) {
+    expect(competitorsFromLines(`Clínica X ${sep} https://x.com.br`)).toEqual([
+      { name: 'Clínica X', url: 'https://x.com.br' },
+    ])
+  }
+  // Colado no nome tambem: "Clínica X: https://..."
+  expect(competitorsFromLines('Clínica X: https://x.com.br')).toEqual([
+    { name: 'Clínica X', url: 'https://x.com.br' },
+  ])
+  // Hifen que faz parte do nome continua.
+  expect(competitorsFromLines('Saúde-Mulher https://x.com.br')[0].name).toBe('Saúde-Mulher')
+})

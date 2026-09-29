@@ -367,3 +367,97 @@ test('falha ao salvar o fuso é avisada, não fica em silêncio', async () => {
 
   expect(await screen.findByText(/não foi possível salvar o fuso/i)).toBeInTheDocument()
 })
+
+// --- Persistência e percentual (CP-01) ------------------------------------------
+
+test('o percentual do topo atualiza logo depois de salvar, sem recarregar', async () => {
+  const user = userEvent.setup()
+  server.use(
+    http.get('/api/v1/projects/1/brand-profile', () => HttpResponse.json(profile())),
+    http.patch('/api/v1/projects/1/brand-profile', () =>
+      HttpResponse.json({ ...profile({ audience: 'Mulheres', persona: 'Ana' }), completion: completion(50) }),
+    ),
+  )
+
+  renderWithProviders(<BrandProfilePage />, ROUTE)
+
+  // Antes de salvar: 25%. Sem esta linha o teste passaria mesmo sem atualizar.
+  expect(await screen.findByText(/25% completo/i)).toBeInTheDocument()
+
+  const nav = screen.getByRole('navigation', { name: /progresso/i })
+  await user.click(within(nav).getByRole('button', { name: /público-alvo/i }))
+  await user.type(screen.getByRole('textbox', { name: /^público/i }), 'Mulheres')
+  await user.type(screen.getByRole('textbox', { name: /persona/i }), 'Ana')
+  await user.click(screen.getByRole('button', { name: /próximo/i }))
+
+  expect(await screen.findByText(/50% completo/i)).toBeInTheDocument()
+  expect(screen.queryByText(/25% completo/i)).not.toBeInTheDocument()
+})
+
+test('Passo 5 salvo volta igual ao reabrir o passo e ao recarregar a página', async () => {
+  const user = userEvent.setup()
+  // Servidor com estado: o PATCH faz merge, o GET devolve o que ficou gravado.
+  let gravado = profile().data
+  server.use(
+    http.get('/api/v1/projects/1/brand-profile', () =>
+      HttpResponse.json({ data: gravado, completion: completion(25) }),
+    ),
+    http.patch('/api/v1/projects/1/brand-profile', async ({ request }) => {
+      gravado = { ...gravado, ...((await request.json()) as object) }
+      return HttpResponse.json({ data: gravado, completion: completion(25) })
+    }),
+  )
+
+  const concorrentes = 'Clínica X https://clinicax.com.br\nConsultório Y'
+  const obrigatorias = 'prevenção\nautocuidado'
+  const proibidas = 'cura garantida\nresultado garantido'
+
+  function abrirVocabulario() {
+    const nav = screen.getByRole('navigation', { name: /progresso/i })
+    return user.click(within(nav).getByRole('button', { name: /vocabulário/i }))
+  }
+
+  function conferir() {
+    expect(screen.getByRole('textbox', { name: /concorrentes/i })).toHaveValue(concorrentes)
+    expect(screen.getByRole('textbox', { name: /obrigatórias/i })).toHaveValue(obrigatorias)
+    expect(screen.getByRole('textbox', { name: /proibidas/i })).toHaveValue(proibidas)
+  }
+
+  const { unmount } = renderWithProviders(<BrandProfilePage />, ROUTE)
+  await screen.findByRole('navigation', { name: /progresso/i })
+  await abrirVocabulario()
+
+  await user.type(screen.getByRole('textbox', { name: /concorrentes/i }), concorrentes.replace('\n', '{Enter}'))
+  await user.type(screen.getByRole('textbox', { name: /obrigatórias/i }), obrigatorias.replace('\n', '{Enter}'))
+  await user.type(screen.getByRole('textbox', { name: /proibidas/i }), proibidas.replace('\n', '{Enter}'))
+  await user.click(screen.getByRole('button', { name: /próximo/i }))
+
+  // Salvou e avançou para Links Sociais; volta ao Passo 5 (o formulário remonta).
+  expect(await screen.findByRole('textbox', { name: /instagram/i })).toBeInTheDocument()
+  await abrirVocabulario()
+  conferir()
+
+  // "Recarregar": cache novo, tudo vem do GET.
+  unmount()
+  renderWithProviders(<BrandProfilePage />, ROUTE)
+  await screen.findByRole('navigation', { name: /progresso/i })
+  await abrirVocabulario()
+  conferir()
+})
+
+test('concorrente com link http:// é recusado na tela, sem sumir com o link no nome', async () => {
+  const user = userEvent.setup()
+  const chamadas = comPatch(() => HttpResponse.json(profile()))
+
+  renderWithProviders(<BrandProfilePage />, ROUTE)
+
+  const nav = await screen.findByRole('navigation', { name: /progresso/i })
+  await user.click(within(nav).getByRole('button', { name: /vocabulário/i }))
+  await user.type(screen.getByRole('textbox', { name: /concorrentes/i }), 'Clínica X http://x.com.br')
+  await user.click(screen.getByRole('button', { name: /próximo/i }))
+
+  expect(screen.getByRole('textbox', { name: /concorrentes/i })).toHaveAccessibleDescription(
+    'O campo link do concorrente deve ser um link completo começando com https://.',
+  )
+  expect(chamadas()).toBe(0)
+})

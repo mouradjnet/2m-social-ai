@@ -209,6 +209,34 @@ class BrandProfileTest extends TestCase
             ->assertJsonPath('data.competitors.0.name', 'Rival');
     }
 
+    /**
+     * O Passo 5 como a tela manda (CP-01): concorrente com e sem link + as duas
+     * listas de palavras. Confere num GET novo, nao so na resposta do PATCH.
+     */
+    public function test_passo_vocabulario_completo_sobrevive_a_um_get_novo(): void
+    {
+        $project = $this->actAs(WorkspaceRole::Editor);
+        $url = "/api/v1/projects/{$project->id}/brand-profile";
+
+        $passo = [
+            'competitors' => [
+                ['name' => 'Clínica X', 'url' => 'https://clinicax.com.br'],
+                ['name' => 'Consultório Y', 'url' => null],
+            ],
+            'required_words' => ['prevenção', 'autocuidado', 'procure avaliação profissional'],
+            'forbidden_words' => ['cura garantida', 'resultado garantido'],
+        ];
+
+        $this->patchJson($url, $passo)->assertOk();
+
+        $data = $this->getJson($url)->assertOk()->json('data');
+        // assertEquals: o jsonb reordena as chaves do objeto (`url` antes de `name`).
+        // A ordem dos ITENS continua valendo, porque as chaves da lista sao 0, 1...
+        foreach ($passo as $campo => $valor) {
+            $this->assertEquals($valor, $data[$campo], $campo);
+        }
+    }
+
     /** A tela mostra a mensagem da API ao usuario: ela precisa estar em portugues. */
     public function test_erros_de_validacao_voltam_em_portugues_com_o_nome_do_campo(): void
     {
