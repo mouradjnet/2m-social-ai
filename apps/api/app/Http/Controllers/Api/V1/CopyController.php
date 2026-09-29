@@ -81,12 +81,8 @@ class CopyController extends Controller
             ], 409);
         }
 
-        if (Budget::exceeded($project->workspace)) {
-            return response()->json([
-                'message' => 'Orçamento mensal de IA esgotado para este espaço de trabalho.',
-                'spent_cents' => Budget::spentCentsThisMonth($project->workspace),
-                'limit_cents' => Budget::limitCents($project->workspace),
-            ], 402);
+        if ($recusa = Budget::refusal($project)) {
+            return $recusa;
         }
 
         try {

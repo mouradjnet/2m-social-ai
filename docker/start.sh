@@ -15,6 +15,11 @@ php artisan config:cache
 php artisan route:cache
 php artisan view:cache
 
+# Com AI_PROVIDER=anthropic e config errada (sem chave, modelo sem preco, timeout
+# que nao cabe no worker), o container nao sobe: `set -e` para aqui. Com o mock,
+# passa sempre. Nao chama a API.
+php artisan ai:check
+
 # /public/storage -> storage/app/public. As imagens da biblioteca moram num volume
 # montado ali, e a Meta as busca por essa URL. Na VPS quem serve /storage e o Nginx
 # direto do volume; o link cobre quem roda a imagem sem ele (Render, `docker run`).

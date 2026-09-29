@@ -3,17 +3,21 @@
 namespace App\Providers;
 
 use Anthropic\Client;
+use Anthropic\RequestOptions;
 use App\Ai\Agents\CopywriterAgent;
+use App\Ai\AiConfig;
 use App\Ai\Exceptions\LlmFailedException;
 use App\Ai\Images\FakeImageProvider;
 use App\Ai\Images\ImageProvider;
 use App\Ai\Images\OpenAiImageProvider;
 use App\Ai\Providers\AnthropicProvider;
+use App\Ai\Providers\CappedRetryAfterTransport;
 use App\Ai\Providers\LlmProvider;
 use App\Ai\Providers\MockProvider;
 use App\Instagram\FakeInstagramGateway;
 use App\Instagram\GraphInstagramGateway;
 use App\Instagram\InstagramGateway;
+use GuzzleHttp\Client as GuzzleClient;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -26,10 +30,11 @@ class AppServiceProvider extends ServiceProvider
     {
         $this->app->bind(LlmProvider::class, function () {
             return match (config('ai.provider')) {
-                'anthropic' => new AnthropicProvider($this->anthropicClient()),
+                'anthropic' => new AnthropicProvider($this->anthropicClient(), (int) config('ai.max_retries')),
                 'mock' => new MockProvider,
                 default => throw new LlmFailedException(
-                    'AI_PROVIDER invalido: '.config('ai.provider')
+                    'AI_PROVIDER invalido: '.config('ai.provider'),
+                    'config',
                 ),
             };
         });
@@ -97,16 +102,28 @@ class AppServiceProvider extends ServiceProvider
         ], 429, $headers);
     }
 
+    /**
+     * O SDK 0.7 aceita `timeout` em RequestOptions mas nao o aplica: o transporte
+     * que ele descobre sozinho (Guzzle sem opcoes) espera para sempre. Por isso o
+     * transporte e montado aqui, com timeout de verdade.
+     */
     private function anthropicClient(): Client
     {
-        $key = config('services.anthropic.key');
-
-        if (blank($key)) {
-            throw new LlmFailedException(
-                'ANTHROPIC_API_KEY nao configurada. Use AI_PROVIDER=mock em desenvolvimento.'
-            );
+        if ($problemas = AiConfig::problems()) {
+            throw new LlmFailedException(implode(' ', $problemas), 'config');
         }
 
-        return new Client(apiKey: $key);
+        return new Client(
+            apiKey: config('services.anthropic.key'),
+            requestOptions: RequestOptions::with(
+                transporter: new CappedRetryAfterTransport(
+                    new GuzzleClient([
+                        'timeout' => (float) config('ai.timeout_seconds'),
+                        'connect_timeout' => (float) config('ai.connect_timeout_seconds'),
+                    ]),
+                    (int) config('ai.max_retry_wait_seconds'),
+                ),
+            ),
+        );
     }
 }

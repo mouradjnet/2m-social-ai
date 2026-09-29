@@ -5,6 +5,8 @@ namespace App\Jobs;
 use App\Ai\Agents\Agent;
 use App\Ai\Agents\AgentContext;
 use App\Ai\Agents\AgentRegistry;
+use App\Ai\Budget;
+use App\Ai\Exceptions\LlmFailedException;
 use App\Ai\Exceptions\LlmRefusedException;
 use App\Ai\Exceptions\OutputRejectedException;
 use App\Ai\Providers\LlmProvider;
@@ -32,7 +34,7 @@ class RunAgentJob implements ShouldQueue
 
     public function __construct(private readonly int $aiRunId) {}
 
-    public function handle(LlmProvider $provider, AgentRegistry $registry): void
+    public function handle(AgentRegistry $registry): void
     {
         // Jobs rodam sem usuario autenticado, entao o WorkspaceMemberScope nao
         // se aplica. O escopo aqui e responsabilidade deste codigo.
@@ -44,6 +46,10 @@ class RunAgentJob implements ShouldQueue
         $startedAt = microtime(true);
 
         try {
+            // Resolvido aqui, e nao na assinatura: config errada (sem chave, modelo
+            // sem preco) lanca ao montar o provedor, e fora do try a causa se perdia
+            // no failed() generico.
+            $provider = app(LlmProvider::class);
             $output = $this->generateAndValidate($provider, $agent, $project, $run->input ?? []);
         } catch (Throwable $e) {
             $errorCode = $this->errorCodeFor($e);
@@ -59,6 +65,7 @@ class RunAgentJob implements ShouldQueue
                 'agent' => $run->agent,
                 'provider' => $run->provider,
                 'error_code' => $errorCode,
+                'provider_error' => $e instanceof LlmFailedException ? $e->kind : null,
                 'exception' => $e,
             ]);
 
@@ -69,6 +76,7 @@ class RunAgentJob implements ShouldQueue
                 'latency_ms' => $this->elapsedMs($startedAt),
                 ...$this->gasto(),
             ]);
+            Budget::alertIfAbnormal($run);
 
             return;
         }
@@ -83,6 +91,8 @@ class RunAgentJob implements ShouldQueue
                 'latency_ms' => $this->elapsedMs($startedAt),
             ]);
         });
+
+        Budget::alertIfAbnormal($run);
     }
 
     /**
@@ -103,6 +113,16 @@ class RunAgentJob implements ShouldQueue
             effort: $config['effort'],
             maxTokens: $config['max_tokens'],
         );
+
+        // Antes de pagar: entrada grande demais nao sai. Estimativa conservadora
+        // (ver `ai.max_input_tokens`); a contagem real vem no `usage` da resposta.
+        $estimativa = (int) ceil(mb_strlen($request->instructions.$request->userMessage) / 3);
+        if ($estimativa > config('ai.max_input_tokens')) {
+            throw new LlmFailedException(
+                "Entrada estimada em {$estimativa} tokens, acima do limite de ".config('ai.max_input_tokens').'.',
+                'input_too_large',
+            );
+        }
 
         foreach ([1, 2] as $attempt) {
             $response = $provider->generate($request);
@@ -179,6 +199,13 @@ class RunAgentJob implements ShouldQueue
         return match (true) {
             $e instanceof LlmRefusedException => $e->getMessage(),
             $e instanceof OutputRejectedException => 'O modelo devolveu um resultado fora das regras: '.$e->getMessage(),
+            $e instanceof LlmFailedException => match ($e->kind) {
+                'rate_limited', 'overloaded' => 'A IA está sobrecarregada agora. Tente de novo em alguns minutos.',
+                'auth', 'config' => 'A IA não está configurada corretamente no servidor. Avise o responsável pelo sistema.',
+                'timeout' => 'A IA demorou demais para responder. Tente novamente.',
+                'input_too_large' => 'Há conteúdo demais para uma única geração. Reduza o lote ou o período e tente de novo.',
+                default => 'Falha ao gerar. Tente novamente em alguns instantes.',
+            },
             default => 'Falha ao gerar. Tente novamente em alguns instantes.',
         };
     }
