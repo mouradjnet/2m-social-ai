@@ -77,7 +77,17 @@ export function InsightsPage() {
       </Link>
 
       <div className="mt-4 flex items-center justify-between gap-4">
-        <h1 className="text-display-lg text-on-surface">Insights</h1>
+        <div>
+          <h1 className="text-display-lg text-on-surface">Insights</h1>
+          <p className="text-body-sm text-on-surface-variant mt-1">
+            Indicadores editoriais, calculados a partir do seu calendário — não do Instagram. O que a rede mediu fica
+            em{' '}
+            <Link to={`/projects/${projectId}/results`} className="text-primary hover:underline">
+              Resultados
+            </Link>
+            .
+          </p>
+        </div>
         <Button disabled={generating} onClick={() => generate()}>
           Gerar relatório
         </Button>

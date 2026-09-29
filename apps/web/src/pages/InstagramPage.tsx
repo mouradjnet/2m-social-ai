@@ -153,12 +153,17 @@ export function InstagramPage() {
                   </p>
                 )}
                 {account.last_error && <p className="text-body-sm text-error mt-1">{account.last_error}</p>}
+                {account.status === 'active' && account.insights_enabled === false && (
+                  <p className="text-body-sm text-on-surface-variant mt-1">
+                    Métricas desligadas: a permissão de insights não foi autorizada. Reconecte para ver os Resultados.
+                  </p>
+                )}
               </div>
 
               <div className="flex gap-2">
-                {account.status !== 'active' && (
+                {(account.status !== 'active' || account.insights_enabled === false) && (
                   <Button disabled={conectar.isPending} onClick={() => conectar.mutate()}>
-                    Reconectar
+                    {account.status !== 'active' ? 'Reconectar' : 'Reconectar com métricas'}
                   </Button>
                 )}
 

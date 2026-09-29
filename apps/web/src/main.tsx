@@ -14,6 +14,7 @@ import { UsagePage } from '@/pages/UsagePage'
 import { AcceptInvitationPage } from '@/pages/AcceptInvitationPage'
 import { InstagramPage } from '@/pages/InstagramPage'
 import { LibraryPage } from '@/pages/LibraryPage'
+import { ResultsPage } from '@/pages/ResultsPage'
 import { getToken } from '@/lib/api'
 import './index.css'
 
@@ -112,6 +113,14 @@ createRoot(document.getElementById('root')!).render(
             element={
               <RequireAuth>
                 <InstagramPage />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/projects/:projectId/results"
+            element={
+              <RequireAuth>
+                <ResultsPage />
               </RequireAuth>
             }
           />

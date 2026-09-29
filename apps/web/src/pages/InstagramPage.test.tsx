@@ -217,3 +217,12 @@ test('atividade mostra quem fez cada gesto, em portugues', async () => {
   expect(within(secao).getByText(/Djair removeu a imagem capa.jpg/)).toBeInTheDocument()
   expect(within(secao).getByText(/Djair desconectou @conta_de_teste/)).toBeInTheDocument()
 })
+
+test('conta sem permissao de metricas oferece reconectar com metricas', async () => {
+  servidor(conta({ insights_enabled: false }))
+
+  renderWithProviders(<InstagramPage />, ROUTE)
+
+  expect(await screen.findByText(/Métricas desligadas/)).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Reconectar com métricas' })).toBeInTheDocument()
+})

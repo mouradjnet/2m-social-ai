@@ -18,6 +18,7 @@ use App\Http\Controllers\Api\V1\InvitationController;
 use App\Http\Controllers\Api\V1\ProjectController;
 use App\Http\Controllers\Api\V1\PublicationController;
 use App\Http\Controllers\Api\V1\RepurposeController;
+use App\Http\Controllers\Api\V1\ResultsController;
 use App\Http\Controllers\Api\V1\ReviewController;
 use App\Http\Controllers\Api\V1\RewriteController;
 use App\Http\Controllers\Api\V1\ScheduleController;
@@ -127,6 +128,8 @@ Route::prefix('v1')->group(function () {
         Route::post('contents/{content}/schedule', [ContentController::class, 'schedule']);
         // O historico da publicacao automatica (ADR-13) e os dois gestos humanos sobre ele.
         Route::get('projects/{project}/publications', [PublicationController::class, 'index']);
+        // O que a Meta mediu nos posts (Etapa 5). Separado dos indicadores editoriais.
+        Route::get('projects/{project}/results', [ResultsController::class, 'show']);
         // Quem fez o que nos gestos que nao deixam outro rastro.
         Route::get('projects/{project}/activity', [ActivityController::class, 'index']);
         Route::get('publications/{publication}', [PublicationController::class, 'show']);

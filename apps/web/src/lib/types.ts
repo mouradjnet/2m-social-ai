@@ -267,6 +267,8 @@ export interface InstagramAccount {
   token_expires_at: string | null
   /** Dias ate o token vencer; negativo = venceu. A tela avisa abaixo de 7. */
   expires_in_days: number | null
+  /** A marca autorizou ler as metricas dos posts (escopo opcional). */
+  insights_enabled?: boolean
   last_error: string | null
   connected_at: string
   connector?: { id: number; name: string } | null
@@ -358,4 +360,39 @@ export interface WeekPlan {
   /** Quantas pecas ja foram escritas a partir dele. */
   contents_count: number
   created_at: string
+}
+
+/** Numeros que a Meta devolveu para UM post (so os presentes). */
+export type PostMetrics = Partial<Record<'reach' | 'views' | 'likes' | 'comments' | 'saved' | 'shares' | 'total_interactions' | 'ig_reels_avg_watch_time', number>>
+
+export interface ResultGroup {
+  name: string
+  posts: number
+  avg_reach: number
+  avg_interactions: number
+  engagement_rate: number | null
+}
+
+/** Os resultados REAIS do projeto (GET /projects/{id}/results). */
+export interface Results {
+  days: number
+  published: number
+  measured: number
+  totals: Required<Omit<PostMetrics, 'ig_reels_avg_watch_time'>>
+  engagement_rate: number | null
+  by_pillar: ResultGroup[]
+  by_format: ResultGroup[]
+  posts: {
+    publication_id: number
+    content_id: number
+    title: string | null
+    pillar: string | null
+    format: string | null
+    published_at: string | null
+    permalink: string | null
+    state: 'measured' | 'pending' | 'unavailable'
+    metrics: PostMetrics | null
+    error: string | null
+    collected_at: string | null
+  }[]
 }

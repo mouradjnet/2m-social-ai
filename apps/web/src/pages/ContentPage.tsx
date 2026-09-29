@@ -135,6 +135,13 @@ export function ContentPage() {
           </Link>
 
           <Link
+            to={`/projects/${projectId}/results`}
+            className="text-body-sm text-on-surface-variant hover:text-primary"
+          >
+            Resultados →
+          </Link>
+
+          <Link
             to={`/projects/${projectId}/insights`}
             className="text-body-sm text-on-surface-variant hover:text-primary"
           >
