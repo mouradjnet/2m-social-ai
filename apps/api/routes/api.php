@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\BrandProfileController;
 use App\Http\Controllers\Api\V1\ContentController;
 use App\Http\Controllers\Api\V1\ContentImageController;
+use App\Http\Controllers\Api\V1\ContentMediaController;
 use App\Http\Controllers\Api\V1\CopyController;
 use App\Http\Controllers\Api\V1\DesignController;
 use App\Http\Controllers\Api\V1\ExportController;
@@ -117,6 +118,9 @@ Route::prefix('v1')->group(function () {
         Route::get('projects/{project}/instagram', [InstagramController::class, 'show']);
         Route::post('projects/{project}/instagram:connect', [InstagramController::class, 'connect']);
         Route::delete('projects/{project}/instagram', [InstagramController::class, 'disconnect']);
+        // Carrossel (2 a 10 imagens, em ordem) e Reel (video). So antes da aprovacao.
+        Route::put('contents/{content}/slides', [ContentMediaController::class, 'slides']);
+        Route::put('contents/{content}/video', [ContentMediaController::class, 'video']);
         // O editor de publicacao: texto, CTA e hashtags. So antes da aprovacao.
         Route::patch('contents/{content}/draft', [ContentController::class, 'updateDraft']);
         // Agendar uma peca aprovada a mao. Sendo do Instagram, o sistema publica na hora.

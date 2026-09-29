@@ -6,6 +6,7 @@ use App\Models\Scopes\WorkspaceMemberScope;
 use Illuminate\Database\Eloquent\Attributes\ScopedBy;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 
 #[ScopedBy(WorkspaceMemberScope::class)]
@@ -17,7 +18,7 @@ class Content extends Model
         'image_prompt', 'status', 'assignee_id', 'scheduled_for',
         'source', 'origin_ai_run_id', 'created_by',
         'approved_by', 'approved_at', 'image_asset_id', 'published_at',
-        'content_plan_id', 'planned_for', 'repurposed_from_id',
+        'content_plan_id', 'planned_for', 'repurposed_from_id', 'video_asset_id',
     ];
 
     protected function casts(): array
@@ -45,6 +46,20 @@ class Content extends Model
     public function image(): BelongsTo
     {
         return $this->belongsTo(Asset::class, 'image_asset_id');
+    }
+
+    /** As imagens do carrossel, em ordem (Etapa 3). */
+    public function slides(): BelongsToMany
+    {
+        return $this->belongsToMany(Asset::class, 'content_slides')
+            ->withPivot('position')
+            ->orderBy('content_slides.position');
+    }
+
+    /** O video do Reel. A imagem da peca (`image`) e a capa. */
+    public function video(): BelongsTo
+    {
+        return $this->belongsTo(Asset::class, 'video_asset_id');
     }
 
     /** Quem aprovou (ADR-13). So id e nome: a tela nao precisa de mais nada do usuario. */

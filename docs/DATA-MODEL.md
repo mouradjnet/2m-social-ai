@@ -247,6 +247,11 @@ Um "post reutilizável" é um `template` de `kind = content` — não um `conten
 
 ### `publications`
 O que o sistema fez em nome de quem aprovou. Guarda o **snapshot** aprovado: `caption` (legenda + CTA + hashtags, como foi ao ar), `image_url`, `account_username`, `approved_by`, `approved_at`, `scheduled_for`. E o resultado: `status` enum (`pending` `publishing` `published` `failed` `unknown` `cancelled`), `container_id`, `media_id` (o id que a Meta devolveu), `permalink`, `published_at`, `attempts`, `next_attempt_at`, `error_kind`, `last_error`.
+**Etapa 3:** `media_type` (`IMAGE` `CAROUSEL` `REELS`, do formato da peça: post/carousel/reel) e `media` jsonb — `{images: [urls na ordem]}` no carrossel, `{video_url, cover_url}` no Reel. Outros formatos nascem `failed` com o motivo (antes um `story` saía como post de imagem).
+
+### `content_slides` (Etapa 3)
+`content_id` (cascade), `asset_id` (cascade — só rascunho perde o slide; peça aprovada não deixa apagar a imagem), `position`; único `(content_id, position)`. As imagens do carrossel. `contents.video_asset_id` (nullOnDelete) é o vídeo do Reel; a `image_asset_id` da peça é a capa.
+
 Índices únicos: `(content_id, scheduled_for)` — uma publicação por horário (o agendador pode rodar duas vezes; o banco aceita uma); e parcial `(content_id) WHERE status IN (pending, publishing, published, unknown)` — **nunca duas publicações vivas da mesma peça**.
 
 ### `publication_attempts`

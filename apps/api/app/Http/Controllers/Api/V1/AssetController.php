@@ -174,7 +174,11 @@ class AssetController extends Controller
     {
         Gate::authorize('update', $asset->project);
 
-        if ($asset->contents()->whereIn('status', self::CONGELADOS)->exists()) {
+        // Imagem de post, capa de Reel, slide de carrossel ou video: em peca aprovada,
+        // nao sai.
+        if ($asset->contents()->whereIn('status', self::CONGELADOS)->exists()
+            || $asset->videoContents()->whereIn('status', self::CONGELADOS)->exists()
+            || $asset->slideContents()->whereIn('contents.status', self::CONGELADOS)->exists()) {
             return response()->json([
                 'message' => 'Esta imagem está numa peça aprovada. Troque a imagem da peça antes de remover.',
             ], 409);

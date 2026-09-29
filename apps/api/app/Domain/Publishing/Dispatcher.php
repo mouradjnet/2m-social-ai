@@ -24,6 +24,9 @@ use Illuminate\Support\Facades\DB;
  */
 class Dispatcher
 {
+    /** O formato da peca -> o `media_type` da Meta. */
+    private const TIPOS = ['post' => 'IMAGE', 'carousel' => 'CAROUSEL', 'reel' => 'REELS'];
+
     /** Quanto tempo uma publicacao enfileirada fica reservada antes de ser reenfileirada. */
     private const LEASE_MINUTES = 3;
 
@@ -49,7 +52,7 @@ class Dispatcher
                 ->from('publications')
                 ->whereColumn('publications.content_id', 'contents.id')
                 ->whereColumn('publications.scheduled_for', 'contents.scheduled_for'))
-            ->with('image')
+            ->with(['image', 'slides', 'video'])
             ->get();
 
         return $vencidas->map(fn (Content $c) => $this->prepare($c))->filter()->values();
@@ -69,7 +72,7 @@ class Dispatcher
 
         $recusa = PublishGate::refusal($content)
             ?? Caption::refusal($content)
-            ?? $this->semImagem($content)
+            ?? $this->semMidia($content)
             ?? $this->semConta($conta)
             ?? $this->atrasada($content);
 
@@ -81,9 +84,12 @@ class Dispatcher
                 'project_id' => $content->project_id,
                 'content_id' => $content->id,
                 'instagram_account_id' => $conta?->id,
-                'asset_id' => $content->image_asset_id,
+                'asset_id' => $content->format === 'reel' ? $content->video_asset_id : $content->image_asset_id,
+                'media_type' => self::TIPOS[$content->format] ?? 'IMAGE',
+                'media' => $this->midia($content),
                 'caption' => Caption::compose($content),
-                'image_url' => $content->image?->url,
+                // Post: a imagem. Reel: a capa. Carrossel: o primeiro slide (o que abre o post).
+                'image_url' => $content->format === 'carousel' ? $content->slides->first()?->url : $content->image?->url,
                 'account_username' => $conta?->username,
                 'approved_by' => $content->approved_by,
                 'approved_at' => $content->approved_at,
@@ -158,9 +164,34 @@ class Dispatcher
         return $presas->count();
     }
 
-    private function semImagem(Content $content): ?string
+    /**
+     * O que cada formato precisa para ir ao ar (limites da Meta, 29/09/2026). Formato
+     * sem tipo aqui nao e publicado pelo sistema — antes um `story` saia como post de
+     * imagem, em silencio.
+     */
+    private function semMidia(Content $content): ?string
     {
-        return $content->image === null ? 'A peça não tem imagem. O Instagram não publica post sem imagem.' : null;
+        $slides = $content->slides->count();
+        [$min, $max] = [config('media.carousel.min_items'), config('media.carousel.max_items')];
+
+        return match ($content->format) {
+            'post' => $content->image === null ? 'A peça não tem imagem. O Instagram não publica post sem imagem.' : null,
+            'carousel' => $slides < $min || $slides > $max
+                ? "O carrossel tem {$slides} imagens; o Instagram exige de {$min} a {$max}."
+                : null,
+            'reel' => $content->video === null ? 'O Reel não tem vídeo.' : null,
+            default => "O formato '{$content->format}' não é publicado automaticamente no Instagram (só post, carrossel e Reel). Publique à mão pelo zip.",
+        };
+    }
+
+    /** O snapshot das URLs aprovadas: e isto que o Publisher manda para a Meta. */
+    private function midia(Content $content): ?array
+    {
+        return match ($content->format) {
+            'carousel' => ['images' => $content->slides->pluck('url')->all()],
+            'reel' => ['video_url' => $content->video?->url, 'cover_url' => $content->image?->url],
+            default => null,
+        };
     }
 
     private function semConta(?InstagramAccount $conta): ?string

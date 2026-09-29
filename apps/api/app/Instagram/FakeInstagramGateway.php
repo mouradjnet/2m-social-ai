@@ -58,6 +58,29 @@ class FakeInstagramGateway implements InstagramGateway
         return $id;
     }
 
+    public function createCarouselItemContainer(string $igUserId, string $token, string $imageUrl): string
+    {
+        return $this->container(['status' => 'FINISHED', 'item' => $imageUrl]);
+    }
+
+    public function createCarouselContainer(string $igUserId, string $token, array $children, string $caption): string
+    {
+        return $this->container(['status' => 'FINISHED', 'caption' => $caption, 'children' => $children]);
+    }
+
+    public function createReelContainer(string $igUserId, string $token, string $videoUrl, string $caption, ?string $coverUrl): string
+    {
+        return $this->container(['status' => 'FINISHED', 'caption' => $caption, 'video_url' => $videoUrl]);
+    }
+
+    private function container(array $dados): string
+    {
+        $id = 'fake-container-'.Str::random(12);
+        Cache::put("instagram-fake:{$id}", $dados, now()->addDay());
+
+        return $id;
+    }
+
     public function containerStatus(string $containerId, string $token): string
     {
         return Cache::get("instagram-fake:{$containerId}")['status'] ?? 'EXPIRED';

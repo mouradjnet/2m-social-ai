@@ -23,7 +23,7 @@ class Publication extends Model
 
     protected $fillable = [
         'workspace_id', 'project_id', 'content_id', 'instagram_account_id', 'asset_id',
-        'caption', 'image_url', 'account_username', 'approved_by', 'approved_at', 'scheduled_for',
+        'media_type', 'media', 'caption', 'image_url', 'account_username', 'approved_by', 'approved_at', 'scheduled_for',
         'status', 'container_id', 'media_id', 'permalink', 'published_at',
         'attempts', 'next_attempt_at', 'error_kind', 'last_error',
     ];
@@ -35,6 +35,7 @@ class Publication extends Model
             'scheduled_for' => 'datetime',
             'published_at' => 'datetime',
             'next_attempt_at' => 'datetime',
+            'media' => 'array',
         ];
     }
 

@@ -287,7 +287,9 @@ Rotas **implementadas** em 2026-09. O `{project}` passa pelo `WorkspaceMemberSco
 GET    /api/v1/projects/{project}/assets
 POST   /api/v1/projects/{project}/assets              multipart: file (JPEG/PNG/WebP, ≤ 8 MB)
 DELETE /api/v1/assets/{asset}                         409 se usada em peça aprovada ou publicação
-PUT    /api/v1/contents/{content}/image               { asset_id | null }  — só idea/production/review
+PUT    /api/v1/contents/{content}/image               { asset_id | null }  — só idea/production/review (só imagem; no Reel é a capa)
+PUT    /api/v1/contents/{content}/slides              { asset_ids: [..] } — carrossel, 2 a 10 imagens do projeto, na ordem; grava revisão
+PUT    /api/v1/contents/{content}/video               { asset_id | null } — o vídeo do Reel; grava revisão
 
 # Conta do Instagram (admin+ para conectar/desconectar)
 GET    /api/v1/projects/{project}/instagram           conta viva (sem token) ou null

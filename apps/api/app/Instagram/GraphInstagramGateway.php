@@ -118,6 +118,44 @@ class GraphInstagramGateway implements InstagramGateway
         return (string) $json['id'];
     }
 
+    public function createCarouselItemContainer(string $igUserId, string $token, string $imageUrl): string
+    {
+        $json = $this->send(fn () => $this->http()->asForm()->post($this->graph("{$igUserId}/media"), [
+            'image_url' => $imageUrl,
+            'is_carousel_item' => 'true',
+            'access_token' => $token,
+        ]));
+
+        return (string) $json['id'];
+    }
+
+    public function createCarouselContainer(string $igUserId, string $token, array $children, string $caption): string
+    {
+        $json = $this->send(fn () => $this->http()->asForm()->post($this->graph("{$igUserId}/media"), [
+            'media_type' => 'CAROUSEL',
+            'children' => implode(',', $children),
+            'caption' => $caption,
+            'access_token' => $token,
+        ]));
+
+        return (string) $json['id'];
+    }
+
+    public function createReelContainer(string $igUserId, string $token, string $videoUrl, string $caption, ?string $coverUrl): string
+    {
+        $json = $this->send(fn () => $this->http()->asForm()->post($this->graph("{$igUserId}/media"), array_filter([
+            'media_type' => 'REELS',
+            'video_url' => $videoUrl,
+            'caption' => $caption,
+            'cover_url' => $coverUrl,
+            // Aparece no feed alem da aba Reels: e o que se espera de um post agendado.
+            'share_to_feed' => 'true',
+            'access_token' => $token,
+        ], fn ($v) => $v !== null)));
+
+        return (string) $json['id'];
+    }
+
     public function containerStatus(string $containerId, string $token): string
     {
         $json = $this->send(fn () => $this->http()->get($this->graph($containerId), [

@@ -34,6 +34,9 @@ return [
      | H.264 ou HEVC, audio AAC, de 3 s a 15 min, ate 1920 px de largura, ate
      | 300 MB. O arquivo NAO e reencodado (nao ha ffmpeg): ou cumpre, ou e recusado.
      */
+    // Carrossel: 2 a 10 itens (Meta). Esta versao aceita so imagens como item.
+    'carousel' => ['min_items' => 2, 'max_items' => 10],
+
     'video' => [
         'max_bytes' => (int) env('MEDIA_VIDEO_MAX_BYTES', 300 * 1024 * 1024),
         'min_ms' => 3_000,

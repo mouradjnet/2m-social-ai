@@ -32,7 +32,7 @@ class ContentController extends Controller
         return response()->json([
             // A ultima review e a ultima sugestao de SEO vem juntas: o board mostra
             // veredito e sugestao sem uma chamada por card.
-            'data' => $project->contents()->with(['latestReview', 'latestSeo', 'latestTextRevision', 'approver', 'image', 'latestPublication'])->latest()->get(),
+            'data' => $project->contents()->with(['latestReview', 'latestSeo', 'latestTextRevision', 'approver', 'image', 'slides', 'video', 'latestPublication'])->latest()->get(),
         ]);
     }
 

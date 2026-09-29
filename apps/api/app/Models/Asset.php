@@ -6,6 +6,7 @@ use App\Models\Scopes\WorkspaceMemberScope;
 use Illuminate\Database\Eloquent\Attributes\ScopedBy;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Facades\Storage;
 
@@ -33,6 +34,18 @@ class Asset extends Model
     public function contents(): HasMany
     {
         return $this->hasMany(Content::class, 'image_asset_id');
+    }
+
+    /** Pecas em que esta imagem e slide de carrossel. */
+    public function slideContents(): BelongsToMany
+    {
+        return $this->belongsToMany(Content::class, 'content_slides');
+    }
+
+    /** Pecas (Reels) em que este e o video. */
+    public function videoContents(): HasMany
+    {
+        return $this->hasMany(Content::class, 'video_asset_id');
     }
 
     public function getUrlAttribute(): string

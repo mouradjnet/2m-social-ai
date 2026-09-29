@@ -20,6 +20,9 @@ return [
     // O container da Meta pode levar alguns segundos para ficar FINISHED.
     'container_poll_minutes' => 1,
     'max_container_polls' => 10,
+    // Reel: a Meta processa o video (recomenda consultar 1x por minuto). Um video de
+    // alguns minutos pode levar mais que os 10 de uma imagem.
+    'max_container_polls_video' => 30,
 
     // Depois de um resultado desconhecido no media_publish, espera antes de
     // perguntar a Meta o que aconteceu.

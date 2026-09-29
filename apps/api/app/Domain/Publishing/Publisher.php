@@ -108,15 +108,42 @@ class Publisher
                 );
             }
 
-            $container = $this->gateway->createImageContainer(
-                $conta->ig_user_id, $token, (string) $this->publicacao->image_url, $this->publicacao->caption,
-            );
+            $container = $this->criarContainer($conta->ig_user_id, $token);
 
             $this->publicacao->update(['container_id' => $container]);
             $this->registrar('container', 'success', "Container {$container} criado.");
         }
 
         $this->seguirContainer($conta, $token);
+    }
+
+    /**
+     * O unico passo que muda por formato. Daqui em diante (estado, media_publish,
+     * reconciliacao) um container e um container.
+     *
+     * Carrossel: um container por imagem (`is_carousel_item`), depois o do carrossel
+     * com os filhos na ordem. Se o processo morrer entre os dois, os filhos orfaos
+     * expiram sozinhos na Meta em 24 h; nada foi publicado.
+     */
+    private function criarContainer(string $igUserId, string $token): string
+    {
+        $p = $this->publicacao;
+
+        return match ($p->media_type) {
+            'CAROUSEL' => $this->gateway->createCarouselContainer(
+                $igUserId,
+                $token,
+                array_map(
+                    fn (string $url) => $this->gateway->createCarouselItemContainer($igUserId, $token, $url),
+                    $p->media['images'] ?? [],
+                ),
+                $p->caption,
+            ),
+            'REELS' => $this->gateway->createReelContainer(
+                $igUserId, $token, (string) ($p->media['video_url'] ?? ''), $p->caption, $p->media['cover_url'] ?? null,
+            ),
+            default => $this->gateway->createImageContainer($igUserId, $token, (string) $p->image_url, $p->caption),
+        };
     }
 
     /** Pergunta o estado do container e age conforme a resposta. */
@@ -129,7 +156,7 @@ class Publisher
             'PUBLISHED' => $this->jaPublicado($conta, $token),
             'IN_PROGRESS' => $this->esperarContainer(),
             'EXPIRED' => $this->recomecar('O container expirou antes de publicar. Um novo será criado.'),
-            default => throw new InstagramException("A Meta recusou a imagem (container {$estado}).", 'permanent'),
+            default => throw new InstagramException("A Meta recusou a mídia (container {$estado}).", 'permanent'),
         };
     }
 
@@ -179,11 +206,16 @@ class Publisher
         $esperas = PublicationAttempt::where('publication_id', $this->publicacao->id)
             ->where('step', 'status')->where('outcome', 'waiting')->count();
 
-        if ($esperas >= config('publishing.max_container_polls')) {
-            throw new InstagramException('A Meta não terminou de processar a imagem a tempo.', 'permanent');
+        // Video leva minutos para processar; imagem, segundos.
+        $limite = $this->publicacao->media_type === 'REELS'
+            ? config('publishing.max_container_polls_video')
+            : config('publishing.max_container_polls');
+
+        if ($esperas >= $limite) {
+            throw new InstagramException('A Meta não terminou de processar a mídia a tempo.', 'permanent');
         }
 
-        $this->registrar('status', 'waiting', 'A Meta ainda processa a imagem.');
+        $this->registrar('status', 'waiting', 'A Meta ainda processa a mídia.');
         $this->publicacao->update([
             'status' => 'pending',
             'next_attempt_at' => now()->addMinutes(config('publishing.container_poll_minutes')),

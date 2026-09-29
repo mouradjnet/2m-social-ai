@@ -41,6 +41,19 @@ interface InstagramGateway
     /** Cria o container de uma imagem. Devolve o id do container (ainda nao publicado). */
     public function createImageContainer(string $igUserId, string $token, string $imageUrl, string $caption): string;
 
+    /** Um item de carrossel (`is_carousel_item`). Nao tem legenda: a legenda e do carrossel. */
+    public function createCarouselItemContainer(string $igUserId, string $token, string $imageUrl): string;
+
+    /**
+     * O container do carrossel (`media_type=CAROUSEL`), com os itens na ordem.
+     *
+     * @param  list<string>  $children
+     */
+    public function createCarouselContainer(string $igUserId, string $token, array $children, string $caption): string;
+
+    /** O container do Reel (`media_type=REELS`). A Meta processa o video: fica IN_PROGRESS por um tempo. */
+    public function createReelContainer(string $igUserId, string $token, string $videoUrl, string $caption, ?string $coverUrl): string;
+
     /** `FINISHED`, `IN_PROGRESS`, `ERROR`, `EXPIRED` ou `PUBLISHED`. */
     public function containerStatus(string $containerId, string $token): string;
 
