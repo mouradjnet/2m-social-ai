@@ -21,6 +21,7 @@ use App\Models\WorkspaceMember;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
+use Tests\Support\Roteiro;
 use Tests\TestCase;
 
 /**
@@ -247,6 +248,40 @@ class WeekPlanTest extends TestCase
             ->assertStatus(409);
     }
 
+    /** CP-03: sem `posts`, vale a frequencia semanal que a estrategia aprovada recomendou. */
+    public function test_sem_numero_de_posts_usa_a_frequencia_da_estrategia(): void
+    {
+        $this->strategy->update(['guidelines' => ['weekly_frequency' => 5]]);
+
+        $this->postJson("/api/v1/projects/{$this->project->id}/week-plan:generate", ['starts_on' => $this->amanha()])
+            ->assertStatus(202);
+
+        $plano = ContentPlan::latest('id')->first();
+        $this->assertSame(5, $plano->posts_count);
+        // Cada horario traz objetivo e CTA.
+        foreach ($plano->slots() as $slot) {
+            $this->assertNotSame('', $slot['objective']);
+            $this->assertNotSame('', $slot['cta']);
+        }
+    }
+
+    /** CP-03: o horario de uma peca ja planejada nao e oferecido de novo. */
+    public function test_planejamento_evita_horario_ja_ocupado(): void
+    {
+        $ocupado = CarbonImmutable::parse($this->amanha().' 19:00', 'America/Sao_Paulo');
+        Content::create([
+            'workspace_id' => $this->workspace->id, 'project_id' => $this->project->id,
+            'title' => 'Já marcada', 'format' => 'post', 'channel' => 'instagram',
+            'status' => 'idea', 'planned_for' => $ocupado->utc(), 'created_by' => $this->editor->id,
+        ]);
+
+        $plano = $this->planejar();
+
+        $this->assertSame('succeeded', AiRun::where('agent', 'planner')->sole()->status);
+        $horarios = array_map(fn ($s) => "{$s['date']} {$s['time']}", $plano->slots());
+        $this->assertNotContains($this->amanha().' 19:00', $horarios);
+    }
+
     public function test_quem_e_de_fora_nao_ve_o_plano(): void
     {
         $this->planejar();
@@ -271,7 +306,7 @@ class WeekPlanTest extends TestCase
 
     private function slot(array $extra = []): array
     {
-        return ['date' => '2026-10-05', 'time' => '19:00', 'pillar' => 'A', 'format' => 'post', 'channel' => 'instagram', 'theme' => 't', 'rationale' => 'r', ...$extra];
+        return ['date' => '2026-10-05', 'time' => '19:00', 'pillar' => 'A', 'format' => 'post', 'channel' => 'instagram', 'theme' => 't', 'objective' => 'Educar', 'cta' => 'Salve este post', 'rationale' => 'r', ...$extra];
     }
 
     public function test_planner_recusa_data_fora_da_semana_hora_repetida_e_pilar_inventado(): void
@@ -297,6 +332,31 @@ class WeekPlanTest extends TestCase
         }
     }
 
+    /** CP-03: objetivo e CTA por horario, e nada em cima de horario ja ocupado. */
+    public function test_planner_recusa_horario_ocupado_e_horario_sem_objetivo_ou_cta(): void
+    {
+        $ctx = $this->contexto(['weekWindow' => [
+            'starts_on' => '2026-10-05', 'ends_on' => '2026-10-11', 'posts' => 1,
+            'timezone' => 'America/Sao_Paulo', 'taken' => ['2026-10-05 19:00'],
+        ]]);
+        $agent = new PlannerAgent;
+
+        $agent->validate(['summary' => 's', 'slots' => [$this->slot(['time' => '20:00'])]], $ctx);
+
+        foreach ([
+            [$this->slot()],
+            [$this->slot(['time' => '20:00', 'objective' => ' '])],
+            [$this->slot(['time' => '20:00', 'cta' => ''])],
+        ] as $slots) {
+            try {
+                $agent->validate(['summary' => 's', 'slots' => $slots], $ctx);
+                $this->fail('Devia recusar: '.json_encode($slots));
+            } catch (OutputRejectedException) {
+                $this->addToAssertionCount(1);
+            }
+        }
+    }
+
     public function test_planner_nao_deixa_de_fora_o_pilar_mais_atrasado(): void
     {
         $ctx = $this->contexto([
@@ -311,7 +371,7 @@ class WeekPlanTest extends TestCase
     public function test_copywriter_com_plano_nao_muda_pilar_formato_nem_canal(): void
     {
         $ctx = $this->contexto(['planSlots' => [$this->slot(), $this->slot(['pillar' => 'B', 'format' => 'carousel'])]]);
-        $peca = fn (array $extra = []) => ['title' => uniqid(), 'caption' => 'c', 'cta' => 'x', 'hashtags' => [], 'format' => 'post', 'channel' => 'instagram', 'pillar' => 'A', ...$extra];
+        $peca = fn (array $extra = []) => ['title' => uniqid(), 'caption' => 'c', 'cta' => 'x', 'hashtags' => [], 'format' => 'post', 'channel' => 'instagram', 'pillar' => 'A', 'structure' => Roteiro::valido(), ...$extra];
         $agent = new CopywriterAgent(5);
 
         // Com plano, o tamanho do lote e o do plano (2), nao o batch_size (5).

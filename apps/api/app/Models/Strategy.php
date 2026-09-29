@@ -15,12 +15,12 @@ class Strategy extends Model
 
     protected $fillable = [
         'workspace_id', 'project_id', 'title', 'summary',
-        'editorial_line', 'pillars', 'status', 'ai_run_id',
+        'editorial_line', 'pillars', 'guidelines', 'status', 'ai_run_id',
     ];
 
     protected function casts(): array
     {
-        return ['pillars' => 'array'];
+        return ['pillars' => 'array', 'guidelines' => 'array'];
     }
 
     public function project(): BelongsTo

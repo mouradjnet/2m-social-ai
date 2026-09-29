@@ -3,6 +3,7 @@
 namespace App\Ai\Agents;
 
 use App\Ai\Exceptions\OutputRejectedException;
+use App\Domain\Editorial\BrandRules;
 use App\Models\AiRun;
 use App\Models\ContentReview;
 use App\Models\Project;
@@ -81,6 +82,19 @@ class ReviewerAgent implements Agent
         - `required_words`: quando um termo caberia com naturalidade e foi ignorado.
         - Clareza da chamada para acao (`cta`) e coerencia entre legenda, formato e
           canal.
+        - Promessa sem comprovacao (cura, resultado garantido, "100%", prazo certo).
+        - Informacao inventada: numero, estudo, cliente ou depoimento que a marca nao
+          forneceu; depoimento simulado apresentado como real.
+        - Inconsistencia comercial: produto, preco, promocao, cupom ou servico que nao
+          esta em `products`/`services` do perfil ("A CONFIRMAR" e "Nenhum" nao sao
+          oferta).
+        - Saude: diagnosticar, prescrever (dose, remedio), anunciar servico medico ou
+          afirmar sem base reconhecida.
+        - Linguagem inadequada para o publico e o tom da marca.
+        - Falta de informacao essencial para a peca cumprir o objetivo (ex.: carrossel
+          sem conclusao, Reels sem gancho).
+        - `structure` e o roteiro (slides, telas, cenas): julgue-o como o resto do
+          texto.
 
         Regras da resposta:
         - `verdict` e `pass` ou `fail`. Use `fail` **somente** quando houver ao menos
@@ -151,7 +165,11 @@ class ReviewerAgent implements Agent
 
     public function persist(Project $project, array $output, AiRun $run): void
     {
+        $proibidas = $project->brandProfile?->forbidden_words ?? [];
+
         foreach ($output['reviews'] as $review) {
+            $review = $this->comRegrasDeterministicas($review, $project, $proibidas);
+
             ContentReview::create([
                 'content_id' => $review['content_id'],
                 'ai_run_id' => $run->id,
@@ -160,6 +178,40 @@ class ReviewerAgent implements Agent
                 'violations' => $review['violations'],
             ]);
         }
+    }
+
+    /**
+     * CP-03: a IA pode deixar passar uma expressao proibida. Aqui ela e procurada no
+     * codigo, no texto inteiro da peca (roteiro incluso): achou, a peca e reprovada,
+     * com a violacao registrada — mesmo que o modelo tenha aprovado.
+     *
+     * @param  list<string>  $proibidas
+     */
+    private function comRegrasDeterministicas(array $review, Project $project, array $proibidas): array
+    {
+        $peca = $project->contents()->find($review['content_id']);
+        $achadas = $peca === null ? [] : BrandRules::forbiddenIn(BrandRules::pieceText($peca->only(['title', 'caption', 'cta', 'hashtags', 'structure'])), $proibidas);
+
+        $jaApontadas = array_map(fn ($v) => mb_strtolower((string) ($v['excerpt'] ?? '')), $review['violations']);
+
+        foreach ($achadas as $expressao) {
+            if (in_array(mb_strtolower($expressao), $jaApontadas, true)) {
+                continue;
+            }
+
+            $review['violations'][] = [
+                'rule' => 'Expressão proibida',
+                'excerpt' => $expressao,
+                'suggestion' => 'Remova ou reescreva: está em "palavras proibidas" do perfil da marca.',
+            ];
+        }
+
+        if ($achadas !== [] && $review['verdict'] === 'pass') {
+            $review['verdict'] = 'fail';
+            $review['summary'] = 'Reprovada pela verificação automática: usa expressão proibida pelo perfil ('.implode(', ', $achadas).').';
+        }
+
+        return $review;
     }
 
     /** Veredito que nao bate com a lista e saida incoerente, nao opiniao. */

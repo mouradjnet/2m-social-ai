@@ -4,7 +4,8 @@ import { PublicationBadge } from '@/components/instagram/PublicationBadge'
 import { Card } from '@/components/ui/Card'
 import { cn } from '@/lib/cn'
 import { copyToClipboard } from '@/lib/copyToClipboard'
-import type { Content, ContentStatus } from '@/lib/types'
+import { StructurePreview } from '@/components/content/StructurePreview'
+import type { Content, ContentFormat, ContentStatus, EditorialState } from '@/lib/types'
 
 interface Props {
   content: Content
@@ -27,6 +28,24 @@ const CHIPS: Record<ContentStatus, string> = {
   scheduled: 'Agendado',
   published: 'Publicado',
   archived: 'Arquivado',
+}
+
+/** CP-03: o formato em portugues, para identificar a peca de relance. */
+const FORMATOS: Record<ContentFormat, string> = {
+  post: 'Feed',
+  carousel: 'Carrossel',
+  reel: 'Reels',
+  story: 'Stories',
+  video: 'Vídeo',
+  article: 'Artigo',
+  thread: 'Thread',
+}
+
+/** CP-03: so os estados que o status sozinho nao conta (os da coluna Revisao). */
+const ESTADOS: Partial<Record<EditorialState, string>> = {
+  in_review: 'Aguardando revisão',
+  needs_revision: 'Precisa de ajuste',
+  ready_for_approval: 'Pronta para aprovação',
 }
 
 // A mesma ordem do FLOW do backend. No cliente e so para habilitar/desabilitar;
@@ -91,7 +110,7 @@ export function ContentCard({
     <Card>
       <div className="flex items-center justify-between gap-2">
         <span className="text-label-sm text-on-surface-variant">
-          {content.format} · {content.channel}
+          {FORMATOS[content.format]} · {content.channel}
         </span>
         <span className="text-label-sm bg-surface-container text-on-surface-variant shrink-0 rounded-full px-2 py-0.5">
           {CHIPS[content.status]}
@@ -117,6 +136,16 @@ export function ContentCard({
 
       {content.hashtags.length > 0 && (
         <p className="text-body-sm text-primary mt-2">{content.hashtags.join(' ')}</p>
+      )}
+
+      {content.editorial_state && ESTADOS[content.editorial_state] && (
+        <p className="text-label-sm text-on-surface mt-2">
+          Estado editorial: {ESTADOS[content.editorial_state]}
+        </p>
+      )}
+
+      {content.structure && (
+        <StructurePreview format={content.format} structure={content.structure} />
       )}
 
       {content.scheduled_for && (

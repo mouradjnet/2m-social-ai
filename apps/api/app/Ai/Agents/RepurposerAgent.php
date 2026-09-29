@@ -3,6 +3,8 @@
 namespace App\Ai\Agents;
 
 use App\Ai\Exceptions\OutputRejectedException;
+use App\Domain\Editorial\BrandRules;
+use App\Domain\Editorial\FormatStructure;
 use App\Models\AiRun;
 use App\Models\Content;
 use App\Models\Project;
@@ -28,13 +30,15 @@ class RepurposerAgent implements Agent
         return [
             'type' => 'object',
             'additionalProperties' => false,
-            'required' => ['title', 'caption', 'cta', 'hashtags', 'adaptation_notes'],
+            'required' => ['title', 'caption', 'cta', 'hashtags', 'adaptation_notes', 'structure'],
             'properties' => [
                 'title' => ['type' => 'string'],
                 'caption' => ['type' => 'string'],
                 'cta' => ['type' => 'string'],
                 'hashtags' => ['type' => 'array', 'items' => ['type' => 'string']],
                 'adaptation_notes' => ['type' => 'string'],
+                // CP-03: o roteiro no formato de DESTINO.
+                'structure' => FormatStructure::schema(),
             ],
         ];
     }
@@ -103,6 +107,16 @@ class RepurposerAgent implements Agent
             return;
         }
 
+        $destino = (string) ($context->repurpose['target']['format'] ?? '');
+        if ($problema = FormatStructure::problem($destino, $output['structure'] ?? null)) {
+            throw new OutputRejectedException($problema);
+        }
+
+        $proibidas = BrandRules::forbiddenIn(BrandRules::pieceText($output), $context->brandProfile['forbidden_words'] ?? []);
+        if ($proibidas !== []) {
+            throw new OutputRejectedException('A peça adaptada usa expressão proibida: '.implode(', ', $proibidas).'.');
+        }
+
         // Copiar e colar nao e reaproveitar: a legenda TEM que mudar.
         if (trim($output['caption']) === trim((string) $origem['caption'])) {
             throw new OutputRejectedException('A peça adaptada é idêntica à original.');
@@ -130,6 +144,7 @@ class RepurposerAgent implements Agent
             'caption' => $output['caption'],
             'cta' => $output['cta'],
             'hashtags' => $output['hashtags'],
+            'structure' => $output['structure'],
             'format' => $run->input['target_format'],
             'channel' => $run->input['target_channel'],
             // Mesmo assunto, mesmo pilar: a aderencia conta a derivada no pilar certo.

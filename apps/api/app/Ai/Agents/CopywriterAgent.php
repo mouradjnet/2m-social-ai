@@ -3,6 +3,8 @@
 namespace App\Ai\Agents;
 
 use App\Ai\Exceptions\OutputRejectedException;
+use App\Domain\Editorial\BrandRules;
+use App\Domain\Editorial\FormatStructure;
 use App\Models\AiRun;
 use App\Models\Content;
 use App\Models\ContentPlan;
@@ -45,7 +47,7 @@ class CopywriterAgent implements Agent
                     'items' => [
                         'type' => 'object',
                         'additionalProperties' => false,
-                        'required' => ['title', 'caption', 'cta', 'hashtags', 'format', 'channel', 'pillar'],
+                        'required' => ['title', 'caption', 'cta', 'hashtags', 'format', 'channel', 'pillar', 'structure'],
                         'properties' => [
                             'title' => ['type' => 'string'],
                             'caption' => ['type' => 'string'],
@@ -54,6 +56,7 @@ class CopywriterAgent implements Agent
                             'format' => ['type' => 'string', 'enum' => self::FORMATS],
                             'channel' => ['type' => 'string', 'enum' => self::CHANNELS],
                             'pillar' => ['type' => 'string'],
+                            'structure' => FormatStructure::schema(),
                         ],
                     ],
                 ],
@@ -106,7 +109,13 @@ class CopywriterAgent implements Agent
           algo, reescreva com outra palavra.
         - Quando `required_words` trouxer termos, prefira-os desde que caibam com
           naturalidade — nao os force.
-        TXT;
+        - Com plano, siga o `theme`, o `objective` e o `cta` de cada horario.
+        - Venda so o que esta em `products`/`services`. Sem oferta real (vazio, "A
+          CONFIRMAR", "Nenhum"): nada de preco, promocao, cupom ou "compre"; o CTA
+          convida a salvar, comentar, compartilhar ou seguir.
+        - Nunca invente depoimento, cliente, numero, estudo ou resultado. Afirmacao de
+          saude so com base reconhecida, sem prometer cura nem prescrever.
+        TXT."\n\n".FormatStructure::instructions();
     }
 
     public function userMessage(AgentContext $context): string
@@ -178,6 +187,16 @@ class CopywriterAgent implements Agent
                 throw new OutputRejectedException("A peça \"{$titulo}\" já existe no projeto.");
             }
 
+            // CP-03: o roteiro do formato, conferido no codigo.
+            if ($problema = FormatStructure::problem($format, $piece['structure'] ?? null)) {
+                throw new OutputRejectedException("\"{$titulo}\": {$problema}");
+            }
+
+            $proibidas = BrandRules::forbiddenIn(BrandRules::pieceText($piece), $context?->brandProfile['forbidden_words'] ?? []);
+            if ($proibidas !== []) {
+                throw new OutputRejectedException("\"{$titulo}\" usa expressão proibida pelo perfil: ".implode(', ', $proibidas).'.');
+            }
+
             $pilar = $piece['pillar'] ?? '';
             if ($context?->targetPillar !== null && $pilar !== $context->targetPillar) {
                 throw new OutputRejectedException(
@@ -229,6 +248,7 @@ class CopywriterAgent implements Agent
                 // O pilar de onde a peca saiu. Sem ele, nao ha como comparar o que a
                 // estrategia pediu com o que foi entregue.
                 'pillar' => $piece['pillar'],
+                'structure' => $piece['structure'],
                 // A IA propoe, o humano promove.
                 'status' => 'idea',
                 // Sustenta o chip "Gerado por IA" e a rastreabilidade de custo.

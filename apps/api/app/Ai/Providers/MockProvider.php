@@ -2,6 +2,7 @@
 
 namespace App\Ai\Providers;
 
+use App\Domain\Editorial\BrandRules;
 use Carbon\CarbonImmutable;
 
 /**
@@ -43,6 +44,8 @@ class MockProvider implements LlmProvider
                     ['name' => 'Prova social', 'weight' => 35, 'description' => 'Casos, depoimentos e numeros verificaveis.'],
                     ['name' => 'Bastidores', 'weight' => 25, 'description' => 'Mostrar o processo e as pessoas por tras da marca.'],
                 ],
+                // CP-03: comercial so com oferta real no perfil, como o validate() exige.
+                'guidelines' => $this->diretrizes($request->userMessage),
             ];
         }
 
@@ -68,11 +71,13 @@ class MockProvider implements LlmProvider
                     'pieces' => array_map(fn (int $i, array $slot) => [
                         'title' => "{$slot['theme']} ({$unico}{$i})",
                         'caption' => "Legenda sobre {$slot['theme']}, no tom da marca.",
-                        'cta' => 'Fale com a gente no WhatsApp.',
+                        // O CTA do horario do plano (CP-03), como o prompt manda o modelo seguir.
+                        'cta' => $slot['cta'] ?? 'Fale com a gente no WhatsApp.',
                         'hashtags' => ['#marca', '#conteudo'],
                         'format' => $slot['format'],
                         'channel' => $slot['channel'],
                         'pillar' => $slot['pillar'],
+                        'structure' => $this->estrutura($slot['format'], $slot['theme']),
                     ], array_keys($context['plan_slots']), $context['plan_slots']),
                 ];
             }
@@ -91,6 +96,7 @@ class MockProvider implements LlmProvider
                         'format' => 'post',
                         'channel' => 'instagram',
                         'pillar' => $pilar,
+                        'structure' => $this->estrutura('post', "peca {$i}"),
                     ];
                 }, range(0, 4)),
             ];
@@ -109,11 +115,14 @@ class MockProvider implements LlmProvider
                 'summary' => 'Semana equilibrada entre os pilares, com prioridade para o que esta atrasado.',
                 'slots' => array_map(fn (int $i) => [
                     'date' => $inicio->addDays($i % 7)->toDateString(),
-                    'time' => '19:00',
+                    // Desvia dos horarios ja ocupados (`week.taken`), como o validate() exige.
+                    'time' => in_array($inicio->addDays($i % 7)->toDateString().' 19:00', $semana['taken'] ?? [], true) ? '20:30' : '19:00',
                     'pillar' => ($i === 0 ? $atrasado : null) ?? ($pilares[$i % max(count($pilares), 1)] ?? 'Pilar'),
                     'format' => $i % 2 === 0 ? 'post' : 'carousel',
                     'channel' => 'instagram',
                     'theme' => "Tema {$i} da semana de {$semana['starts_on']}",
+                    'objective' => $i % 2 === 0 ? 'Educar' : 'Engajar',
+                    'cta' => 'Salve este post para consultar depois.',
                     'rationale' => 'Horario de maior presenca do publico no Instagram.',
                 ], range(0, (int) $semana['posts'] - 1)),
             ];
@@ -133,6 +142,7 @@ class MockProvider implements LlmProvider
                 'cta' => $origem['cta'] ?? 'Fale com a gente no WhatsApp.',
                 'hashtags' => $origem['hashtags'] ?? ['#marca'],
                 'adaptation_notes' => "Adaptado de {$origem['format']} para {$alvo}.",
+                'structure' => $this->estrutura($alvo, $origem['title'] ?? 'o assunto'),
             ];
         }
 
@@ -147,6 +157,7 @@ class MockProvider implements LlmProvider
                 'caption' => 'Versao corrigida, sem o que o revisor apontou.',
                 'cta' => $alvo['cta'] ?? 'Fale com a gente no WhatsApp.',
                 'hashtags' => $alvo['hashtags'] ?? ['#marca'],
+                'structure' => $this->estrutura($alvo['format'] ?? 'post', $alvo['title'] ?? 'a peca'),
             ];
         }
 
@@ -296,6 +307,48 @@ class MockProvider implements LlmProvider
     }
 
     /** O userMessage carrega o AgentContext em JSON, entre <context> e </context>. */
+    /** Roteiro minimo VALIDO para o formato (FormatStructure::problem() aceita). */
+    private function estrutura(string $formato, string $tema): array
+    {
+        $base = ['visual' => "Imagem clara e acolhedora sobre {$tema}, nas cores da marca."];
+
+        return match ($formato) {
+            'carousel' => [...$base, 'slides' => [
+                ['heading' => $tema, 'body' => 'Capa: a pergunta que o carrossel responde.'],
+                ['heading' => 'O que saber', 'body' => 'Uma ideia por slide, em linguagem simples.'],
+                ['heading' => 'Para lembrar', 'body' => 'Salve este carrossel para consultar depois.'],
+            ]],
+            'story' => [...$base, 'screens' => [
+                ['text' => 'Voce ja pensou sobre isso?', 'visual' => 'Fundo liso na cor da marca.', 'interaction' => 'enquete'],
+                ['text' => 'Conta pra gente nos comentarios.', 'visual' => 'Mesma paleta.', 'interaction' => ''],
+            ]],
+            'reel' => [...$base,
+                'hook' => "Uma coisa sobre {$tema} que pouca gente sabe.",
+                'scenes' => [
+                    ['description' => 'Rosto em primeiro plano, luz natural.', 'on_screen_text' => $tema, 'narration' => 'Apresente o tema em uma frase.'],
+                    ['description' => 'Detalhe das maos ou do ambiente.', 'on_screen_text' => 'Salve para lembrar', 'narration' => 'Feche com o convite para salvar.'],
+                ],
+                'production_notes' => 'Vertical 9:16, 20 a 30 segundos, trilha suave.',
+            ],
+            default => $base,
+        };
+    }
+
+    private function diretrizes(string $userMessage): array
+    {
+        preg_match('/<brand_profile>(.*?)<\/brand_profile>/s', $userMessage, $m);
+        $perfil = json_decode(trim($m[1] ?? '{}'), true)['brand_profile'] ?? [];
+        $comercial = BrandRules::hasRealOffer($perfil) ? 20 : 0;
+
+        return [
+            'objectives' => ['Educar o publico', 'Fortalecer a marca'],
+            'themes' => ['Duvidas frequentes', 'Rotina', 'Bastidores do trabalho', 'Primeiros passos'],
+            'formats' => ['post', 'carousel', 'reel', 'story'],
+            'weekly_frequency' => 3,
+            'content_mix' => ['educational' => 60, 'institutional' => 40 - $comercial, 'commercial' => $comercial],
+        ];
+    }
+
     private function contextOf(string $userMessage): array
     {
         preg_match('/<context>(.*?)<\/context>/s', $userMessage, $m);

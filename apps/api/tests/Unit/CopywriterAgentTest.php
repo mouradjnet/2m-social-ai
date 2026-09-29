@@ -7,6 +7,7 @@ use App\Ai\Agents\CopywriterAgent;
 use App\Ai\Exceptions\OutputRejectedException;
 use LogicException;
 use PHPUnit\Framework\TestCase;
+use Tests\Support\Roteiro;
 
 class CopywriterAgentTest extends TestCase
 {
@@ -20,6 +21,7 @@ class CopywriterAgentTest extends TestCase
             'format' => 'post',
             'channel' => 'instagram',
             'pillar' => 'Educacao',
+            'structure' => Roteiro::valido(),
         ], $overrides);
     }
 

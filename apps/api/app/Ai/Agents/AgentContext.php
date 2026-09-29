@@ -196,6 +196,7 @@ readonly class AgentContext
                     'ends_on' => CarbonImmutable::parse($input['week_starts_on'])->addDays(6)->toDateString(),
                     'posts' => (int) $input['posts'],
                     'timezone' => $project->timezone,
+                    'taken' => self::takenSlots($project, $input['week_starts_on']),
                 ]
                 : null,
             planSlots: isset($input['content_plan_id'])
@@ -299,6 +300,7 @@ readonly class AgentContext
             'format' => $peca->format,
             'channel' => $peca->channel,
             'pillar' => $peca->pillar,
+            'structure' => $peca->structure,
             'verdict' => $review?->verdict,
             'summary' => $review?->summary,
             // Com o trecho: e o proprio texto sendo consertado (ver o campo).
@@ -378,6 +380,27 @@ readonly class AgentContext
             ->all();
     }
 
+    /**
+     * CP-03: horarios da semana ja ocupados por pecas vivas (agendadas ou planejadas),
+     * em "AAAA-MM-DD HH:MM" LOCAL do projeto — o mesmo formato dos slots do planner.
+     *
+     * @return list<string>
+     */
+    private static function takenSlots(Project $project, string $inicio): array
+    {
+        $de = CarbonImmutable::parse($inicio, $project->timezone)->startOfDay()->utc();
+        $ate = $de->addDays(7);
+
+        return $project->contents()
+            ->where('status', '!=', 'archived')
+            ->where(fn ($q) => $q->whereBetween('scheduled_for', [$de, $ate])->orWhereBetween('planned_for', [$de, $ate]))
+            ->get(['scheduled_for', 'planned_for'])
+            ->map(fn ($c) => ($c->scheduled_for ?? $c->planned_for)->setTimezone($project->timezone)->format('Y-m-d H:i'))
+            ->unique()
+            ->values()
+            ->all();
+    }
+
     /** As aprovadas no momento da execucao — nao no momento do POST. */
     private static function approvedContents(Project $project): array
     {
@@ -398,7 +421,7 @@ readonly class AgentContext
      */
     private static function batchContents(Project $project, array $ids, string $status): array
     {
-        $columns = ['id', 'title', 'caption', 'cta', 'hashtags', 'format', 'channel'];
+        $columns = ['id', 'title', 'caption', 'cta', 'hashtags', 'format', 'channel', 'structure'];
 
         return $project->contents()
             ->where('status', $status)

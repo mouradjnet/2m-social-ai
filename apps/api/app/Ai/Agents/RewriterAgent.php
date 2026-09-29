@@ -3,6 +3,8 @@
 namespace App\Ai\Agents;
 
 use App\Ai\Exceptions\OutputRejectedException;
+use App\Domain\Editorial\BrandRules;
+use App\Domain\Editorial\FormatStructure;
 use App\Models\AiRun;
 use App\Models\ContentRevision;
 use App\Models\Project;
@@ -31,12 +33,14 @@ class RewriterAgent implements Agent
         return [
             'type' => 'object',
             'additionalProperties' => false,
-            'required' => ['title', 'caption', 'cta', 'hashtags'],
+            'required' => ['title', 'caption', 'cta', 'hashtags', 'structure'],
             'properties' => [
                 'title' => ['type' => 'string'],
                 'caption' => ['type' => 'string'],
                 'cta' => ['type' => 'string'],
                 'hashtags' => ['type' => 'array', 'items' => ['type' => 'string']],
+                // CP-03: o roteiro do formato da peca, corrigido junto.
+                'structure' => FormatStructure::schema(),
             ],
         ];
     }
@@ -106,6 +110,15 @@ class RewriterAgent implements Agent
             return;
         }
 
+        if ($problema = FormatStructure::problem((string) $original['format'], $output['structure'] ?? null)) {
+            throw new OutputRejectedException($problema);
+        }
+
+        $proibidas = BrandRules::forbiddenIn(BrandRules::pieceText($output), $context->brandProfile['forbidden_words'] ?? []);
+        if ($proibidas !== []) {
+            throw new OutputRejectedException('A peça reescrita ainda usa expressão proibida: '.implode(', ', $proibidas).'.');
+        }
+
         // Devolver o mesmo texto e a fraude obvia de uma reescrita: o modelo "concorda"
         // com o revisor e nao muda nada. O titulo pode ate continuar (o defeito costuma
         // estar no corpo), mas a legenda TEM que mudar — e ela que foi reprovada.
@@ -119,13 +132,14 @@ class RewriterAgent implements Agent
         $id = $run->input['rewrite_content_id'] ?? null;
         $peca = $project->contents()->findOrFail($id);
 
-        $antes = $peca->only(['title', 'caption', 'cta', 'hashtags']);
+        $antes = $peca->only(['title', 'caption', 'cta', 'hashtags', 'structure']);
 
         $peca->update([
             'title' => $output['title'],
             'caption' => $output['caption'],
             'cta' => $output['cta'],
             'hashtags' => $output['hashtags'],
+            'structure' => $output['structure'],
         ]);
 
         // Append-only, sem status: nao houve transicao, houve troca de texto. E o mesmo
@@ -135,7 +149,7 @@ class RewriterAgent implements Agent
             'user_id' => $run->created_by,
             'changes' => [
                 'de' => $antes,
-                'para' => $peca->only(['title', 'caption', 'cta', 'hashtags']),
+                'para' => $peca->only(['title', 'caption', 'cta', 'hashtags', 'structure']),
                 'motivo' => 'reescrita apos reprovacao do revisor',
                 'ai_run_id' => $run->id,
             ],

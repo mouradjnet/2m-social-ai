@@ -17,6 +17,7 @@ use App\Models\WorkspaceMember;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Testing\TestResponse;
 use Laravel\Sanctum\Sanctum;
+use Tests\Support\Roteiro;
 use Tests\TestCase;
 
 /**
@@ -222,6 +223,7 @@ class RewriteGenerationTest extends TestCase
             'caption' => $peca->caption,
             'cta' => $peca->cta,
             'hashtags' => $peca->hashtags,
+            'structure' => Roteiro::valido(),
         ], $context);
     }
 

@@ -42,7 +42,7 @@ class PlannerAgent implements Agent
                     'items' => [
                         'type' => 'object',
                         'additionalProperties' => false,
-                        'required' => ['date', 'time', 'pillar', 'format', 'channel', 'theme', 'rationale'],
+                        'required' => ['date', 'time', 'pillar', 'format', 'channel', 'theme', 'objective', 'cta', 'rationale'],
                         'properties' => [
                             'date' => ['type' => 'string', 'description' => 'AAAA-MM-DD, dentro de week.starts_on..week.ends_on.'],
                             'time' => ['type' => 'string', 'description' => 'HH:MM, hora LOCAL no fuso week.timezone.'],
@@ -50,6 +50,8 @@ class PlannerAgent implements Agent
                             'format' => ['type' => 'string', 'enum' => self::FORMATS],
                             'channel' => ['type' => 'string', 'enum' => self::CHANNELS],
                             'theme' => ['type' => 'string'],
+                            'objective' => ['type' => 'string', 'description' => 'O que a peca quer causar: educar, engajar, fortalecer a marca...'],
+                            'cta' => ['type' => 'string', 'description' => 'A chamada para acao sugerida.'],
                             'rationale' => ['type' => 'string'],
                         ],
                     ],
@@ -83,6 +85,13 @@ class PlannerAgent implements Agent
           `channel` e um de: instagram, facebook, linkedin, tiktok, youtube, blog.
         - `theme` e o assunto da peca numa frase. Nao repita temas de
           `existing_contents` nem entre si.
+        - `objective` diz o que a peca quer causar (educar, engajar, fortalecer a
+          marca, crescer a audiencia) e `cta` e a chamada para acao sugerida. CTA de
+          venda so para o que esta em `products`/`services` do perfil; sem oferta
+          real ("A CONFIRMAR", "Nenhum" ou vazio), o CTA e de conversa ou de seguir
+          (salvar, comentar, compartilhar), nunca de compra, preco ou promocao.
+        - `week.taken` lista os horarios ja ocupados por outras pecas (data e hora
+          locais): nao use nenhum deles.
         - `rationale` explica em uma frase por que aquele pilar, formato e horario.
         - Se houver `results`, e o que a Meta mediu nos ultimos `results.days` dias:
           medias por post em `by_pillar` e `by_format` (`posts` = quantos sustentam a
@@ -141,6 +150,17 @@ class PlannerAgent implements Agent
 
             if (isset($vistos["{$data} {$hora}"])) {
                 throw new OutputRejectedException("Dois horários iguais: {$data} {$hora}.");
+            }
+
+            // CP-03: nao marcar em cima de peca que ja ocupa o horario.
+            if (in_array("{$data} {$hora}", $semana['taken'] ?? [], true)) {
+                throw new OutputRejectedException("Horário já ocupado por outra peça: {$data} {$hora}.");
+            }
+
+            foreach (['theme', 'objective', 'cta'] as $campo) {
+                if (trim((string) ($slot[$campo] ?? '')) === '') {
+                    throw new OutputRejectedException("Horário {$data} {$hora} sem `{$campo}`.");
+                }
             }
             $vistos["{$data} {$hora}"] = true;
 

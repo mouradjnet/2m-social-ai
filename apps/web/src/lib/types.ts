@@ -84,9 +84,44 @@ export interface Strategy {
   summary: string | null
   editorial_line: string | null
   pillars: Pillar[]
+  /** CP-03: o que o responsável revisa antes de planejar. Null em estratégias antigas. */
+  guidelines?: StrategyGuidelines | null
   status: 'draft' | 'active' | 'archived'
   ai_run_id: number | null
 }
+
+export interface StrategyGuidelines {
+  objectives: string[]
+  themes: string[]
+  formats: ContentFormat[]
+  weekly_frequency: number
+  /** Porcentagens que somam 100. Comercial é 0 sem produto ou serviço real. */
+  content_mix: { educational: number; institutional: number; commercial: number }
+}
+
+/**
+ * CP-03: o ROTEIRO da peça por formato — texto para produzir, não a arte nem o
+ * vídeo. Null em peças manuais ou anteriores ao CP-03.
+ */
+export interface ContentStructure {
+  visual: string
+  slides?: { heading: string; body: string }[]
+  screens?: { text: string; visual: string; interaction: string }[]
+  hook?: string
+  scenes?: { description: string; on_screen_text: string; narration: string }[]
+  production_notes?: string
+}
+
+/** Estado editorial explícito, derivado de status + último veredito (servidor). */
+export type EditorialState =
+  | 'draft'
+  | 'in_review'
+  | 'needs_revision'
+  | 'ready_for_approval'
+  | 'approved'
+  | 'scheduled'
+  | 'published'
+  | 'archived'
 
 export type ContentStatus =
   | 'idea'
@@ -140,6 +175,10 @@ export interface Content {
   scheduled_for: string | null
   /** Em ingles: e o texto que se cola no gerador de imagem. Quem escreve e o designer. */
   image_prompt: string | null
+  /** CP-03: o roteiro do formato (slides, telas, cenas). */
+  structure?: ContentStructure | null
+  /** CP-03: o estado editorial explícito. */
+  editorial_state?: EditorialState
   /** A ultima revisao (as reviews sao append-only). Null se nunca foi revisada. */
   latest_review: ContentReview | null
   /** A ultima sugestao de SEO. Null se o agente nunca rodou nesta peca. */
@@ -347,6 +386,9 @@ export interface PlanSlot {
   format: ContentFormat
   channel: ContentChannel
   theme: string
+  /** CP-03: o que a peça quer causar e a chamada sugerida. Ausentes em planos antigos. */
+  objective?: string
+  cta?: string
   rationale: string
 }
 

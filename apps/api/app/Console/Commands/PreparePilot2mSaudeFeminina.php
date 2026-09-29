@@ -58,8 +58,8 @@ class PreparePilot2mSaudeFeminina extends Command
                 ['workspace_id' => $workspace->id, 'name' => self::PROJECT_NAME],
                 [
                     'company' => '2M Saúde Feminina',
-                    'segment' => 'Saúde da mulher',
-                    'description' => 'Conteúdo educativo de saúde e bem-estar feminino para o Instagram @2msaudefeminina.',
+                    'segment' => 'Autocuidado, beleza e bem-estar feminino',
+                    'description' => 'Loja online de produtos femininos e conteúdo educativo para o Instagram @2msaudefeminina.',
                     'owner_user_id' => $owner->id,
                     'status' => 'active',
                     'timezone' => 'America/Sao_Paulo',
@@ -136,36 +136,42 @@ class PreparePilot2mSaudeFeminina extends Command
         $this->line('Calendário inicial: '.count(self::primeiroMes()).' ideias criadas em "Ideia".');
     }
 
-    /** @return array<string, mixed> */
+    /**
+     * CP-03: a identidade definida para o piloto. Loja online SEM catalogo confirmado:
+     * a oferta fica "A CONFIRMAR" e a IA comeca por conteudo educativo e institucional.
+     *
+     * @return array<string, mixed>
+     */
     public static function perfilDaMarca(): array
     {
         return [
             'brand_name' => '2M Saúde Feminina',
-            'description' => 'Perfil de educação em saúde da mulher: informação clara e responsável sobre ciclo, prevenção, '
-                .'fases da vida e autocuidado. A CONFIRMAR: quem assina o conteúdo (profissional e registro no conselho) e se há atendimento.',
-            'audience' => 'Mulheres de 25 a 55 anos que querem entender o próprio corpo, cuidar da saúde com prevenção e '
-                .'decidir junto com a médica ou o médico — sem medo e sem promessas.',
-            'persona' => 'Ana, 38 anos, trabalha fora, adia os exames de rotina por falta de tempo, lê sobre saúde no '
-                .'celular à noite e desconfia de quem promete solução rápida.',
+            'description' => 'Loja online de produtos femininos e conteúdos educativos sobre autocuidado, beleza e bem-estar. '
+                .'A CONFIRMAR: catálogo de produtos (ainda não há produto confirmado) e quem assina os conteúdos de saúde.',
+            'audience' => 'Mulheres de diferentes idades, em todo o Brasil, que querem cuidar de si com informação confiável '
+                .'sobre autocuidado, beleza e bem-estar — sem pressão estética e sem promessas.',
+            'persona' => 'Ana, 38 anos, trabalha fora, tem pouco tempo para si, lê sobre bem-estar no celular à noite e '
+                .'desconfia de quem promete solução rápida. A CONFIRMAR com seguidoras reais.',
             'tone_of_voice' => implode("\n", [
-                'Acolhedor, claro e responsável. Fala COM a mulher, nunca SOBRE ela; sem julgamento e sem alarmismo.',
+                'Feminino, acolhedor, inspirador e responsável. Fala COM a mulher, nunca SOBRE ela; sem julgamento e sem alarmismo.',
                 'REGRAS DE SAÚDE (inegociáveis):',
                 '- Informar e orientar, nunca diagnosticar nem prescrever: nada de dose, nome de remédio para usar, ou "faça X e resolva".',
-                '- Não prometer resultado, cura ou prazo. Toda condição tem avaliação individual.',
-                '- Sempre que falar de sintoma, orientar a procurar avaliação profissional.',
-                '- Não usar medo como gatilho ("você pode estar com câncer e não sabe").',
-                '- Informação baseada em consenso médico e fontes reconhecidas (Ministério da Saúde, FEBRASGO, INCA, OMS). Na dúvida, não publicar.',
-                '- Não expor paciente, caso clínico identificável ou foto de paciente.',
+                '- Não anunciar serviço médico nem consulta: a marca não presta atendimento de saúde.',
+                '- Não prometer resultado, cura ou prazo. Sempre que falar de sintoma, orientar a procurar avaliação profissional.',
+                '- Não usar medo como gatilho.',
+                '- Afirmação de saúde só com base em fonte reconhecida (Ministério da Saúde, FEBRASGO, INCA, OMS). Na dúvida, não publicar.',
                 'REGRAS DE BELEZA E AUTOCUIDADO:',
                 '- Autocuidado é saúde, não padrão estético: nada de "corpo perfeito", comparação ou vergonha do corpo.',
                 '- Sem "antes e depois" e sem promessa de resultado estético.',
-                '- Produto ou procedimento citado não é recomendação de uso sem avaliação.',
+                'REGRAS COMERCIAIS (enquanto não houver catálogo confirmado):',
+                '- Não inventar produto, preço, promoção, cupom ou frete.',
+                '- Não apresentar depoimento simulado como real; depoimento só real e autorizado.',
             ]),
-            'differentiators' => 'Informação responsável, sem sensacionalismo, com linguagem simples. A CONFIRMAR: diferenciais do serviço.',
-            'products' => [],
-            'services' => ['A CONFIRMAR'],
+            'differentiators' => 'Informação responsável, sem sensacionalismo, em linguagem simples. A CONFIRMAR: diferenciais da loja (curadoria, entrega, atendimento).',
+            'products' => ['A CONFIRMAR'],
+            'services' => [],
             'competitors' => [],
-            'required_words' => ['procure avaliação profissional', 'prevenção', 'autocuidado'],
+            'required_words' => ['autocuidado', 'bem-estar', 'procure avaliação profissional'],
             // Expressoes, nao palavras soltas: o revisor trata QUALQUER aparicao como
             // violacao dura, e "garantido" sozinho pegaria "sigilo garantido".
             'forbidden_words' => [
@@ -178,21 +184,39 @@ class PreparePilot2mSaudeFeminina extends Command
         ];
     }
 
-    /** @return array{title: string, summary: string, editorial_line: string, pillars: list<array{name: string, weight: int, description: string}>} */
+    /** @return array{title: string, summary: string, editorial_line: string, pillars: list<array{name: string, weight: int, description: string}>, guidelines: array<string, mixed>} */
     public static function estrategiaEditorial(): array
     {
         return [
             'title' => 'Piloto 2M Saúde Feminina — primeiros 90 dias',
-            'summary' => 'Construir confiança com educação em saúde feminina: 3 posts por semana, sempre com orientação a procurar avaliação profissional.',
-            'editorial_line' => 'Saúde da mulher explicada com clareza e responsabilidade: informar para a mulher decidir melhor '
-                .'junto com quem a atende. Nunca diagnóstico, nunca promessa, nunca medo.',
+            'summary' => 'Construir audiência e confiança com conteúdo educativo e institucional sobre autocuidado, beleza e bem-estar. '
+                .'Sem conteúdo de venda até o catálogo ser confirmado.',
+            'editorial_line' => 'Autocuidado, beleza e bem-estar explicados com leveza e responsabilidade: inspirar a mulher a cuidar de si, '
+                .'com informação confiável. Nunca diagnóstico, nunca promessa, nunca pressão estética.',
             // As categorias de conteudo. O copywriter distribui o lote pelos pesos.
             'pillars' => [
-                ['name' => 'Educação em saúde', 'weight' => 35, 'description' => 'Ciclo menstrual, hormônios, fases da vida (puberdade, gestação, menopausa), explicados sem jargão.'],
-                ['name' => 'Prevenção e exames', 'weight' => 25, 'description' => 'Check-up, papanicolau, mamografia, vacinas: quando, por quê e como se preparar.'],
-                ['name' => 'Bem-estar e autocuidado', 'weight' => 20, 'description' => 'Sono, alimentação, movimento, saúde emocional e rotina de autocuidado — sem padrão estético.'],
-                ['name' => 'Mitos e verdades', 'weight' => 15, 'description' => 'Desfazer crenças comuns com base em consenso médico e fonte citada.'],
-                ['name' => 'Bastidores e confiança', 'weight' => 5, 'description' => 'Quem produz o conteúdo e como. A CONFIRMAR o que pode ser mostrado.'],
+                ['name' => 'Autocuidado e bem-estar', 'weight' => 30, 'description' => 'Sono, rotina, movimento, saúde emocional e pequenos hábitos de cuidado — sem padrão estético.'],
+                ['name' => 'Beleza com responsabilidade', 'weight' => 20, 'description' => 'Cuidados com pele e cabelo explicados sem promessa de resultado e sem fotos comparativas de resultado.'],
+                ['name' => 'Saúde da mulher', 'weight' => 25, 'description' => 'Ciclo, prevenção e fases da vida, com fonte reconhecida e orientação a procurar avaliação profissional.'],
+                ['name' => 'Mitos e verdades', 'weight' => 15, 'description' => 'Desfazer crenças comuns com base em fonte reconhecida.'],
+                ['name' => 'Bastidores da marca', 'weight' => 10, 'description' => 'Quem somos, por que a loja existe e como escolhemos falar. A CONFIRMAR o que pode ser mostrado.'],
+            ],
+            // CP-03: o que o responsavel revisa antes de planejar. Comercial 0 enquanto
+            // nao houver produto confirmado (o StrategistAgent recusaria outra coisa).
+            'guidelines' => [
+                'objectives' => [
+                    'Fazer a audiência crescer com conteúdo útil',
+                    'Gerar engajamento (salvar, comentar, compartilhar)',
+                    'Fortalecer a marca como fonte confiável',
+                    'Preparar a base para vendas futuras, quando houver catálogo',
+                ],
+                'themes' => [
+                    'Rotina de autocuidado em 5 minutos', 'Sono e bem-estar', 'Cuidados com a pele sem promessas',
+                    'Ciclo menstrual explicado', 'Prevenção e exames de rotina', 'Mitos de beleza', 'Quem é a 2M Saúde Feminina',
+                ],
+                'formats' => ['post', 'carousel', 'reel', 'story'],
+                'weekly_frequency' => 3,
+                'content_mix' => ['educational' => 70, 'institutional' => 30, 'commercial' => 0],
             ],
         ];
     }
@@ -205,18 +229,18 @@ class PreparePilot2mSaudeFeminina extends Command
     public static function primeiroMes(): array
     {
         return [
-            ['Educação em saúde', 'O que o seu ciclo menstrual diz sobre você', 'As fases do ciclo e o que é esperado em cada uma; quando uma mudança merece avaliação.'],
-            ['Prevenção e exames', 'Papanicolau: quando fazer e como se preparar', 'Periodicidade recomendada, preparo e por que não adiar.'],
-            ['Bem-estar e autocuidado', 'Sono e hormônios: uma relação de mão dupla', 'Como o sono influencia o ciclo e o humor; hábitos simples de higiene do sono.'],
+            ['Autocuidado e bem-estar', 'Autocuidado não é luxo: 5 minutos por dia', 'Pequenos hábitos sustentáveis de cuidado com corpo e mente.'],
+            ['Saúde da mulher', 'O que o seu ciclo menstrual diz sobre você', 'As fases do ciclo e o que é esperado; quando uma mudança merece avaliação profissional.'],
+            ['Beleza com responsabilidade', 'Pele saudável começa pelo básico', 'Limpeza, hidratação e protetor solar explicados sem promessa de resultado.'],
+            ['Mitos e verdades', 'Mito ou verdade: beber água "limpa" a pele?', 'O que se sabe de fato e o que é exagero, com fonte.'],
+            ['Autocuidado e bem-estar', 'Sono e bem-estar: uma relação de mão dupla', 'Como o sono influencia humor e disposição; hábitos simples de higiene do sono.'],
+            ['Saúde da mulher', 'Papanicolau: quando fazer e como se preparar', 'Periodicidade recomendada pelas fontes oficiais e por que não adiar.'],
+            ['Bastidores da marca', 'Quem é a 2M Saúde Feminina', 'Por que a loja existe e como escolhemos falar com você: informação antes de venda.'],
+            ['Beleza com responsabilidade', 'Cabelo e estresse: o que a ciência já sabe', 'O que é comprovado, o que é mito, e quando procurar avaliação profissional.'],
+            ['Autocuidado e bem-estar', 'Movimento sem cobrança', 'Atividade física como cuidado, não como punição ou padrão estético.'],
             ['Mitos e verdades', 'Mito ou verdade: cólica forte é normal?', 'Diferenciar desconforto comum de sinal de alerta que pede avaliação.'],
-            ['Educação em saúde', 'Menopausa não é doença: o que muda no corpo', 'Sintomas mais comuns, a variação entre mulheres e quando conversar com a médica.'],
-            ['Prevenção e exames', 'Autoexame das mamas não substitui a mamografia', 'O papel de cada um e a idade de rastreamento segundo as recomendações oficiais.'],
-            ['Bem-estar e autocuidado', 'Autocuidado não é luxo: 5 minutos por dia', 'Pequenos hábitos sustentáveis de cuidado com corpo e mente.'],
-            ['Educação em saúde', 'TPM ou algo mais? Entendendo os sintomas', 'O que caracteriza a TPM e quando os sintomas pedem investigação.'],
-            ['Mitos e verdades', 'Mito ou verdade: anticoncepcional engorda?', 'O que as evidências dizem e por que a escolha é individual e com orientação.'],
-            ['Prevenção e exames', 'Vacina de HPV: quem pode tomar', 'Público recomendado e por que a vacina é prevenção.'],
-            ['Educação em saúde', 'Corrimento: quando é normal e quando procurar ajuda', 'Variações esperadas ao longo do ciclo e sinais que pedem consulta.'],
-            ['Bastidores e confiança', 'Por que falamos de saúde com responsabilidade', 'O compromisso do perfil: informar sem diagnosticar, sem prometer e citando fontes.'],
+            ['Saúde da mulher', 'Autoexame das mamas não substitui a mamografia', 'O papel de cada um e a idade de rastreamento segundo as recomendações oficiais.'],
+            ['Autocuidado e bem-estar', 'Um momento só seu na rotina', 'Como reservar tempo para si sem culpa, em qualquer fase da vida.'],
         ];
     }
 }

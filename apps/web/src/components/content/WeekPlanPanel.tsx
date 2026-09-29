@@ -12,7 +12,12 @@ interface Props {
   generating: boolean
   onPlan: (body: { starts_on: string; posts: number }) => void
   onWrite: (planId: number) => void
+  /** CP-03: a frequência semanal da estratégia ativa. Vale até a pessoa digitar outra. */
+  suggestedPosts?: number | null
 }
+
+/** O maximo do planner (`ai.agents.planner.max_posts`). */
+const MAX_POSTS = 7
 
 /** A chave mora sob ['contents', projectId]: o sucesso de qualquer geracao da pagina a invalida junto. */
 const weekPlanKey = (projectId: string) => ['contents', projectId, 'week-plan']
@@ -46,9 +51,12 @@ function amanha(): string {
  * O plano da semana: o humano ve dia, hora, pilar e tema ANTES de pagar pelo texto.
  * Escrever as pecas e um segundo clique — e elas nascem como ideia, sem agenda.
  */
-export function WeekPlanPanel({ projectId, generating, onPlan, onWrite }: Props) {
+export function WeekPlanPanel({ projectId, generating, onPlan, onWrite, suggestedPosts }: Props) {
   const [inicio, setInicio] = useState(amanha)
-  const [posts, setPosts] = useState(3)
+  // Null = ainda nao digitou: vale a frequencia da estrategia (que pode chegar depois).
+  const [digitado, setDigitado] = useState<number | null>(null)
+  const sugestao = suggestedPosts ? Math.min(Math.max(suggestedPosts, 1), MAX_POSTS) : null
+  const posts = digitado ?? sugestao ?? 3
 
   const plano = useQuery({
     queryKey: weekPlanKey(projectId),
@@ -70,14 +78,19 @@ export function WeekPlanPanel({ projectId, generating, onPlan, onWrite }: Props)
           label="Peças"
           type="number"
           min={1}
-          max={7}
+          max={MAX_POSTS}
           value={posts}
-          onChange={(e) => setPosts(Number(e.target.value))}
+          onChange={(e) => setDigitado(Number(e.target.value))}
           className="w-24"
         />
         <Button variant="secondary" disabled={generating} onClick={() => onPlan({ starts_on: inicio, posts })}>
           Planejar semana com IA
         </Button>
+        {sugestao !== null && (
+          <p className="text-body-sm text-on-surface-variant w-full">
+            A estratégia recomenda {sugestao} {sugestao === 1 ? 'publicação' : 'publicações'} por semana.
+          </p>
+        )}
       </div>
 
       {p && (
@@ -94,6 +107,16 @@ export function WeekPlanPanel({ projectId, generating, onPlan, onWrite }: Props)
                   {dia(s.date)} · {s.time} · {FORMATOS[s.format] ?? s.format} · {s.pillar}
                 </p>
                 <p className="text-body-sm text-on-surface mt-1">{s.theme}</p>
+                {s.objective && (
+                  <p className="text-body-sm text-on-surface-variant mt-1">
+                    <span className="text-on-surface">Objetivo:</span> {s.objective}
+                  </p>
+                )}
+                {s.cta && (
+                  <p className="text-body-sm text-on-surface-variant mt-1">
+                    <span className="text-on-surface">CTA:</span> {s.cta}
+                  </p>
+                )}
                 <p className="text-body-sm text-on-surface-variant mt-1">{s.rationale}</p>
               </li>
             ))}

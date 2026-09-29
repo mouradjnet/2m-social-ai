@@ -15,6 +15,7 @@ use App\Models\WorkspaceMember;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Testing\TestResponse;
 use Laravel\Sanctum\Sanctum;
+use Tests\Support\Roteiro;
 use Tests\TestCase;
 
 /** Etapa 2d: uma peca vira outra, em outro formato ou canal. A original nao muda. */
@@ -141,7 +142,7 @@ class RepurposeTest extends TestCase
                 'target' => ['format' => 'carousel', 'channel' => 'instagram'],
             ],
         );
-        $saida = fn (array $extra) => ['title' => 'Nova', 'caption' => 'Slide 1: outro texto.', 'cta' => 'x', 'hashtags' => [], 'adaptation_notes' => 'n', ...$extra];
+        $saida = fn (array $extra) => ['title' => 'Nova', 'caption' => 'Slide 1: outro texto.', 'cta' => 'x', 'hashtags' => [], 'adaptation_notes' => 'n', 'structure' => Roteiro::valido(), ...$extra];
         $agent = new RepurposerAgent;
 
         $agent->validate($saida([]), $ctx);

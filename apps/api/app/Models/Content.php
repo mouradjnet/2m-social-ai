@@ -2,8 +2,10 @@
 
 namespace App\Models;
 
+use App\Domain\Editorial\EditorialState;
 use App\Models\Scopes\WorkspaceMemberScope;
 use Illuminate\Database\Eloquent\Attributes\ScopedBy;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -19,12 +21,17 @@ class Content extends Model
         'source', 'origin_ai_run_id', 'created_by',
         'approved_by', 'approved_at', 'image_asset_id', 'published_at',
         'content_plan_id', 'planned_for', 'repurposed_from_id', 'video_asset_id',
+        'structure',
     ];
+
+    /** CP-03: o estado editorial explicito vai em toda resposta (ver EditorialState). */
+    protected $appends = ['editorial_state'];
 
     protected function casts(): array
     {
         return [
             'hashtags' => 'array',
+            'structure' => 'array',
             'scheduled_for' => 'datetime',
             'planned_for' => 'datetime',
             'published_at' => 'datetime',
@@ -35,6 +42,11 @@ class Content extends Model
     public function project(): BelongsTo
     {
         return $this->belongsTo(Project::class);
+    }
+
+    protected function editorialState(): Attribute
+    {
+        return Attribute::get(fn (): string => EditorialState::for($this));
     }
 
     /** A publicacao mais recente no Instagram — o board e o calendario mostram o estado dela. */

@@ -3,12 +3,16 @@
 namespace App\Ai\Agents;
 
 use App\Ai\Exceptions\OutputRejectedException;
+use App\Domain\Editorial\BrandRules;
 use App\Models\AiRun;
 use App\Models\Project;
 use App\Models\Strategy;
 
 class StrategistAgent implements Agent
 {
+    /** CP-03: os quatro formatos editoriais que a estrategia pode recomendar. */
+    private const FORMATS = ['post', 'carousel', 'reel', 'story'];
+
     public function name(): string
     {
         return 'strategist';
@@ -23,7 +27,7 @@ class StrategistAgent implements Agent
         return [
             'type' => 'object',
             'additionalProperties' => false,
-            'required' => ['title', 'summary', 'editorial_line', 'pillars'],
+            'required' => ['title', 'summary', 'editorial_line', 'pillars', 'guidelines'],
             'properties' => [
                 'title' => ['type' => 'string'],
                 'summary' => ['type' => 'string'],
@@ -38,6 +42,28 @@ class StrategistAgent implements Agent
                             'name' => ['type' => 'string'],
                             'weight' => ['type' => 'integer'],
                             'description' => ['type' => 'string'],
+                        ],
+                    ],
+                ],
+                // CP-03: o que o responsavel revisa antes de planejar.
+                'guidelines' => [
+                    'type' => 'object',
+                    'additionalProperties' => false,
+                    'required' => ['objectives', 'themes', 'formats', 'weekly_frequency', 'content_mix'],
+                    'properties' => [
+                        'objectives' => ['type' => 'array', 'items' => ['type' => 'string']],
+                        'themes' => ['type' => 'array', 'items' => ['type' => 'string']],
+                        'formats' => ['type' => 'array', 'items' => ['type' => 'string', 'enum' => self::FORMATS]],
+                        'weekly_frequency' => ['type' => 'integer', 'description' => 'Publicacoes por semana, de 1 a 14.'],
+                        'content_mix' => [
+                            'type' => 'object',
+                            'additionalProperties' => false,
+                            'required' => ['educational', 'institutional', 'commercial'],
+                            'properties' => [
+                                'educational' => ['type' => 'integer'],
+                                'institutional' => ['type' => 'integer'],
+                                'commercial' => ['type' => 'integer'],
+                            ],
                         ],
                     ],
                 ],
@@ -67,6 +93,22 @@ class StrategistAgent implements Agent
           que caibam com naturalidade — nao os force.
         - Se o perfil da marca estiver vazio ou raso, proponha uma estrategia
           conservadora e diga isso no `summary`, em vez de inventar fatos.
+
+        `guidelines` e o que o responsavel revisa antes de planejar:
+        - `objectives`: de 2 a 4 objetivos editoriais concretos (ex.: "educar sobre
+          autocuidado", "fazer a audiencia crescer").
+        - `themes`: de 4 a 10 temas, coerentes com os pilares.
+        - `formats`: os formatos recomendados, entre post, carousel, reel e story.
+        - `weekly_frequency`: publicacoes por semana, de 1 a 14, realista para quem
+          produz.
+        - `content_mix`: porcentagem educativo / institucional / comercial, inteiros
+          que somam exatamente 100.
+        - Conteudo comercial so fala do que esta em `products` e `services`. Se
+          eles estiverem vazios ou disserem "A CONFIRMAR" ou "Nenhum", `commercial`
+          e 0 e nenhum pilar ou tema vende produto: comece por educativo e
+          institucional.
+        - Nunca invente produto, preco, promocao, depoimento, numero ou dado de
+          desempenho. Nada de "depoimentos de clientes" se a marca nao os forneceu.
         TXT;
     }
 
@@ -112,6 +154,13 @@ class StrategistAgent implements Agent
         if ($sum !== 100) {
             throw new OutputRejectedException("A soma dos pesos deve ser 100, recebido {$sum}.");
         }
+
+        $this->validateGuidelines($output['guidelines'] ?? [], $context);
+
+        $proibidas = BrandRules::forbiddenIn(json_encode($output, JSON_UNESCAPED_UNICODE), $context?->brandProfile['forbidden_words'] ?? []);
+        if ($proibidas !== []) {
+            throw new OutputRejectedException('A estratégia usa expressão proibida pelo perfil: '.implode(', ', $proibidas).'.');
+        }
     }
 
     public function persist(Project $project, array $output, AiRun $run): void
@@ -123,9 +172,48 @@ class StrategistAgent implements Agent
             'summary' => $output['summary'],
             'editorial_line' => $output['editorial_line'],
             'pillars' => $output['pillars'],
+            'guidelines' => $output['guidelines'],
             // Nasce como rascunho: a IA auxilia, o usuario decide.
             'status' => 'draft',
             'ai_run_id' => $run->id,
         ]);
+    }
+
+    /** CP-03: diretrizes coerentes e comercial so com oferta real cadastrada. */
+    private function validateGuidelines(array $g, ?AgentContext $context): void
+    {
+        $objetivos = count(array_filter($g['objectives'] ?? [], fn ($o) => trim((string) $o) !== ''));
+        if ($objetivos < 1 || $objetivos > 5) {
+            throw new OutputRejectedException("Esperado de 1 a 5 objetivos, recebido {$objetivos}.");
+        }
+
+        if (array_filter($g['themes'] ?? [], fn ($t) => trim((string) $t) !== '') === []) {
+            throw new OutputRejectedException('A estratégia veio sem temas.');
+        }
+
+        $formatos = $g['formats'] ?? [];
+        if ($formatos === [] || array_diff($formatos, self::FORMATS) !== []) {
+            throw new OutputRejectedException('Formatos recomendados vazios ou inválidos.');
+        }
+
+        $frequencia = $g['weekly_frequency'] ?? 0;
+        if (! is_int($frequencia) || $frequencia < 1 || $frequencia > 14) {
+            throw new OutputRejectedException("Frequência semanal fora de 1..14: {$frequencia}.");
+        }
+
+        $mix = $g['content_mix'] ?? [];
+        $partes = [$mix['educational'] ?? -1, $mix['institutional'] ?? -1, $mix['commercial'] ?? -1];
+        foreach ($partes as $parte) {
+            if (! is_int($parte) || $parte < 0 || $parte > 100) {
+                throw new OutputRejectedException('Distribuição de conteúdo com valor fora de 0..100.');
+            }
+        }
+        if (array_sum($partes) !== 100) {
+            throw new OutputRejectedException('A distribuição educativo/institucional/comercial deve somar 100, recebido '.array_sum($partes).'.');
+        }
+
+        if ($mix['commercial'] > 0 && ! BrandRules::hasRealOffer($context?->brandProfile ?? [])) {
+            throw new OutputRejectedException('Conteúdo comercial sem produto ou serviço cadastrado no perfil: comercial deve ser 0.');
+        }
     }
 }

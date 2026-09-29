@@ -250,6 +250,9 @@ export function ContentPage() {
         generating={generating}
         onPlan={(body) => generate({ endpoint: 'week-plan:generate', body })}
         onWrite={(planId) => generate({ body: { content_plan_id: planId } })}
+        suggestedPosts={
+          strategies.data?.data.find((s) => s.status === 'active')?.guidelines?.weekly_frequency ?? null
+        }
       />
 
       <GenerationStatus state={state} onRetry={retry} onDismiss={dismiss} />

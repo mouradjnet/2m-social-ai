@@ -735,6 +735,12 @@ class StrategyGenerationTest extends TestCase
                             ['name' => 'b', 'weight' => 35, 'description' => 'd'],
                             ['name' => 'c', 'weight' => $ultimo, 'description' => 'd'],
                         ],
+                        // CP-03: diretrizes validas; o que falha aqui e so a soma dos pesos.
+                        'guidelines' => [
+                            'objectives' => ['o'], 'themes' => ['t'], 'formats' => ['post'],
+                            'weekly_frequency' => 3,
+                            'content_mix' => ['educational' => 70, 'institutional' => 30, 'commercial' => 0],
+                        ],
                     ],
                     model: 'claude-opus-4-8',
                     inputTokens: 1_000,

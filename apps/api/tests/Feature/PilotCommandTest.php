@@ -2,7 +2,10 @@
 
 namespace Tests\Feature;
 
+use App\Ai\Agents\AgentContext;
+use App\Ai\Agents\StrategistAgent;
 use App\Console\Commands\PreparePilot2mSaudeFeminina as Piloto;
+use App\Domain\Editorial\BrandRules;
 use App\Enums\WorkspaceRole;
 use App\Models\Content;
 use App\Models\Project;
@@ -58,6 +61,27 @@ class PilotCommandTest extends TestCase
             $pecas->pluck('pillar')->unique()->values()->all(),
         );
         $this->assertSame(0, Publication::withoutGlobalScopes()->count());
+    }
+
+    /**
+     * CP-03: sem catalogo confirmado, a estrategia do piloto e educativa e institucional
+     * e passa pelas MESMAS regras que o estrategista aplica a uma estrategia da IA.
+     */
+    public function test_estrategia_do_piloto_respeita_as_regras_editoriais(): void
+    {
+        $this->artisan('pilot:2m-saude-feminina', ['workspace' => $this->workspace()->slug])->assertSuccessful();
+
+        $project = Project::withoutGlobalScopes()->where('name', Piloto::PROJECT_NAME)->sole();
+        $estrategia = Strategy::withoutGlobalScopes()->where('project_id', $project->id)->sole();
+
+        $this->assertSame(0, $estrategia->guidelines['content_mix']['commercial']);
+        $this->assertFalse(BrandRules::hasRealOffer($project->brandProfile->toArray()));
+        $this->assertStringContainsString('Não anunciar serviço médico', $project->brandProfile->tone_of_voice);
+
+        (new StrategistAgent)->validate(
+            $estrategia->only(['title', 'summary', 'editorial_line', 'pillars', 'guidelines']),
+            AgentContext::forProject($project),
+        );
     }
 
     public function test_rodar_de_novo_nao_duplica_nem_sobrescreve_o_que_foi_editado(): void

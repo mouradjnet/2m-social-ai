@@ -78,7 +78,9 @@ class WeekPlanController extends Controller
                 'input' => [
                     'strategy_id' => $strategy->id,
                     'week_starts_on' => $data['starts_on'],
-                    'posts' => $data['posts'] ?? (int) config('ai.agents.planner.default_posts'),
+                    // CP-03: sem numero pedido, vale a frequencia da estrategia aprovada.
+                    'posts' => $data['posts']
+                        ?? min($max, (int) ($strategy->guidelines['weekly_frequency'] ?? config('ai.agents.planner.default_posts'))),
                     // O plano nao repete o que existe e corrige o pilar atrasado.
                     'with_existing_contents' => true,
                     'with_pillar_adherence' => true,

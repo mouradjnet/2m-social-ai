@@ -1,7 +1,7 @@
 import { Pillars } from '@/components/strategy/Pillars'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
-import type { Strategy } from '@/lib/types'
+import type { ContentFormat, Strategy, StrategyGuidelines } from '@/lib/types'
 
 interface Props {
   strategy: Strategy
@@ -51,6 +51,8 @@ export function StrategyCard({
       <h3 className="text-label-md text-on-surface mt-8">Pilares de conteúdo</h3>
       <Pillars pillars={strategy.pillars} />
 
+      {strategy.guidelines && <Diretrizes g={strategy.guidelines} />}
+
       <div className="mt-8 flex gap-2">
         {strategy.status === 'draft' ? (
           <>
@@ -68,5 +70,46 @@ export function StrategyCard({
         )}
       </div>
     </Card>
+  )
+}
+
+const FORMATOS: Partial<Record<ContentFormat, string>> = {
+  post: 'Feed',
+  carousel: 'Carrossel',
+  reel: 'Reels',
+  story: 'Stories',
+}
+
+/** CP-03: o que o responsável confere antes de aprovar e planejar. */
+function Diretrizes({ g }: { g: StrategyGuidelines }) {
+  return (
+    <>
+      <h3 className="text-label-md text-on-surface mt-8">Objetivos</h3>
+      <ul className="text-body-md text-on-surface-variant mt-2 list-disc pl-5">
+        {g.objectives.map((o) => (
+          <li key={o}>{o}</li>
+        ))}
+      </ul>
+
+      <h3 className="text-label-md text-on-surface mt-8">Temas</h3>
+      <p className="text-body-md text-on-surface-variant mt-2">{g.themes.join(' · ')}</p>
+
+      <h3 className="text-label-md text-on-surface mt-8">Formatos e frequência</h3>
+      <p className="text-body-md text-on-surface-variant mt-2">
+        {g.formats.map((f) => FORMATOS[f] ?? f).join(', ')} — {g.weekly_frequency}{' '}
+        {g.weekly_frequency === 1 ? 'publicação' : 'publicações'} por semana
+      </p>
+
+      <h3 className="text-label-md text-on-surface mt-8">Distribuição do conteúdo</h3>
+      <p className="text-body-md text-on-surface-variant mt-2">
+        Educativo {g.content_mix.educational}% · Institucional {g.content_mix.institutional}% ·
+        Comercial {g.content_mix.commercial}%
+      </p>
+      {g.content_mix.commercial === 0 && (
+        <p className="text-body-sm text-on-surface-variant mt-1">
+          Sem conteúdo de venda: não há produto ou serviço confirmado no Perfil da Marca.
+        </p>
+      )}
+    </>
   )
 }

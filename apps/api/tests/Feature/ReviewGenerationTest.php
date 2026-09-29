@@ -99,6 +99,52 @@ class ReviewGenerationTest extends TestCase
         $this->assertSame([], $segunda->violations);
     }
 
+    /**
+     * CP-03: a checagem deterministica. O mock APROVA a segunda peca, mas ela traz uma
+     * expressao proibida escondida num slide do roteiro: a peca sai reprovada, com a
+     * violacao registrada, e o estado editorial diz o que fazer.
+     */
+    public function test_expressao_proibida_reprova_mesmo_quando_a_ia_aprova(): void
+    {
+        [, $project] = $this->scene();
+        $project->brandProfile()->updateOrCreate([], ['forbidden_words' => ['cura garantida']]);
+        $a = $this->content($project);
+        $b = $this->content($project);
+        $b->update(['format' => 'carousel', 'structure' => ['visual' => 'v', 'slides' => [
+            ['heading' => 'Capa', 'body' => 'x'],
+            ['heading' => 'Meio', 'body' => 'Tratamento com CURA GARANTÍDA.'],
+            ['heading' => 'Fim', 'body' => 'Salve.'],
+        ]]]);
+
+        $this->generate($project)->assertStatus(202);
+
+        $revisao = ContentReview::where('content_id', $b->id)->sole();
+        $this->assertSame('fail', $revisao->verdict);
+        $this->assertSame('Expressão proibida', $revisao->violations[0]['rule']);
+        $this->assertSame('cura garantida', $revisao->violations[0]['excerpt']);
+
+        $estados = collect($this->getJson("/api/v1/projects/{$project->id}/contents")->assertOk()->json('data'))
+            ->pluck('editorial_state', 'id');
+        $this->assertSame('needs_revision', $estados[$a->id]);
+        $this->assertSame('needs_revision', $estados[$b->id]);
+    }
+
+    /** Sem expressao proibida, o veredito do modelo vale: aprovada fica pronta para aprovacao humana. */
+    public function test_peca_aprovada_pelo_revisor_fica_pronta_para_aprovacao_e_nao_e_aprovada_sozinha(): void
+    {
+        [, $project] = $this->scene();
+        $this->content($project);
+        $b = $this->content($project);
+
+        $this->generate($project)->assertStatus(202);
+
+        $this->assertSame('pass', ContentReview::where('content_id', $b->id)->sole()->verdict);
+        $this->assertSame('ready_for_approval', $b->fresh()->editorial_state);
+        // Pronta para aprovar nao e aprovada: isso e gesto humano.
+        $this->assertSame('review', $b->fresh()->status);
+        $this->assertNull($b->fresh()->approved_at);
+    }
+
     public function test_o_index_devolve_a_ultima_review_de_cada_peca(): void
     {
         [, $project] = $this->scene();

@@ -2,6 +2,7 @@
 
 namespace Tests\Unit;
 
+use App\Ai\Agents\AgentContext;
 use App\Ai\Agents\StrategistAgent;
 use App\Ai\Exceptions\OutputRejectedException;
 use PHPUnit\Framework\TestCase;
@@ -19,14 +20,44 @@ class StrategistAgentTest extends TestCase
         return ['name' => $name, 'weight' => $weight, 'description' => 'd'];
     }
 
-    private function outputWith(array $pillars): array
+    private function outputWith(array $pillars, array $diretrizes = []): array
     {
         return [
             'title' => 't',
             'summary' => 's',
             'editorial_line' => 'e',
             'pillars' => $pillars,
+            'guidelines' => [...[
+                'objectives' => ['Educar', 'Crescer a audiência'],
+                'themes' => ['Autocuidado', 'Rotina'],
+                'formats' => ['post', 'carousel'],
+                'weekly_frequency' => 3,
+                'content_mix' => ['educational' => 70, 'institutional' => 30, 'commercial' => 0],
+            ], ...$diretrizes],
         ];
+    }
+
+    private function pilaresValidos(): array
+    {
+        return [$this->pillar('a', 40), $this->pillar('b', 35), $this->pillar('c', 25)];
+    }
+
+    private function contexto(array $perfil): AgentContext
+    {
+        return new AgentContext(projectId: 1, projectName: 'p', segment: null, brandProfile: $perfil);
+    }
+
+    private function rejeita(array $output, ?AgentContext $contexto, string $trecho): void
+    {
+        try {
+            (new StrategistAgent)->validate($output, $contexto);
+        } catch (OutputRejectedException $e) {
+            $this->assertStringContainsString($trecho, $e->getMessage());
+
+            return;
+        }
+
+        $this->fail("Esperava rejeição contendo \"{$trecho}\".");
     }
 
     public function test_aceita_tres_pilares_somando_cem(): void
@@ -139,5 +170,60 @@ class StrategistAgentTest extends TestCase
 
         $this->assertStringContainsString('forbidden_words', $instructions);
         $this->assertStringContainsString('required_words', $instructions);
+    }
+
+    // --- CP-03: diretrizes editoriais ------------------------------------------------
+
+    public function test_mistura_que_nao_soma_cem_e_rejeitada(): void
+    {
+        $this->rejeita(
+            $this->outputWith($this->pilaresValidos(), ['content_mix' => ['educational' => 60, 'institutional' => 30, 'commercial' => 0]]),
+            null,
+            'deve somar 100',
+        );
+    }
+
+    public function test_frequencia_fora_do_limite_e_rejeitada(): void
+    {
+        $this->rejeita($this->outputWith($this->pilaresValidos(), ['weekly_frequency' => 0]), null, 'Frequência semanal');
+        $this->rejeita($this->outputWith($this->pilaresValidos(), ['weekly_frequency' => 15]), null, 'Frequência semanal');
+    }
+
+    public function test_sem_objetivos_ou_sem_temas_e_rejeitada(): void
+    {
+        $this->rejeita($this->outputWith($this->pilaresValidos(), ['objectives' => []]), null, 'objetivos');
+        $this->rejeita($this->outputWith($this->pilaresValidos(), ['themes' => ['  ']]), null, 'sem temas');
+    }
+
+    /** Perfil incompleto (sem oferta): comercial tem de ser 0, nada de vender o que nao existe. */
+    public function test_comercial_sem_produto_nem_servico_e_rejeitado(): void
+    {
+        $comercial = ['content_mix' => ['educational' => 50, 'institutional' => 30, 'commercial' => 20]];
+
+        $this->rejeita($this->outputWith($this->pilaresValidos(), $comercial), $this->contexto([]), 'Conteúdo comercial sem produto');
+        $this->rejeita(
+            $this->outputWith($this->pilaresValidos(), $comercial),
+            $this->contexto(['products' => ['A CONFIRMAR'], 'services' => ['Nenhum — perfil educativo']]),
+            'Conteúdo comercial sem produto',
+        );
+    }
+
+    /** Perfil completo, com oferta real: comercial pode entrar. */
+    public function test_comercial_com_oferta_real_e_aceito(): void
+    {
+        (new StrategistAgent)->validate(
+            $this->outputWith($this->pilaresValidos(), ['content_mix' => ['educational' => 50, 'institutional' => 30, 'commercial' => 20]]),
+            $this->contexto(['products' => ['Sabonete íntimo 200 ml'], 'services' => []]),
+        );
+
+        $this->expectNotToPerformAssertions();
+    }
+
+    public function test_estrategia_com_expressao_proibida_e_rejeitada(): void
+    {
+        $saida = $this->outputWith($this->pilaresValidos());
+        $saida['editorial_line'] = 'Mostrar resultados com Cura Garantida.';
+
+        $this->rejeita($saida, $this->contexto(['forbidden_words' => ['cura garantida']]), 'cura garantida');
     }
 }

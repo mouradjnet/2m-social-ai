@@ -21,6 +21,7 @@ use App\Models\WorkspaceMember;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Testing\TestResponse;
 use Laravel\Sanctum\Sanctum;
+use Tests\Support\Roteiro;
 use Tests\TestCase;
 
 class CopyGenerationTest extends TestCase
@@ -162,7 +163,7 @@ class CopyGenerationTest extends TestCase
                 // Mesmo titulo da peca existente, com caixa diferente.
                 'title' => 'COMO LER UM LAUDO CAUTELAR',
                 'caption' => 'c', 'cta' => 'x', 'hashtags' => [],
-                'format' => 'post', 'channel' => 'instagram', 'pillar' => 'Educacao',
+                'format' => 'post', 'channel' => 'instagram', 'pillar' => 'Educacao', 'structure' => Roteiro::valido(),
             ]),
         ], $context);
     }
@@ -216,7 +217,7 @@ class CopyGenerationTest extends TestCase
         (new CopywriterAgent)->validate([
             'pieces' => array_fill(0, 5, [
                 'title' => 't', 'caption' => 'c', 'cta' => 'x', 'hashtags' => [],
-                'format' => 'post', 'channel' => 'instagram', 'pillar' => 'Educacao',
+                'format' => 'post', 'channel' => 'instagram', 'pillar' => 'Educacao', 'structure' => Roteiro::valido(),
             ]),
         ], $context);
     }
@@ -321,6 +322,7 @@ class CopyGenerationTest extends TestCase
             'cta' => 'x',
             'hashtags' => ['#a'],
             'format' => 'post',
+            'structure' => Roteiro::valido(),
             'channel' => 'instagram',
             'pillar' => $pillar,
             'status' => $status,
@@ -338,7 +340,7 @@ class CopyGenerationTest extends TestCase
             {
                 $peca = [
                     'title' => 't', 'caption' => 'c', 'cta' => 'x',
-                    'hashtags' => [], 'format' => 'post', 'channel' => 'instagram', 'pillar' => 'p',
+                    'hashtags' => [], 'format' => 'post', 'channel' => 'instagram', 'pillar' => 'p', 'structure' => Roteiro::valido(),
                 ];
 
                 return new LlmResponse(
@@ -554,6 +556,7 @@ class CopyGenerationTest extends TestCase
             'cta' => 'x',
             'hashtags' => ['#a'],
             'format' => 'post',
+            'structure' => Roteiro::valido(),
             'channel' => 'instagram',
             // Todas de Educacao — o pilar que JA estourou o peso. "Prova social",
             // que esta 50pp atrasado, nao recebeu nenhuma.
@@ -584,6 +587,7 @@ class CopyGenerationTest extends TestCase
             'cta' => 'x',
             'hashtags' => ['#a'],
             'format' => 'post',
+            'structure' => Roteiro::valido(),
             'channel' => 'instagram',
             'pillar' => $i === 0 ? 'Prova social' : 'Educacao',
         ], range(0, 4))];
@@ -619,6 +623,7 @@ class CopyGenerationTest extends TestCase
             'cta' => 'x',
             'hashtags' => ['#a'],
             'format' => 'post',
+            'structure' => Roteiro::valido(),
             'channel' => 'instagram',
             'pillar' => 'Educacao',
         ], range(0, 4))];
