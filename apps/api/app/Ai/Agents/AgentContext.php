@@ -102,6 +102,11 @@ readonly class AgentContext
          * da nova. Null fora do repurposer.
          */
         public ?array $repurpose = null,
+        /**
+         * O resumo do que a Meta mediu (medias por pilar/formato + melhores posts),
+         * congelado no input do planner. Null sem amostra minima ou fora do planner.
+         */
+        public ?array $pastResults = null,
     ) {}
 
     /**
@@ -199,6 +204,7 @@ readonly class AgentContext
             repurpose: isset($input['repurpose_content_id'], $input['target_format'], $input['target_channel'])
                 ? self::repurpose($project, $input)
                 : null,
+            pastResults: $input['results'] ?? null,
         );
     }
 
@@ -256,6 +262,10 @@ readonly class AgentContext
 
         if ($this->repurpose !== null) {
             $data['repurpose'] = $this->repurpose;
+        }
+
+        if ($this->pastResults !== null) {
+            $data['results'] = $this->pastResults;
         }
 
         return $data;

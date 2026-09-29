@@ -84,6 +84,13 @@ class PlannerAgent implements Agent
         - `theme` e o assunto da peca numa frase. Nao repita temas de
           `existing_contents` nem entre si.
         - `rationale` explica em uma frase por que aquele pilar, formato e horario.
+        - Se houver `results`, e o que a Meta mediu nos ultimos `results.days` dias:
+          medias por post em `by_pillar` e `by_format` (`posts` = quantos sustentam a
+          media) e os melhores posts em `top`. Use como pista, nao como prova: a
+          amostra e pequena. Prefira os formatos e angulos que foram melhor, sem
+          repetir o tema de um post do `top`, e cite o numero no `rationale` quando
+          ele pesar na escolha. Resultado nunca tira horario do pilar mais atrasado.
+          Sem `results`, nao invente desempenho.
         - `summary` resume a semana em duas ou tres frases.
         - Escreva em portugues do Brasil. Nunca use as palavras de `forbidden_words`.
         TXT;

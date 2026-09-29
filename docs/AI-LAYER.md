@@ -49,7 +49,7 @@ Um agente, uma responsabilidade. Nenhum agente chama outro — quem orquestra é
 | `seo` | conteúdo + palavras-chave | título otimizado, hashtags, keywords | `medium` |
 | `analytics` | agregações de `contents` | insights em texto + pontuação | `high` |
 | `reviewer` | conteúdo + Brand Profile | veredito + lista de violações | `high` |
-| `planner` | estratégia ativa + aderência por pilar + inventário + semana (`week`) | `summary` + `slots` (dia, hora local, pilar, formato, canal, tema) → `content_plans` | `medium` |
+| `planner` | estratégia ativa + aderência por pilar + inventário + semana (`week`) + resumo dos resultados da Meta (`results`, só com ≥ 3 posts medidos) | `summary` + `slots` (dia, hora local, pilar, formato, canal, tema) → `content_plans` | `medium` |
 
 | `results` | resultados REAIS (`Domain\Results\Performance`, congelados no input) | `summary` + 2 a 5 `insights` {title, detail com número, action} → `analytics_reports` com `kind = results`, sem score | `high` |
 | `repurposer` | peça de origem (texto inteiro) + formato/canal alvo + inventário | `title`, `caption`, `cta`, `hashtags`, `adaptation_notes` → peça NOVA em `idea` (`repurposed_from_id`) | `medium` |

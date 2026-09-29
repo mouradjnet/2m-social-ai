@@ -10,7 +10,10 @@ use App\Enums\WorkspaceRole;
 use App\Models\AiRun;
 use App\Models\Content;
 use App\Models\ContentPlan;
+use App\Models\InstagramAccount;
 use App\Models\Project;
+use App\Models\Publication;
+use App\Models\PublicationMetric;
 use App\Models\Strategy;
 use App\Models\User;
 use App\Models\Workspace;
@@ -134,6 +137,64 @@ class WeekPlanTest extends TestCase
         $this->postJson("/api/v1/projects/{$this->project->id}/copy:generate", ['content_plan_id' => $plano->id])
             ->assertStatus(409);
         $this->getJson("/api/v1/projects/{$this->project->id}/week-plan")->assertJsonPath('data.contents_count', 3);
+    }
+
+    /** Um post publicado, com a coleta da Meta (ou sem, se `$metricas` for null). */
+    private function publicado(string $titulo, string $pilar, string $formato, ?array $metricas): void
+    {
+        $conta = InstagramAccount::firstOrCreate(['project_id' => $this->project->id], [
+            'workspace_id' => $this->workspace->id, 'ig_user_id' => '1784', 'username' => 'marca',
+            'account_type' => 'BUSINESS', 'access_token' => 't', 'token_expires_at' => now()->addDays(50),
+            'scopes' => [], 'status' => 'active', 'connected_by' => $this->editor->id, 'connected_at' => now(),
+        ]);
+        $c = Content::create([
+            'workspace_id' => $this->workspace->id, 'project_id' => $this->project->id, 'title' => $titulo,
+            'pillar' => $pilar, 'hashtags' => [], 'format' => $formato, 'channel' => 'instagram',
+            'status' => 'published', 'created_by' => $this->editor->id,
+        ]);
+        $p = Publication::create([
+            'workspace_id' => $this->workspace->id, 'project_id' => $this->project->id, 'content_id' => $c->id,
+            'instagram_account_id' => $conta->id, 'caption' => 'x', 'scheduled_for' => now()->subDays(3),
+            'status' => 'published', 'media_id' => "m{$c->id}", 'published_at' => now()->subDays(3),
+        ]);
+
+        if ($metricas !== null) {
+            PublicationMetric::create(['publication_id' => $p->id, 'metrics' => $metricas, 'collected_at' => now()]);
+        }
+    }
+
+    public function test_planner_recebe_os_resultados_reais_quando_ha_amostra(): void
+    {
+        $this->publicado('Mitos do preventivo', 'Educação em saúde', 'carousel', ['reach' => 2000, 'total_interactions' => 180]);
+        $this->publicado('Agenda de exames', 'Prevenção e exames', 'post', ['reach' => 800, 'total_interactions' => 20]);
+        $this->publicado('Rotina de autocuidado', 'Educação em saúde', 'reel', ['reach' => 1500, 'total_interactions' => 90]);
+        $this->publicado('Sem numero ainda', 'Prevenção e exames', 'post', null);
+
+        $this->planejar();
+
+        $run = AiRun::where('agent', 'planner')->sole();
+        $resultados = $run->input['results'];
+        $this->assertSame(3, $resultados['measured']);
+        // O melhor post por interacoes vem primeiro, e o pendente nao entra na media.
+        $this->assertSame('Mitos do preventivo', $resultados['top'][0]['title']);
+        $this->assertSame(['carousel', 'reel', 'post'], array_column($resultados['by_format'], 'name'));
+        // A lista post a post fica fora: o planner le o resumo, nao o extrato.
+        $this->assertArrayNotHasKey('posts', $resultados);
+
+        $mensagem = (new PlannerAgent)->userMessage(AgentContext::forProject($this->project, $run->input));
+        $this->assertStringContainsString('"results"', $mensagem);
+        $this->assertStringContainsString('Mitos do preventivo', $mensagem);
+    }
+
+    public function test_planner_sem_amostra_minima_nao_recebe_resultados(): void
+    {
+        $this->publicado('A', 'Educação em saúde', 'post', ['reach' => 100, 'total_interactions' => 5]);
+        $this->publicado('B', 'Prevenção e exames', 'post', ['reach' => 100, 'total_interactions' => 5]);
+
+        $this->planejar();
+
+        // Com 2 posts medidos a comparacao seria palpite (mesmo minimo do agente results).
+        $this->assertArrayNotHasKey('results', AiRun::where('agent', 'planner')->sole()->input);
     }
 
     public function test_plano_de_estrategia_que_saiu_de_cena_nao_e_escrito(): void

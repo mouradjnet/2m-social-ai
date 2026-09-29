@@ -380,3 +380,10 @@ mediu. Nenhum dos dois agentes recebe os números do outro.
 **Não verificado de ponta a ponta:** nenhuma métrica real foi lida — depende da conta
 conectada com o escopo (bloqueio da Etapa 1). Próximo passo natural, quando houver
 dados: levar os resultados ao `planner` para a semana nascer já corrigida.
+
+**5d — resultados alimentam o `planner`:** ao planejar a semana, o controller
+congela no input o resumo de `Performance` dos últimos 30 dias (médias por pilar e
+por formato + os 3 melhores posts, sem a lista post a post), só com o mesmo mínimo do
+agente `results` (3 posts medidos). O prompt trata como pista, não prova; o pilar
+mais atrasado continua com horário garantido pelo `validate()`. Não há guard que
+confira a preferência por formato — preferência não é verificável; só o prompt.
