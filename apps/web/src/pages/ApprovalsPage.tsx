@@ -139,6 +139,12 @@ interface RespostaAprovacao {
 function PecaParaDecidir({ peca, marca, projectId, podeDecidir, onAviso }: Props) {
   const queryClient = useQueryClient()
   const [acao, setAcao] = useState<'reject' | 'request-changes' | null>(null)
+  // CP-04B: a mesma idempotencia da aprovacao — uma chave por intencao de decidir.
+  const [chaveAcao, setChaveAcao] = useState<string | null>(null)
+  const abrir = (qual: 'reject' | 'request-changes') => {
+    setAcao(qual)
+    setChaveAcao(crypto.randomUUID())
+  }
   const [motivo, setMotivo] = useState('')
   const [verHistorico, setVerHistorico] = useState(false)
   // CP-04A: a chave nasce quando a pessoa abre a confirmação e vale para ESTA
@@ -170,16 +176,27 @@ function PecaParaDecidir({ peca, marca, projectId, podeDecidir, onAviso }: Props
   })
 
   const decidir = useMutation({
-    mutationFn: ({ rota, reason }: { rota: 'reject' | 'request-changes'; reason: string }) =>
-      api(`/contents/${peca.id}/${rota}`, {
+    mutationFn: ({ rota, reason, requestKey }: { rota: 'reject' | 'request-changes'; reason: string; requestKey: string }) =>
+      api<RespostaAprovacao>(`/contents/${peca.id}/${rota}`, {
         method: 'POST',
-        body: JSON.stringify({ version: versao, reason }),
+        body: JSON.stringify({ expected_version: versao, reason, request_key: requestKey }),
       }),
+    // Atualiza so depois da resposta do servidor.
     onSettled: () => queryClient.invalidateQueries({ queryKey: ['contents', projectId] }),
-    onSuccess: (_d, v) => {
+    onSuccess: (r, v) => {
       setAcao(null)
+      setChaveAcao(null)
       setMotivo('')
-      onAviso(v.rota === 'reject' ? `“${peca.title}” rejeitada.` : `Ajustes pedidos em “${peca.title}”.`)
+      const quem = r.decision.user?.name ?? 'você'
+      onAviso(
+        v.rota === 'reject'
+          ? `“${peca.title}” rejeitada por ${quem} (versão ${r.decision.version}). Para reaproveitá-la, ela recomeça em produção.`
+          : `Ajustes pedidos por ${quem} em “${peca.title}” (versão ${r.decision.version}). A peça voltou para produção.`,
+      )
+    },
+    onError: (e) => {
+      // A peca mudou (409) ou a chave nao serve mais (422): nova intencao, nova chave.
+      if (e instanceof ApiError && (e.status === 409 || e.status === 422)) setChaveAcao(crypto.randomUUID())
     },
   })
 
@@ -301,6 +318,12 @@ function PecaParaDecidir({ peca, marca, projectId, podeDecidir, onAviso }: Props
 
       {podeDecidir && acao && (
         <div className="mt-4">
+          {acao === 'reject' && (
+            <p className="text-body-sm text-error mb-2">
+              Rejeitar tira a versão {versao} do fluxo. Ela não volta a ser aprovada: para reaproveitá-la, recomeça em
+              produção e passa de novo por revisão e aprovação.
+            </p>
+          )}
           <Textarea
             label={acao === 'reject' ? 'Motivo da rejeição' : 'O que precisa mudar'}
             value={motivo}
@@ -309,12 +332,18 @@ function PecaParaDecidir({ peca, marca, projectId, podeDecidir, onAviso }: Props
           />
           <div className="mt-2 flex flex-wrap gap-2">
             <Button
-              disabled={ocupado || motivo.trim().length < 3}
-              onClick={() => decidir.mutate({ rota: acao, reason: motivo.trim() })}
+              disabled={ocupado || motivo.trim().length < 3 || !chaveAcao}
+              onClick={() => chaveAcao && decidir.mutate({ rota: acao, reason: motivo.trim(), requestKey: chaveAcao })}
             >
               {acao === 'reject' ? 'Confirmar rejeição' : 'Enviar pedido de ajuste'}
             </Button>
-            <Button variant="ghost" onClick={() => setAcao(null)}>
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setAcao(null)
+                setChaveAcao(null)
+              }}
+            >
               Voltar
             </Button>
           </div>
@@ -331,10 +360,10 @@ function PecaParaDecidir({ peca, marca, projectId, podeDecidir, onAviso }: Props
               >
                 Aprovar versão {versao}
               </Button>
-              <Button variant="secondary" disabled={ocupado} onClick={() => setAcao('request-changes')}>
+              <Button variant="secondary" disabled={ocupado} onClick={() => abrir('request-changes')}>
                 Solicitar ajustes
               </Button>
-              <Button variant="secondary" disabled={ocupado} onClick={() => setAcao('reject')}>
+              <Button variant="secondary" disabled={ocupado} onClick={() => abrir('reject')}>
                 Rejeitar
               </Button>
             </>

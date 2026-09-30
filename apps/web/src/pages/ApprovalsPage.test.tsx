@@ -203,35 +203,73 @@ test('versão desatualizada: o servidor recusa (409) e a tela avisa e recarrega 
   expect(await screen.findByRole('button', { name: 'Aprovar versão 4' })).toBeInTheDocument()
 })
 
-test('rejeitar e pedir ajustes exigem motivo e o mandam junto com a versão', async () => {
-  const { chamadas } = cenario([peca()])
+test('rejeitar e pedir ajustes exigem motivo, mandam versão e request_key e mostram o resultado do servidor', async () => {
+  const { chamadas, trocarLista } = cenario([peca()])
+  const resposta = (decision: string) =>
+    HttpResponse.json({
+      data: peca(),
+      decision: { id: 9, decision, version: 3, reason: 'x', user: { id: 5, name: 'Dra. Ana' } },
+      replayed: false,
+    })
   server.use(
     http.post('/api/v1/contents/10/reject', async ({ request }) => {
       chamadas.push({ url: 'reject', body: await request.json() })
-      return HttpResponse.json({ data: peca({ status: 'archived', editorial_state: 'rejected' }) })
+      return resposta('rejected')
     }),
     http.post('/api/v1/contents/10/request-changes', async ({ request }) => {
       chamadas.push({ url: 'request-changes', body: await request.json() })
-      return HttpResponse.json({ data: peca({ status: 'production', editorial_state: 'needs_revision' }) })
+      trocarLista([])
+      return resposta('changes_requested')
     }),
   )
   const user = userEvent.setup()
 
   renderWithProviders(<ApprovalsPage />, ROUTE)
 
+  // Rejeitar: aviso explícito + motivo obrigatório antes de confirmar.
   await user.click(await screen.findByRole('button', { name: 'Rejeitar' }))
+  expect(screen.getByText(/Ela não volta a ser aprovada/)).toBeInTheDocument()
   const confirmar = screen.getByRole('button', { name: 'Confirmar rejeição' })
   expect(confirmar).toBeDisabled()
   await user.type(screen.getByRole('textbox', { name: 'Motivo da rejeição' }), 'Promete resultado.')
+  expect(chamadas).toEqual([])
   await user.click(confirmar)
-  await waitFor(() => expect(chamadas[0]).toEqual({ url: 'reject', body: { version: 3, reason: 'Promete resultado.' } }))
 
+  await waitFor(() => expect(chamadas).toHaveLength(1))
+  const rejeicao = chamadas[0].body as { expected_version: number; reason: string; request_key: string }
+  expect(rejeicao).toMatchObject({ expected_version: 3, reason: 'Promete resultado.' })
+  expect(rejeicao.request_key).toMatch(UUID)
+  expect(await screen.findByRole('status')).toHaveTextContent(/rejeitada por Dra\. Ana \(versão 3\)/)
+
+  // Pedir ajustes.
   await user.click(await screen.findByRole('button', { name: 'Solicitar ajustes' }))
   await user.type(screen.getByRole('textbox', { name: 'O que precisa mudar' }), 'Troque o CTA.')
   await user.click(screen.getByRole('button', { name: 'Enviar pedido de ajuste' }))
-  await waitFor(() =>
-    expect(chamadas[1]).toEqual({ url: 'request-changes', body: { version: 3, reason: 'Troque o CTA.' } }),
+
+  await waitFor(() => expect(chamadas).toHaveLength(2))
+  const ajuste = chamadas[1].body as { expected_version: number; reason: string; request_key: string }
+  expect(ajuste).toMatchObject({ expected_version: 3, reason: 'Troque o CTA.' })
+  expect(ajuste.request_key).toMatch(UUID)
+  expect(ajuste.request_key).not.toBe(rejeicao.request_key)
+  expect(await screen.findByRole('status')).toHaveTextContent(/Ajustes pedidos por Dra\. Ana.*voltou para produção/)
+})
+
+test('erro do servidor na rejeição aparece e nada é dado como feito', async () => {
+  cenario([peca()])
+  server.use(
+    http.post('/api/v1/contents/10/reject', () =>
+      HttpResponse.json({ message: 'A peça está agendada: desagende antes de decidir sobre ela.' }, { status: 409 }),
+    ),
   )
+  const user = userEvent.setup()
+
+  renderWithProviders(<ApprovalsPage />, ROUTE)
+  await user.click(await screen.findByRole('button', { name: 'Rejeitar' }))
+  await user.type(screen.getByRole('textbox', { name: 'Motivo da rejeição' }), 'Motivo válido.')
+  await user.click(screen.getByRole('button', { name: 'Confirmar rejeição' }))
+
+  expect(await screen.findByRole('alert')).toHaveTextContent(/desagende antes de decidir/)
+  expect(screen.queryByRole('status')).not.toBeInTheDocument()
 })
 
 test('o histórico mostra quem decidiu, a versão e o motivo', async () => {

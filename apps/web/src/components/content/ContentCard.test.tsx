@@ -295,3 +295,29 @@ test('arquivar a peca nao apaga a violacao do card', () => {
   expect(screen.getByText(/use um caso real/i)).toBeInTheDocument()
   expect(screen.queryByText(/texto reescrito/i)).not.toBeInTheDocument()
 })
+
+/** CP-04B: ajuste pedido por uma pessoa abre a reescrita pela IA, com o motivo à vista. */
+test('ajuste pedido por uma pessoa mostra o motivo e oferece reescrever', async () => {
+  const onRewrite = vi.fn()
+  render(
+    <ContentCard
+      content={content({
+        status: 'production',
+        editorial_state: 'needs_revision',
+        latest_decision: {
+          id: 3,
+          decision: 'changes_requested',
+          version: 1,
+          reason: 'Tire a promessa de resultado.',
+          created_at: '2026-09-30T10:00:00Z',
+        },
+      })}
+      {...noop}
+      onRewrite={onRewrite}
+    />,
+  )
+
+  expect(screen.getByText('Ajuste pedido: Tire a promessa de resultado.')).toBeInTheDocument()
+  await userEvent.setup().click(screen.getByRole('button', { name: /reescrever/i }))
+  expect(onRewrite).toHaveBeenCalled()
+})

@@ -61,6 +61,13 @@ class EditorialState
             return 'in_review';
         }
 
+        // CP-04B: uma pessoa rejeitou ou pediu ajustes DEPOIS desse veredito. O "pass"
+        // da IA nao vale mais: a peca passa por nova revisao antes de ir a aprovacao.
+        $decisao = $content->latestDecision;
+        if ($decisao !== null && $decisao->decision !== 'approved' && $decisao->created_at > $veredito->created_at) {
+            return 'in_review';
+        }
+
         return $veredito->verdict === 'fail' ? 'needs_revision' : 'pending_approval';
     }
 

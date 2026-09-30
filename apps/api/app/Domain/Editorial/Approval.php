@@ -75,33 +75,61 @@ class Approval
     }
 
     /**
-     * CP-04A. Idempotente pela `request_key` (gerada pelo cliente por intencao de
-     * aprovar): a mesma chave com o mesmo pedido devolve a decisao original, sem
-     * gravar nada; com outro pedido, IdempotencyConflict. So peca em
-     * `pending_approval` (a IA revisou e aprovou ESTA versao, ou a aprovacao antiga
-     * caiu) pode ser aprovada.
+     * CP-04A. So peca em `pending_approval` (a IA revisou e aprovou ESTA versao, ou a
+     * aprovacao antiga caiu) pode ser aprovada.
      *
      * @throws ApprovalConflict estado ou versao nao batem (409)
      * @throws IdempotencyConflict chave reutilizada com outro pedido (422)
      */
     public static function approve(Content $content, int $version, User $user, string $requestKey): ApprovalOutcome
     {
-        $impressao = hash('sha256', "approve|{$content->id}|{$version}");
+        return self::comChave($user, $requestKey, "approve|{$content->id}|{$version}",
+            fn (string $impressao) => self::decidir($content, $version, $user, 'approved', null, 'approved', $requestKey, $impressao));
+    }
+
+    /**
+     * CP-04B. Rejeitar tira a peca do fluxo (arquivada), com o motivo registrado. Uma
+     * rejeitada nunca volta direto para aprovada: desarquivar a devolve a producao, e
+     * ela passa de novo por revisao e aprovacao.
+     */
+    public static function reject(Content $content, int $version, User $user, string $reason, string $requestKey): ApprovalOutcome
+    {
+        return self::comChave($user, $requestKey, "reject|{$content->id}|{$version}|".hash('sha256', $reason),
+            fn (string $impressao) => self::decidir($content, $version, $user, 'rejected', $reason, 'archived', $requestKey, $impressao));
+    }
+
+    /**
+     * CP-04B. Pedir ajustes devolve a peca para producao, com o que precisa mudar. Se
+     * ela estava aprovada, a aprovacao cai (a ultima decisao deixa de ser `approved`).
+     */
+    public static function requestChanges(Content $content, int $version, User $user, string $reason, string $requestKey): ApprovalOutcome
+    {
+        return self::comChave($user, $requestKey, "changes|{$content->id}|{$version}|".hash('sha256', $reason),
+            fn (string $impressao) => self::decidir($content, $version, $user, 'changes_requested', $reason, 'production', $requestKey, $impressao));
+    }
+
+    /**
+     * Idempotencia pela `request_key` (gerada pelo cliente por intencao de decidir): a
+     * mesma chave com o mesmo pedido devolve a decisao original, sem gravar nada; com
+     * outro pedido, IdempotencyConflict. Duas requisicoes simultaneas com a mesma
+     * chave: o indice unico deixa passar uma, e a outra devolve a que ficou.
+     *
+     * @param  callable(string): ContentDecision  $decidir
+     */
+    private static function comChave(User $user, string $requestKey, string $pedido, callable $decidir): ApprovalOutcome
+    {
+        $impressao = hash('sha256', $pedido);
 
         if ($original = self::pedidoAnterior($user, $requestKey, $impressao)) {
             return new ApprovalOutcome($original, replayed: true);
         }
 
         try {
-            $registro = self::decidir($content, $version, $user, 'approved', null, 'approved', $requestKey, $impressao);
+            return new ApprovalOutcome($decidir($impressao), replayed: false);
         } catch (UniqueConstraintViolationException) {
-            // Duas requisicoes com a mesma chave ao mesmo tempo: o indice unico deixou
-            // passar so uma. Esta devolve a que ficou.
             return new ApprovalOutcome(self::pedidoAnterior($user, $requestKey, $impressao)
                 ?? throw new IdempotencyConflict('Chave de requisição em uso. Tente de novo.'), replayed: true);
         }
-
-        return new ApprovalOutcome($registro, replayed: false);
     }
 
     private static function pedidoAnterior(User $user, string $requestKey, string $impressao): ?ContentDecision
@@ -115,18 +143,6 @@ class Approval
         return $anterior;
     }
 
-    /** Rejeitar tira a peca do fluxo (arquivada), com o motivo registrado. */
-    public static function reject(Content $content, int $version, User $user, string $reason): ContentDecision
-    {
-        return self::decidir($content, $version, $user, 'rejected', $reason, 'archived');
-    }
-
-    /** Pedir ajustes devolve a peca para producao, com o que precisa mudar. */
-    public static function requestChanges(Content $content, int $version, User $user, string $reason): ContentDecision
-    {
-        return self::decidir($content, $version, $user, 'changes_requested', $reason, 'production');
-    }
-
     private static function decidir(
         Content $content, int $version, User $user, string $decisao, ?string $motivo, string $para,
         ?string $requestKey = null, ?string $impressao = null,
@@ -135,12 +151,18 @@ class Approval
             // Relida COM trava: a versao conferida e a gravada sao a mesma.
             $atual = Content::withoutGlobalScopes()->whereKey($content->id)->lockForUpdate()->firstOrFail();
 
-            // Em revisao, ou `approved` cuja aprovacao CAIU (dada antes do controle de
-            // versoes): essa pode ser reaprovada, rejeitada ou devolvida. Aprovada e
-            // valida nao se re-aprova; agendada se desagenda antes.
+            // Aprovar: em revisao, ou `approved` cuja aprovacao CAIU. Rejeitar e pedir
+            // ajustes (CP-04B): em revisao ou aprovada (a aprovacao cai junto). Agendada
+            // se desagenda antes: ha uma publicacao preparada para ela.
             $aprovadaSemValidade = $atual->status === 'approved' && self::validApproval($atual) === null;
-            if ($atual->status !== 'review' && ! $aprovadaSemValidade) {
-                throw new ApprovalConflict("A peça está em '{$atual->status}': só peça em revisão (ou com aprovação vencida) recebe decisão.");
+            $podeDecidir = $decisao === 'approved'
+                ? $atual->status === 'review' || $aprovadaSemValidade
+                : in_array($atual->status, ['review', 'approved'], true);
+
+            if (! $podeDecidir) {
+                throw new ApprovalConflict($atual->status === 'scheduled'
+                    ? 'A peça está agendada: desagende antes de decidir sobre ela.'
+                    : "A peça está em '{$atual->status}': esta decisão não se aplica a ela.");
             }
 
             $de = $atual->status;

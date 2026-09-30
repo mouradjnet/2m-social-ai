@@ -22,6 +22,7 @@ use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Str;
 use Laravel\Sanctum\Sanctum;
 use LogicException;
 use Tests\Support\Aprovar;
@@ -171,8 +172,8 @@ class ApprovalFlowTest extends TestCase
 
         Sanctum::actingAs($this->editor);
         $this->aprovar($peca)->assertForbidden();
-        $this->postJson("/api/v1/contents/{$peca->id}/reject", ['version' => 1, 'reason' => 'não'])->assertForbidden();
-        $this->postJson("/api/v1/contents/{$peca->id}/request-changes", ['version' => 1, 'reason' => 'ajuste'])->assertForbidden();
+        $this->postJson("/api/v1/contents/{$peca->id}/reject", ['version' => 1, 'request_key' => (string) Str::uuid(), 'reason' => 'não'])->assertForbidden();
+        $this->postJson("/api/v1/contents/{$peca->id}/request-changes", ['version' => 1, 'request_key' => (string) Str::uuid(), 'reason' => 'ajuste'])->assertForbidden();
 
         Sanctum::actingAs($this->membro(WorkspaceRole::Viewer));
         $this->aprovar($peca)->assertForbidden();
@@ -181,8 +182,8 @@ class ApprovalFlowTest extends TestCase
         $alheio = $this->membro(WorkspaceRole::Owner, Workspace::factory()->create());
         Sanctum::actingAs($alheio);
         $this->aprovar($peca)->assertNotFound();
-        $this->postJson("/api/v1/contents/{$peca->id}/reject", ['version' => 1, 'reason' => 'não'])->assertNotFound();
-        $this->postJson("/api/v1/contents/{$peca->id}/request-changes", ['version' => 1, 'reason' => 'x x'])->assertNotFound();
+        $this->postJson("/api/v1/contents/{$peca->id}/reject", ['version' => 1, 'request_key' => (string) Str::uuid(), 'reason' => 'não'])->assertNotFound();
+        $this->postJson("/api/v1/contents/{$peca->id}/request-changes", ['version' => 1, 'request_key' => (string) Str::uuid(), 'reason' => 'x x'])->assertNotFound();
         $this->getJson("/api/v1/contents/{$peca->id}/history")->assertNotFound();
 
         $this->assertSame(0, ContentDecision::count());
@@ -201,9 +202,9 @@ class ApprovalFlowTest extends TestCase
         $peca = $this->peca();
         Sanctum::actingAs($this->reviewer);
 
-        $this->postJson("/api/v1/contents/{$peca->id}/reject", ['version' => 1])->assertUnprocessable();
+        $this->postJson("/api/v1/contents/{$peca->id}/reject", ['version' => 1, 'request_key' => (string) Str::uuid()])->assertUnprocessable();
 
-        $this->postJson("/api/v1/contents/{$peca->id}/reject", ['version' => 1, 'reason' => 'Promete resultado sem base.'])
+        $this->postJson("/api/v1/contents/{$peca->id}/reject", ['version' => 1, 'request_key' => (string) Str::uuid(), 'reason' => 'Promete resultado sem base.'])
             ->assertOk()
             ->assertJsonPath('data.status', 'archived')
             ->assertJsonPath('data.editorial_state', 'rejected');
@@ -219,7 +220,7 @@ class ApprovalFlowTest extends TestCase
         $peca = $this->peca();
         Sanctum::actingAs($this->reviewer);
 
-        $this->postJson("/api/v1/contents/{$peca->id}/request-changes", ['version' => 1, 'reason' => 'Troque o CTA.'])
+        $this->postJson("/api/v1/contents/{$peca->id}/request-changes", ['version' => 1, 'request_key' => (string) Str::uuid(), 'reason' => 'Troque o CTA.'])
             ->assertOk()
             ->assertJsonPath('data.status', 'production')
             ->assertJsonPath('data.editorial_state', 'needs_revision');
@@ -405,7 +406,7 @@ class ApprovalFlowTest extends TestCase
     {
         $peca = $this->peca();
         Sanctum::actingAs($this->reviewer);
-        $this->postJson("/api/v1/contents/{$peca->id}/request-changes", ['version' => 1, 'reason' => 'CTA fraco.'])->assertOk();
+        $this->postJson("/api/v1/contents/{$peca->id}/request-changes", ['version' => 1, 'request_key' => (string) Str::uuid(), 'reason' => 'CTA fraco.'])->assertOk();
 
         $historico = $this->getJson("/api/v1/contents/{$peca->id}/history")->assertOk()->json('data');
 

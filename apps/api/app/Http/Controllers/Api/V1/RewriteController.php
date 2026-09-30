@@ -37,11 +37,15 @@ class RewriteController extends Controller
             ->latest('id')
             ->first();
 
-        // So peca REPROVADA se reescreve. Um `pass` nao tem o que corrigir, e uma peca
-        // nunca revisada nao tem veredito nenhum: reescrever seria adivinhar.
-        if ($review?->verdict !== 'fail') {
+        // So peca REPROVADA se reescreve: pelo revisor de IA, ou (CP-04B) por uma
+        // pessoa que pediu ajustes, com o motivo. Um `pass` nao tem o que corrigir, e
+        // uma peca nunca revisada nao tem veredito nenhum: reescrever seria adivinhar.
+        $pedidoHumano = $content->latestDecision?->decision === 'changes_requested'
+            && in_array($content->status, ['idea', 'production', 'review'], true);
+
+        if ($review?->verdict !== 'fail' && ! $pedidoHumano) {
             return response()->json([
-                'message' => 'Só uma peça reprovada pelo revisor pode ser reescrita.',
+                'message' => 'Só uma peça reprovada pelo revisor, ou com ajustes pedidos por uma pessoa, pode ser reescrita.',
             ], 422);
         }
 

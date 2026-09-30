@@ -306,6 +306,11 @@ readonly class AgentContext
             'summary' => $review?->summary,
             // Com o trecho: e o proprio texto sendo consertado (ver o campo).
             'violations' => $review?->violations ?? [],
+            // CP-04B: o que uma PESSOA pediu para ajustar, quando e o caso. Vale mais
+            // que o veredito da IA: foi a decisao humana que devolveu a peca.
+            'human_request' => $peca->latestDecision?->decision === 'changes_requested'
+                ? $peca->latestDecision->reason
+                : null,
         ];
     }
 

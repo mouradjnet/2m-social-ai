@@ -92,7 +92,14 @@ export function ContentCard({
   const reviewVelha =
     review !== null && textoMudouEm !== null && new Date(review.created_at) < new Date(textoMudouEm)
 
-  const podeReescrever = review?.verdict === 'fail' && !reviewVelha
+  // CP-04B: uma PESSOA pediu ajustes (a peca voltou para producao) tambem abre a
+  // reescrita pela IA, com o motivo dela.
+  const ajustePedido =
+    content.latest_decision?.decision === 'changes_requested' &&
+    ['idea', 'production', 'review'].includes(content.status)
+      ? content.latest_decision.reason
+      : null
+  const podeReescrever = (review?.verdict === 'fail' && !reviewVelha) || ajustePedido !== null
   const seo = content.latest_seo
   const i = FLOW.indexOf(content.status)
 
@@ -146,6 +153,17 @@ export function ContentCard({
         <p className="text-label-sm text-on-surface mt-2">
           Estado editorial: {ESTADOS[content.editorial_state]}
         </p>
+      )}
+
+      {ajustePedido && (
+        <p className="text-body-sm text-error mt-1">Ajuste pedido: {ajustePedido}</p>
+      )}
+
+      {/* Sem veredito da IA, o botão do bloco de revisão não aparece: fica aqui. */}
+      {ajustePedido && !review && (
+        <Button size="sm" variant="secondary" className="mt-2" disabled={pending} onClick={onRewrite}>
+          Reescrever com IA
+        </Button>
       )}
 
       {content.structure && (

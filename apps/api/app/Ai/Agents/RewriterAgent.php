@@ -69,6 +69,9 @@ class RewriterAgent implements Agent
           canal e pilar da peca NAO mudam — ela ja tem lugar no calendario.
         - `past_violations` sao regras que o revisor ja reprovou neste projeto. Nao
           cometa esses erros de novo enquanto conserta este.
+        - `rewrite_target.human_request`, quando vier, e o ajuste que uma PESSOA da
+          marca pediu. Ele manda: atenda exatamente o que foi pedido, mesmo que o
+          revisor de IA nao tenha apontado nada.
         - Escreva em portugues do Brasil, no tom de voz da marca, e nunca use as
           palavras de `forbidden_words`.
         TXT;

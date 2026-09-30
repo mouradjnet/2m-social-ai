@@ -142,6 +142,12 @@ class ContentController extends Controller
      */
     private function statusAntesDoArquivamento(Content $content): string
     {
+        // CP-04B: rejeitada nunca volta direto para aprovada (nem para revisao com o
+        // veredito antigo). Reaproveitar e um novo ciclo: producao -> revisao -> aprovacao.
+        if ($content->latestDecision?->decision === 'rejected') {
+            return 'production';
+        }
+
         return ContentRevision::where('content_id', $content->id)
             ->where('to_status', 'archived')
             ->latest('id')
