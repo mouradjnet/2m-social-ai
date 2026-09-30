@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Domain\Editorial\Versioning;
 use App\Http\Controllers\Controller;
 use App\Models\Asset;
 use App\Models\Content;
@@ -26,6 +27,7 @@ class ContentMediaController extends Controller
 
         $max = (int) config('media.carousel.max_items');
         $data = $request->validate([
+            'expected_version' => ['required', 'integer', 'min:1'],
             'asset_ids' => ['present', 'array', "max:{$max}"],
             'asset_ids.*' => ['integer', 'distinct'],
         ], [
@@ -46,8 +48,10 @@ class ContentMediaController extends Controller
 
         $de = $content->slides()->pluck('assets.id')->all();
 
-        if ($de !== $ids) {
-            DB::transaction(function () use ($content, $ids, $de, $request) {
+        DB::transaction(function () use ($content, $ids, $de, $request, $data) {
+            Versioning::exigir($content, (int) $data['expected_version']);
+
+            if ($de !== $ids) {
                 DB::table('content_slides')->where('content_id', $content->id)->delete();
                 DB::table('content_slides')->insert(array_map(
                     fn (int $id, int $i) => ['content_id' => $content->id, 'asset_id' => $id, 'position' => $i],
@@ -60,8 +64,8 @@ class ContentMediaController extends Controller
                 ]);
                 // CP-04: os slides vao ao ar; trocar e mudar de versao.
                 $content->markContentChanged();
-            });
-        }
+            }
+        });
 
         return response()->json(['data' => $content->refresh()->load('slides')]);
     }
@@ -70,7 +74,10 @@ class ContentMediaController extends Controller
     {
         Gate::authorize('update', $content->project);
 
-        $data = $request->validate(['asset_id' => ['present', 'nullable', 'integer']]);
+        $data = $request->validate([
+            'expected_version' => ['required', 'integer', 'min:1'],
+            'asset_id' => ['present', 'nullable', 'integer'],
+        ]);
 
         if ($resposta = $this->congelada($content)) {
             return $resposta;
@@ -83,16 +90,18 @@ class ContentMediaController extends Controller
 
         $de = $content->video_asset_id;
 
-        if ($de !== $data['asset_id']) {
-            DB::transaction(function () use ($content, $de, $data, $request) {
+        DB::transaction(function () use ($content, $de, $data, $request) {
+            Versioning::exigir($content, (int) $data['expected_version']);
+
+            if ($de !== $data['asset_id']) {
                 $content->update(['video_asset_id' => $data['asset_id']]);
                 ContentRevision::create([
                     'content_id' => $content->id,
                     'user_id' => $request->user()->id,
                     'changes' => ['video_asset_id' => ['from' => $de, 'to' => $data['asset_id']]],
                 ]);
-            });
-        }
+            }
+        });
 
         return response()->json(['data' => $content->refresh()->load('video')]);
     }

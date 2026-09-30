@@ -79,16 +79,16 @@ test('salvar manda o texto e troca a imagem', async () => {
   server.use(
     http.patch('/api/v1/contents/1/draft', async ({ request }) => {
       texto = await request.json()
-      return HttpResponse.json({ data: peca() })
+      return HttpResponse.json({ data: peca({ version: 5 }) })
     }),
     http.put('/api/v1/contents/1/image', async ({ request }) => {
       imagem = await request.json()
-      return HttpResponse.json({ data: peca() })
+      return HttpResponse.json({ data: peca({ version: 6 }) })
     }),
   )
   const onClose = vi.fn()
 
-  renderWithProviders(<PublicationEditor projectId="1" content={peca()} onClose={onClose} />, ROUTE)
+  renderWithProviders(<PublicationEditor projectId="1" content={peca({ version: 4 })} onClose={onClose} />, ROUTE)
   const user = userEvent.setup()
 
   await user.click(await screen.findByRole('button', { name: 'foto.jpg' }))
@@ -97,8 +97,15 @@ test('salvar manda o texto e troca a imagem', async () => {
   await user.click(screen.getByRole('button', { name: 'Salvar' }))
 
   await vi.waitFor(() => expect(onClose).toHaveBeenCalled())
-  expect(texto).toEqual({ title: 'Ciclo', caption: 'Legenda', cta: 'Agende', hashtags: ['#saude', '#bem_estar'] })
-  expect(imagem).toEqual({ asset_id: 9 })
+  // CP-04C: a versão vista vai junto; a segunda gravação encadeia na versão nova.
+  expect(texto).toEqual({
+    title: 'Ciclo',
+    caption: 'Legenda',
+    cta: 'Agende',
+    hashtags: ['#saude', '#bem_estar'],
+    expected_version: 4,
+  })
+  expect(imagem).toEqual({ asset_id: 9, expected_version: 5 })
 })
 
 test('peca aprovada fica somente leitura, mostra quem aprovou e agenda', async () => {

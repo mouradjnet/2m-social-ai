@@ -272,8 +272,8 @@ test('erro do servidor na rejeição aparece e nada é dado como feito', async (
   expect(screen.queryByRole('status')).not.toBeInTheDocument()
 })
 
-test('o histórico mostra quem decidiu, a versão e o motivo', async () => {
-  cenario([peca()])
+// CP-04C: histórico, versões, comparação e restauração.
+function historicoCp04c(restaurados: { versao: number; body: unknown }[] = []) {
   server.use(
     http.get('/api/v1/contents/10/history', () =>
       HttpResponse.json({
@@ -282,26 +282,140 @@ test('o histórico mostra quem decidiu, a versão e o motivo', async () => {
           project_id: 1,
           version: 3,
           approval_valid: false,
-          decisions: [
+          approved_version: null,
+          decisions: [],
+          revisions: [],
+          events: [
+            { type: 'created', version: 1, origin: 'ai_generation', user: { id: 4, name: 'Beto' }, at: '2026-09-30T10:00:00Z' },
             {
-              id: 1, decision: 'changes_requested', version: 2, reason: 'CTA fraco.', from_status: 'review',
-              to_status: 'production', snapshot_hash: null, user: { id: 5, name: 'Dra. Ana' }, at: '2026-09-30T12:00:00Z',
+              type: 'approved', version: 1, reason: null, from_status: 'review', to_status: 'approved',
+              user: { id: 5, name: 'Dra. Ana' }, at: '2026-09-30T11:00:00Z',
+            },
+            { type: 'manual_edit', version: 2, origin: 'manual_edit', user: { id: 4, name: 'Beto' }, at: '2026-09-30T12:00:00Z' },
+            { type: 'approval_invalidated', version: 2, user: { id: 4, name: 'Beto' }, at: '2026-09-30T12:00:00Z' },
+            {
+              type: 'changes_requested', version: 2, reason: 'CTA fraco.', from_status: 'review', to_status: 'production',
+              user: { id: 5, name: 'Dra. Ana' }, at: '2026-09-30T13:00:00Z',
             },
           ],
-          revisions: [{ type: 'change', from_status: null, to_status: null, fields: ['cta'], user_id: 4, at: '2026-09-30T13:00:00Z' }],
         },
       }),
+    ),
+    http.get('/api/v1/contents/10/versions', () =>
+      HttpResponse.json({
+        data: {
+          content_id: 10,
+          current_version: 3,
+          approved_version: null,
+          versions: [1, 2, 3].map((v) => ({
+            version: v, origin: v === 1 ? 'ai_generation' : 'manual_edit', restored_from_version: null,
+            invalidated_approval: v === 2, snapshot_hash: `h${v}`, is_approved: false, ai_run_id: null,
+            user: { id: 4, name: 'Beto' }, title: 'Autocuidado', at: '2026-09-30T12:00:00Z',
+          })),
+        },
+      }),
+    ),
+    http.get('/api/v1/contents/10/versions/compare', ({ request }) => {
+      const u = new URL(request.url)
+      return HttpResponse.json({
+        data: {
+          from: Number(u.searchParams.get('from')),
+          to: Number(u.searchParams.get('to')),
+          fields: [
+            { field: 'caption', changed: true, from: 'Legenda antiga.', to: 'Legenda nova.' },
+            { field: 'title', changed: false, from: 'Autocuidado', to: 'Autocuidado' },
+            {
+              field: 'image', changed: true,
+              from: { id: 1, original_name: 'foto.jpg', checksum: 'aaaaaaaaaaaa' },
+              to: { id: 2, original_name: 'foto.jpg', checksum: 'bbbbbbbbbbbb' },
+              note: 'Arquivos diferentes (checksums diferentes).',
+            },
+          ],
+        },
+      })
+    }),
+    http.post('/api/v1/contents/10/versions/:v/restore', async ({ request, params }) => {
+      restaurados.push({ versao: Number(params.v), body: await request.json() })
+      return HttpResponse.json({
+        data: peca({ version: 4, editorial_state: 'in_review' }),
+        message: `Versão ${params.v} restaurada como versão 4. Ela precisa passar de novo por revisão e aprovação.`,
+      })
+    }),
+  )
+}
+
+test('o histórico mostra a linha do tempo com quem fez, a versão, o motivo e as decisões humanas', async () => {
+  cenario([peca()])
+  historicoCp04c()
+
+  renderWithProviders(<ApprovalsPage />, ROUTE)
+  await userEvent.setup().click(await screen.findByRole('button', { name: 'Histórico' }))
+
+  const linha = await screen.findByLabelText('Linha do tempo')
+  expect(within(linha).getByText(/Dra\. Ana · Pediu ajustes · versão 2 · decisão humana/)).toBeInTheDocument()
+  expect(within(linha).getByText(/CTA fraco/)).toBeInTheDocument()
+  expect(within(linha).getByText(/A aprovação anterior deixou de valer · versão 2/)).toBeInTheDocument()
+  expect(within(linha).getByText(/Beto · Editou · versão 2/)).toBeInTheDocument()
+  expect(screen.getByText(/sem aprovação válida para esta versão/)).toBeInTheDocument()
+})
+
+test('compara versões campo a campo e não iguala mídia pelo nome', async () => {
+  cenario([peca()])
+  historicoCp04c()
+  const user = userEvent.setup()
+
+  renderWithProviders(<ApprovalsPage />, ROUTE)
+  await user.click(await screen.findByRole('button', { name: 'Histórico' }))
+
+  const comparar = await screen.findByLabelText('Comparar versões')
+  // Padrão: a anterior contra a atual.
+  expect(within(comparar).getByLabelText('Versão de origem')).toHaveValue('2')
+  expect(within(comparar).getByLabelText('Versão de destino')).toHaveValue('3')
+  expect(await within(comparar).findByText('Legenda nova.')).toBeInTheDocument()
+  expect(within(comparar).getByText('Legenda antiga.')).toBeInTheDocument()
+  // Campo que não mudou não aparece.
+  expect(within(comparar).queryByText('Título')).not.toBeInTheDocument()
+  expect(within(comparar).getByText('Arquivos diferentes (checksums diferentes).')).toBeInTheDocument()
+})
+
+test('restaurar pede confirmação, manda a versão atual e mostra a resposta do servidor', async () => {
+  cenario([peca()], 'editor')
+  const restaurados: { versao: number; body: unknown }[] = []
+  historicoCp04c(restaurados)
+  const user = userEvent.setup()
+
+  renderWithProviders(<ApprovalsPage />, ROUTE)
+  await user.click(await screen.findByRole('button', { name: 'Histórico' }))
+  const versoes = await screen.findByLabelText('Versões')
+
+  // A atual não se restaura; as anteriores, sim (lista da mais nova para a mais antiga).
+  expect(within(versoes).getAllByRole('button', { name: 'Restaurar' })).toHaveLength(2)
+  await user.click(within(versoes).getAllByRole('button', { name: 'Restaurar' })[1])
+  expect(restaurados).toHaveLength(0)
+  expect(within(versoes).getByText(/Restaurar o conteúdo da versão 1 como versão 4\?/)).toBeInTheDocument()
+
+  await user.click(within(versoes).getByRole('button', { name: 'Confirmar restauração' }))
+
+  await waitFor(() => expect(restaurados).toHaveLength(1))
+  expect(restaurados[0]).toEqual({ versao: 1, body: { expected_version: 3 } })
+  expect(await screen.findByText(/Versão 1 restaurada como versão 4/)).toBeInTheDocument()
+})
+
+test('leitor vê o histórico mas não restaura', async () => {
+  cenario([peca()])
+  historicoCp04c()
+  server.use(
+    http.get('/api/v1/me', () =>
+      HttpResponse.json({ id: 1, name: 'Ana', email: 'a@x.test', workspaces: [{ id: 7, name: 'W', slug: 'w', role: 'viewer' }] }),
     ),
   )
 
   renderWithProviders(<ApprovalsPage />, ROUTE)
   await userEvent.setup().click(await screen.findByRole('button', { name: 'Histórico' }))
 
-  const historico = await screen.findByLabelText('Histórico da peça')
-  expect(within(historico).getByText(/sem aprovação válida para esta versão/)).toBeInTheDocument()
-  expect(within(historico).getByText(/Dra\. Ana · Pediu ajustes a versão 2/)).toBeInTheDocument()
-  expect(within(historico).getByText(/CTA fraco/)).toBeInTheDocument()
-  expect(within(historico).getByText(/alterou cta/)).toBeInTheDocument()
+  const versoes = await screen.findByLabelText('Versões')
+  expect(within(versoes).getByText('Versão 1')).toBeInTheDocument()
+  expect(within(versoes).queryByRole('button', { name: 'Restaurar' })).not.toBeInTheDocument()
 })
 
 test('peça reprovada pela IA oferece nova geração; aprovada pela IA não', async () => {

@@ -238,7 +238,7 @@ class AssetTest extends TestCase
         $asset = Asset::first();
         $content = $this->content($project, 'production');
 
-        $this->putJson("/api/v1/contents/{$content->id}/image", ['asset_id' => $asset->id])
+        $this->putJson("/api/v1/contents/{$content->id}/image", ['expected_version' => $content->fresh()->version, 'asset_id' => $asset->id])
             ->assertOk()
             ->assertJsonPath('data.image.id', $asset->id)
             ->assertJsonPath('data.image.url', $asset->url);
@@ -246,7 +246,7 @@ class AssetTest extends TestCase
         $revisao = ContentRevision::where('content_id', $content->id)->latest('id')->first();
         $this->assertEquals(['from' => null, 'to' => $asset->id], $revisao->changes['image_asset_id']);
 
-        $this->putJson("/api/v1/contents/{$content->id}/image", ['asset_id' => null])->assertOk();
+        $this->putJson("/api/v1/contents/{$content->id}/image", ['expected_version' => $content->fresh()->version, 'asset_id' => null])->assertOk();
         $this->assertNull($content->fresh()->image_asset_id);
     }
 
@@ -256,7 +256,7 @@ class AssetTest extends TestCase
         $this->upload($project, UploadedFile::fake()->image('a.jpg', 1080, 1080))->assertCreated();
         $content = $this->content($project, 'approved');
 
-        $this->putJson("/api/v1/contents/{$content->id}/image", ['asset_id' => Asset::first()->id])
+        $this->putJson("/api/v1/contents/{$content->id}/image", ['expected_version' => $content->fresh()->version, 'asset_id' => Asset::first()->id])
             ->assertStatus(422);
     }
 
@@ -267,7 +267,7 @@ class AssetTest extends TestCase
         $this->upload($outro, UploadedFile::fake()->image('a.jpg', 1080, 1080))->assertCreated();
         $content = $this->content($project, 'idea');
 
-        $this->putJson("/api/v1/contents/{$content->id}/image", ['asset_id' => Asset::first()->id])
+        $this->putJson("/api/v1/contents/{$content->id}/image", ['expected_version' => $content->fresh()->version, 'asset_id' => Asset::first()->id])
             ->assertStatus(422)
             ->assertJsonValidationErrors('asset_id');
     }
@@ -277,10 +277,10 @@ class AssetTest extends TestCase
         [$workspace, $project] = $this->scene(WorkspaceRole::Viewer);
         $content = $this->content($project, 'idea');
 
-        $this->putJson("/api/v1/contents/{$content->id}/image", ['asset_id' => null])->assertForbidden();
+        $this->putJson("/api/v1/contents/{$content->id}/image", ['expected_version' => $content->fresh()->version, 'asset_id' => null])->assertForbidden();
 
         $alheio = $this->content(Project::factory()->create(), 'idea');
-        $this->putJson("/api/v1/contents/{$alheio->id}/image", ['asset_id' => null])->assertNotFound();
+        $this->putJson("/api/v1/contents/{$alheio->id}/image", ['expected_version' => 1, 'asset_id' => null])->assertNotFound();
     }
 
     /**

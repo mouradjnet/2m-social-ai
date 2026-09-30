@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Domain\Editorial\EditorialState;
+use App\Domain\Editorial\Versioning;
 use App\Models\Scopes\WorkspaceMemberScope;
 use Illuminate\Database\Eloquent\Attributes\ScopedBy;
 use Illuminate\Database\Eloquent\Casts\Attribute;
@@ -49,7 +50,14 @@ class Content extends Model
             }
         });
 
+        // CP-04C: toda versao nova fica gravada (content_versions), com o que ia ao ar.
+        static::created(fn (Content $content) => Versioning::record($content));
+
         static::updated(function (Content $content) {
+            if ($content->wasChanged('version')) {
+                Versioning::record($content, $content->aprovacaoCaiu);
+            }
+
             if ($content->aprovacaoCaiu) {
                 $content->aprovacaoCaiu = false;
                 $content->cancelarPublicacoesPendentes();
@@ -83,6 +91,7 @@ class Content extends Model
     {
         $this->applyContentChange();
         $this->saveQuietly();
+        Versioning::record($this, $this->aprovacaoCaiu);
 
         if ($this->aprovacaoCaiu) {
             $this->aprovacaoCaiu = false;
@@ -155,6 +164,12 @@ class Content extends Model
     public function decisions(): HasMany
     {
         return $this->hasMany(ContentDecision::class)->orderBy('id');
+    }
+
+    /** CP-04C: as versoes gravadas (imutaveis), da mais antiga para a mais nova. */
+    public function versions(): HasMany
+    {
+        return $this->hasMany(ContentVersion::class)->orderBy('version');
     }
 
     public function latestDecision(): HasOne

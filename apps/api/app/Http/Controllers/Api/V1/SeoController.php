@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Ai\Budget;
+use App\Domain\Editorial\Versioning;
 use App\Http\Controllers\Controller;
 use App\Jobs\RunAgentJob;
 use App\Models\AiRun;
@@ -104,7 +105,7 @@ class SeoController extends Controller
         DB::transaction(function () use ($content, $seo) {
             $de = ['title' => $content->title, 'hashtags' => $content->hashtags];
 
-            $content->update(['title' => $seo->title, 'hashtags' => $seo->hashtags]);
+            Versioning::como('seo', request()->user()->id, fn () => $content->update(['title' => $seo->title, 'hashtags' => $seo->hashtags]));
             $seo->update(['applied_at' => now()]);
 
             ContentRevision::create([

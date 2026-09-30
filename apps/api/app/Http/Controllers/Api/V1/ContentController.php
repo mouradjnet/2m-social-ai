@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Domain\Editorial\Versioning;
 use App\Domain\Publishing\PublishGate;
 use App\Http\Controllers\Controller;
 use App\Models\Content;
@@ -200,6 +201,7 @@ class ContentController extends Controller
         Gate::authorize('update', $content->project);
 
         $data = $request->validate([
+            'expected_version' => ['required', 'integer', 'min:1'],
             'title' => ['sometimes', 'required', 'string', 'max:200'],
             'caption' => ['sometimes', 'nullable', 'string', 'max:2200'],
             'cta' => ['sometimes', 'nullable', 'string', 'max:280'],
@@ -208,7 +210,12 @@ class ContentController extends Controller
         ], [
             'hashtags.max' => 'O Instagram aceita até 30 hashtags.',
             'hashtags.*.regex' => 'Hashtag só tem letras, números e _ (sem espaço).',
+            'expected_version.required' => 'Falta a versão da peça que você está editando (expected_version).',
         ]);
+
+        // CP-04C: concorrencia otimista. A versao nao e campo editavel.
+        $esperada = (int) $data['expected_version'];
+        unset($data['expected_version']);
 
         if (! in_array($content->status, ['idea', 'production', 'review'], true)) {
             return response()->json([
@@ -224,16 +231,18 @@ class ContentController extends Controller
             }
         }
 
-        if ($mudancas !== []) {
-            DB::transaction(function () use ($content, $data, $mudancas, $request) {
+        DB::transaction(function () use ($content, $data, $mudancas, $request, $esperada) {
+            Versioning::exigir($content, $esperada);
+
+            if ($mudancas !== []) {
                 $content->update($data);
                 ContentRevision::create([
                     'content_id' => $content->id,
                     'user_id' => $request->user()->id,
                     'changes' => $mudancas,
                 ]);
-            });
-        }
+            }
+        });
 
         return response()->json(['data' => $content->refresh()->load(['image', 'latestTextRevision'])]);
     }

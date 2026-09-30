@@ -165,6 +165,80 @@ export interface ContentHistory {
     user_id: number
     at: string
   }[]
+  approved_version?: number | null
+  events?: EditorialEvent[]
+}
+
+/** CP-04C: um evento da linha do tempo editorial (montada no servidor). */
+export interface EditorialEvent {
+  type:
+    | 'created'
+    | 'manual_edit'
+    | 'ai_regeneration'
+    | 'seo_applied'
+    | 'restored'
+    | 'version_recorded'
+    | 'changed'
+    | 'approval_invalidated'
+    | 'approved'
+    | 'rejected'
+    | 'changes_requested'
+    | 'sent_to_review'
+    | 'scheduled'
+    | 'cancelled'
+    | 'archived'
+    | 'unarchived'
+    | 'published'
+    | 'status_changed'
+  version?: number
+  origin?: string
+  restored_from_version?: number | null
+  reason?: string | null
+  from_status?: string | null
+  to_status?: string | null
+  user: { id: number; name: string } | null
+  at: string
+}
+
+/** CP-04C: uma versão gravada (imutável). GET /contents/{id}/versions */
+export interface ContentVersionSummary {
+  version: number
+  origin: string
+  restored_from_version: number | null
+  invalidated_approval: boolean
+  snapshot_hash: string
+  is_approved: boolean
+  ai_run_id: number | null
+  user: { id: number; name: string } | null
+  title: string | null
+  at: string
+}
+
+export interface ContentVersionList {
+  content_id: number
+  current_version: number
+  approved_version: number | null
+  versions: ContentVersionSummary[]
+}
+
+export interface MediaMeta {
+  id: number
+  missing?: boolean
+  type?: string
+  original_name?: string | null
+  mime?: string
+  size_bytes?: number
+  width?: number | null
+  height?: number | null
+  duration_ms?: number | null
+  checksum?: string | null
+}
+
+/** GET /contents/{id}/versions/compare */
+export interface VersionComparison {
+  from: number
+  to: number
+  fields: { field: string; changed: boolean; from: unknown; to: unknown; note?: string }[]
 }
 
 export type ContentStatus =

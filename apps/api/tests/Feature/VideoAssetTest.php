@@ -117,7 +117,7 @@ class VideoAssetTest extends TestCase
             'status' => 'production', 'created_by' => User::factory()->create()->id,
         ]);
 
-        $this->putJson("/api/v1/contents/{$peca->id}/image", ['asset_id' => $video->id])->assertStatus(422);
+        $this->putJson("/api/v1/contents/{$peca->id}/image", ['expected_version' => $peca->fresh()->version, 'asset_id' => $video->id])->assertStatus(422);
     }
 
     public function test_imagem_acima_de_8_mb_continua_recusada(): void

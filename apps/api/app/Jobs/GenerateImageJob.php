@@ -4,6 +4,7 @@ namespace App\Jobs;
 
 use App\Ai\Images\ImageGenerationException;
 use App\Ai\Images\ImageProvider;
+use App\Domain\Editorial\Versioning;
 use App\Domain\Media\ImageProcessor;
 use App\Domain\Media\InvalidImageException;
 use App\Models\AiRun;
@@ -77,7 +78,7 @@ class GenerateImageJob implements ShouldQueue
 
             if ($anexada && $content->image_asset_id !== $asset->id) {
                 $de = $content->image_asset_id;
-                $content->update(['image_asset_id' => $asset->id]);
+                Versioning::como('ai_image', $run->created_by, fn () => $content->update(['image_asset_id' => $asset->id]), aiRunId: $run->id);
                 ContentRevision::create([
                     'content_id' => $content->id,
                     'user_id' => $run->created_by,

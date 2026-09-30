@@ -51,7 +51,7 @@ class ContentDraftTest extends TestCase
         $content = $this->content($project, 'review');
         Sanctum::actingAs($this->memberOf($workspace, WorkspaceRole::Editor));
 
-        $this->patchJson("/api/v1/contents/{$content->id}/draft", [
+        $this->patchJson("/api/v1/contents/{$content->id}/draft", ['expected_version' => $content->fresh()->version,
             'caption' => 'Legenda nova', 'hashtags' => ['#saude', 'bemestar'],
         ])->assertOk()->assertJsonPath('data.caption', 'Legenda nova');
 
@@ -67,7 +67,7 @@ class ContentDraftTest extends TestCase
         $content = $this->content($project, 'idea');
         Sanctum::actingAs($this->memberOf($workspace, WorkspaceRole::Editor));
 
-        $this->patchJson("/api/v1/contents/{$content->id}/draft", ['title' => 'Titulo'])->assertOk();
+        $this->patchJson("/api/v1/contents/{$content->id}/draft", ['expected_version' => $content->fresh()->version, 'title' => 'Titulo'])->assertOk();
 
         $this->assertSame(0, ContentRevision::count());
     }
@@ -84,10 +84,10 @@ class ContentDraftTest extends TestCase
         Sanctum::actingAs($reviewer);
 
         $this->postJson("/api/v1/contents/{$content->id}/approve", Aprovar::pedido($content))->assertOk();
-        $this->patchJson("/api/v1/contents/{$content->id}/draft", ['caption' => 'x'])->assertStatus(422);
+        $this->patchJson("/api/v1/contents/{$content->id}/draft", ['expected_version' => $content->fresh()->version, 'caption' => 'x'])->assertStatus(422);
 
         $this->patchJson("/api/v1/contents/{$content->id}", ['status' => 'review'])->assertOk();
-        $this->patchJson("/api/v1/contents/{$content->id}/draft", ['caption' => 'Outra'])->assertOk();
+        $this->patchJson("/api/v1/contents/{$content->id}/draft", ['expected_version' => $content->fresh()->version, 'caption' => 'Outra'])->assertOk();
 
         // Forca a peca a parecer aprovada e agendada sem passar pela aprovacao de novo.
         $content->refresh()->update([
@@ -104,11 +104,11 @@ class ContentDraftTest extends TestCase
         $content = $this->content($project, 'production');
         Sanctum::actingAs($this->memberOf($workspace, WorkspaceRole::Editor));
 
-        $this->patchJson("/api/v1/contents/{$content->id}/draft", ['hashtags' => array_fill(0, 31, '#a')])
+        $this->patchJson("/api/v1/contents/{$content->id}/draft", ['expected_version' => $content->fresh()->version, 'hashtags' => array_fill(0, 31, '#a')])
             ->assertStatus(422)->assertJsonValidationErrors('hashtags');
-        $this->patchJson("/api/v1/contents/{$content->id}/draft", ['hashtags' => ['com espaco']])
+        $this->patchJson("/api/v1/contents/{$content->id}/draft", ['expected_version' => $content->fresh()->version, 'hashtags' => ['com espaco']])
             ->assertStatus(422);
-        $this->patchJson("/api/v1/contents/{$content->id}/draft", ['caption' => str_repeat('a', 2201)])
+        $this->patchJson("/api/v1/contents/{$content->id}/draft", ['expected_version' => $content->fresh()->version, 'caption' => str_repeat('a', 2201)])
             ->assertStatus(422)->assertJsonValidationErrors('caption');
     }
 
@@ -117,9 +117,9 @@ class ContentDraftTest extends TestCase
         [$workspace, $project] = $this->scene();
         $content = $this->content($project, 'idea');
         Sanctum::actingAs($this->memberOf($workspace, WorkspaceRole::Viewer));
-        $this->patchJson("/api/v1/contents/{$content->id}/draft", ['title' => 'x'])->assertForbidden();
+        $this->patchJson("/api/v1/contents/{$content->id}/draft", ['expected_version' => $content->fresh()->version, 'title' => 'x'])->assertForbidden();
 
         $alheia = $this->content(Project::factory()->create(), 'idea');
-        $this->patchJson("/api/v1/contents/{$alheia->id}/draft", ['title' => 'x'])->assertNotFound();
+        $this->patchJson("/api/v1/contents/{$alheia->id}/draft", ['expected_version' => 1, 'title' => 'x'])->assertNotFound();
     }
 }

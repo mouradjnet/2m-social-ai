@@ -25,3 +25,6 @@ export const podeAprovar = (role: Role | null | undefined) =>
 
 export const podeCriarProjeto = (role: Role) =>
   role === 'owner' || role === 'admin' || role === 'editor'
+
+/** CP-04C: espelha a policy `update` (editor+; revisor esta acima de editor). Restaurar versao. */
+export const podeEditar = (role: Role | null | undefined) => role != null && role !== 'viewer'

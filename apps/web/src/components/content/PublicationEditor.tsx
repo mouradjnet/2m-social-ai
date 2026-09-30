@@ -88,24 +88,29 @@ export function PublicationEditor({ projectId, content, onClose, onGenerateImage
 
   const salvar = useMutation({
     mutationFn: async () => {
-      await api(`/contents/${content.id}/draft`, {
-        method: 'PATCH',
-        body: JSON.stringify({ title, caption, cta, hashtags: parseHashtags(hashtags) }),
-      })
+      // CP-04C: cada gravacao leva a versao que o editor viu; a resposta traz a nova
+      // (a proxima gravacao encadeia nela). Outra pessoa mexeu antes: 409.
+      let versao = content.version
+      const gravar = async (url: string, method: string, corpo: object) => {
+        const r = await api<{ data: Content }>(url, {
+          method,
+          body: JSON.stringify({ ...corpo, expected_version: versao }),
+        })
+        versao = r.data.version
+      }
+
+      await gravar(`/contents/${content.id}/draft`, 'PATCH', { title, caption, cta, hashtags: parseHashtags(hashtags) })
 
       if (imageId !== imagemDoServidor) {
-        await api(`/contents/${content.id}/image`, {
-          method: 'PUT',
-          body: JSON.stringify({ asset_id: imageId }),
-        })
+        await gravar(`/contents/${content.id}/image`, 'PUT', { asset_id: imageId })
       }
 
       if (content.format === 'carousel' && slideIds.join(',') !== slidesDoServidor.join(',')) {
-        await api(`/contents/${content.id}/slides`, { method: 'PUT', body: JSON.stringify({ asset_ids: slideIds }) })
+        await gravar(`/contents/${content.id}/slides`, 'PUT', { asset_ids: slideIds })
       }
 
       if (content.format === 'reel' && videoId !== videoDoServidor) {
-        await api(`/contents/${content.id}/video`, { method: 'PUT', body: JSON.stringify({ asset_id: videoId }) })
+        await gravar(`/contents/${content.id}/video`, 'PUT', { asset_id: videoId })
       }
     },
     onSuccess: async () => {

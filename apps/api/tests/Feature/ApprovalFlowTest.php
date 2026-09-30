@@ -237,7 +237,7 @@ class ApprovalFlowTest extends TestCase
         $this->aprovar($peca)->assertOk();
 
         // Pelo editor: recusado (peca aprovada nao muda o texto).
-        $this->patchJson("/api/v1/contents/{$peca->id}/draft", ['caption' => 'Outra'])->assertUnprocessable();
+        $this->patchJson("/api/v1/contents/{$peca->id}/draft", ['expected_version' => $peca->fresh()->version, 'caption' => 'Outra'])->assertUnprocessable();
 
         // Por qualquer outro caminho de codigo (agente, job): o model derruba a aprovacao.
         $peca->refresh()->update(['hashtags' => ['#outra']]);
@@ -289,7 +289,7 @@ class ApprovalFlowTest extends TestCase
 
         // O editor muda o texto enquanto o revisor esta com a tela aberta.
         Sanctum::actingAs($this->editor);
-        $this->patchJson("/api/v1/contents/{$peca->id}/draft", ['caption' => 'Texto novo do editor.'])->assertOk();
+        $this->patchJson("/api/v1/contents/{$peca->id}/draft", ['expected_version' => $peca->fresh()->version, 'caption' => 'Texto novo do editor.'])->assertOk();
 
         Sanctum::actingAs($this->reviewer);
         $this->aprovar($peca, $versaoVista)
@@ -312,7 +312,7 @@ class ApprovalFlowTest extends TestCase
         // Mudar o status a seco nao aprova.
         $this->patchJson("/api/v1/contents/{$peca->id}", ['status' => 'approved'])->assertUnprocessable();
         // O cliente nao escolhe a versao: o campo e ignorado no editor.
-        $this->patchJson("/api/v1/contents/{$peca->id}/draft", ['version' => 99, 'title' => 'Outro título'])->assertOk();
+        $this->patchJson("/api/v1/contents/{$peca->id}/draft", ['expected_version' => 1, 'version' => 99, 'title' => 'Outro título'])->assertOk();
         $this->assertSame(2, $peca->fresh()->version);
 
         // "Aprovada" no banco, sem decisao humana: nao agenda.

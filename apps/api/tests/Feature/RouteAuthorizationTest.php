@@ -62,6 +62,7 @@ class RouteAuthorizationTest extends TestCase
         'POST api/v1/contents/{content}/repurpose:generate' => 'RepurposeTest: viewer 403, outro tenant 404, sem token 401',
         'POST api/v1/contents/{content}/image:generate' => 'ImageGenerationTest: viewer 403, outro tenant 404, sem token 401',
         'PUT api/v1/contents/{content}/image' => 'AssetTest: viewer 403, outro tenant 404, peca aprovada 422',
+        'POST api/v1/contents/{content}/versions/{version}/restore' => 'ContentVersionsTest: sem sessao 401, leitor 403, outra marca 404',
         'POST api/v1/contents/{content}/approve' => 'ApprovalFlowTest (CP-04): editor e viewer 403, outro tenant 404, sem token 401, versao velha 409',
         'POST api/v1/contents/{content}/reject' => 'ApprovalFlowTest (CP-04): editor 403, outro tenant 404, sem motivo 422',
         'POST api/v1/contents/{content}/request-changes' => 'ApprovalFlowTest (CP-04): editor 403, outro tenant 404, sem motivo 422',

@@ -19,6 +19,15 @@ class ContentRevision extends Model
 
     protected $fillable = ['content_id', 'user_id', 'from_status', 'to_status', 'changes'];
 
+    /**
+     * CP-04C: a hora do PHP, como versoes e decisoes. O `useCurrent` do banco da a hora
+     * do INICIO da transacao, e a linha do tempo (EditorialTimeline) misturaria relogios.
+     */
+    protected static function booted(): void
+    {
+        static::creating(fn (ContentRevision $r) => $r->created_at ??= now());
+    }
+
     protected function casts(): array
     {
         return ['changes' => 'array'];

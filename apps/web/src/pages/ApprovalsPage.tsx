@@ -2,14 +2,15 @@ import { type QueryClient, useMutation, useQuery, useQueryClient } from '@tansta
 import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { StructurePreview } from '@/components/content/StructurePreview'
+import { VersionHistory } from '@/components/content/VersionHistory'
 import { InstagramPreview } from '@/components/instagram/InstagramPreview'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { Shell } from '@/components/ui/Shell'
 import { Textarea } from '@/components/ui/Textarea'
 import { ApiError, api } from '@/lib/api'
-import { podeAprovar } from '@/lib/roles'
-import type { Content, ContentFormat, ContentHistory, EditorialState, Me, Project } from '@/lib/types'
+import { podeAprovar, podeEditar } from '@/lib/roles'
+import type { Content, ContentFormat, EditorialState, Me, Project } from '@/lib/types'
 
 /**
  * CP-04 — a Central de Aprovação. A regra: nada é agendado nem publicado sem uma
@@ -45,8 +46,6 @@ const ESTADOS: Record<EditorialState, string> = {
   cancelled: 'Cancelada',
   archived: 'Arquivada',
 }
-
-const DECISOES = { approved: 'Aprovou', rejected: 'Rejeitou', changes_requested: 'Pediu ajustes' }
 
 function quando(iso: string | null | undefined): string | null {
   if (!iso) return null
@@ -114,6 +113,7 @@ export function ApprovalsPage() {
             marca={project.data?.data.name ?? ''}
             projectId={projectId!}
             podeDecidir={podeAprovar(papel)}
+            podeRestaurar={podeEditar(papel)}
             onAviso={setAviso}
           />
         ))}
@@ -128,6 +128,8 @@ interface Props {
   projectId: string
   /** O papel do usuário permite decidir (espelho da policy `approve`; o servidor confere). */
   podeDecidir: boolean
+  /** CP-04C: restaurar versão (espelho da policy `update`, editor+). */
+  podeRestaurar: boolean
   onAviso: (texto: string) => void
 }
 
@@ -136,7 +138,7 @@ interface RespostaAprovacao {
   replayed: boolean
 }
 
-function PecaParaDecidir({ peca, marca, projectId, podeDecidir, onAviso }: Props) {
+function PecaParaDecidir({ peca, marca, projectId, podeDecidir, podeRestaurar, onAviso }: Props) {
   const queryClient = useQueryClient()
   const [acao, setAcao] = useState<'reject' | 'request-changes' | null>(null)
   // CP-04B: a mesma idempotencia da aprovacao — uma chave por intencao de decidir.
@@ -392,7 +394,7 @@ function PecaParaDecidir({ peca, marca, projectId, podeDecidir, onAviso }: Props
         </p>
       )}
 
-      {verHistorico && <Historico contentId={peca.id} />}
+      {verHistorico && <VersionHistory contentId={peca.id} projectId={projectId} podeRestaurar={podeRestaurar} />}
     </Card>
   )
 }
@@ -400,39 +402,4 @@ function PecaParaDecidir({ peca, marca, projectId, podeDecidir, onAviso }: Props
 async function regenerar(queryClient: QueryClient, id: number, projectId: string) {
   await api(`/contents/${id}/rewrite:generate`, { method: 'POST' })
   await queryClient.invalidateQueries({ queryKey: ['contents', projectId] })
-}
-
-function Historico({ contentId }: { contentId: number }) {
-  const historico = useQuery({
-    queryKey: ['content-history', contentId],
-    queryFn: () => api<{ data: ContentHistory }>(`/contents/${contentId}/history`),
-  })
-
-  if (historico.isLoading) return <p className="text-body-sm text-on-surface-variant mt-4">Carregando histórico…</p>
-
-  const h = historico.data?.data
-  if (!h) return null
-
-  return (
-    <div className="border-outline-variant mt-4 rounded border p-3" aria-label="Histórico da peça">
-      <p className="text-label-md text-on-surface">
-        Histórico · versão atual {h.version} ·{' '}
-        {h.approval_valid ? 'aprovação válida para esta versão' : 'sem aprovação válida para esta versão'}
-      </p>
-      <ul className="mt-2 flex flex-col gap-1">
-        {h.decisions.map((d) => (
-          <li key={`d${d.id}`} className="text-body-sm text-on-surface">
-            {quando(d.at)} · {d.user?.name ?? 'alguém'} · {DECISOES[d.decision]} a versão {d.version}
-            {d.reason && <span className="text-on-surface-variant"> — “{d.reason}”</span>}
-          </li>
-        ))}
-        {h.revisions.map((r, i) => (
-          <li key={`r${i}`} className="text-body-sm text-on-surface-variant">
-            {quando(r.at)} ·{' '}
-            {r.type === 'change' ? `alterou ${r.fields.join(', ')}` : `moveu de ${r.from_status} para ${r.to_status}`}
-          </li>
-        ))}
-      </ul>
-    </div>
-  )
 }

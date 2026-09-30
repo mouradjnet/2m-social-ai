@@ -204,7 +204,7 @@ class RejectAndChangesTest extends TestCase
 
         // O editor muda o texto enquanto o revisor escreve o pedido de ajuste.
         Sanctum::actingAs($this->editor);
-        $this->patchJson("/api/v1/contents/{$peca->id}/draft", ['caption' => 'Texto novo.'])->assertOk();
+        $this->patchJson("/api/v1/contents/{$peca->id}/draft", ['expected_version' => $peca->fresh()->version, 'caption' => 'Texto novo.'])->assertOk();
 
         Sanctum::actingAs($this->reviewer);
         $this->pedirAjustes($peca, $vistaPeloRevisor)->assertStatus(409)->assertJsonPath('version', 2);
@@ -263,7 +263,7 @@ class RejectAndChangesTest extends TestCase
 
         // Nova versao: editada a mao.
         Sanctum::actingAs($this->editor);
-        $this->patchJson("/api/v1/contents/{$peca->id}/draft", ['cta' => 'Comente sua dúvida.'])->assertOk();
+        $this->patchJson("/api/v1/contents/{$peca->id}/draft", ['expected_version' => $peca->fresh()->version, 'cta' => 'Comente sua dúvida.'])->assertOk();
         $peca->refresh();
         $this->assertSame(2, $peca->version);
         $this->assertSame('needs_revision', $peca->editorial_state);

@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\V1;
 use App\Domain\Editorial\Approval;
 use App\Domain\Editorial\ApprovalConflict;
 use App\Domain\Editorial\ApprovalOutcome;
+use App\Domain\Editorial\EditorialTimeline;
 use App\Domain\Editorial\IdempotencyConflict;
 use App\Http\Controllers\Controller;
 use App\Models\Content;
@@ -98,6 +99,8 @@ class ContentDecisionController extends Controller
                 'project_id' => $content->project_id,
                 'version' => $content->version,
                 'approval_valid' => Approval::validApproval($content) !== null,
+                'approved_version' => Approval::validApproval($content)?->version,
+                'events' => EditorialTimeline::for($content),
                 'decisions' => $decisoes,
                 'revisions' => $revisoes,
             ],

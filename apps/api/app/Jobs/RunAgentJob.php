@@ -12,6 +12,7 @@ use App\Ai\Exceptions\OutputRejectedException;
 use App\Ai\Providers\LlmProvider;
 use App\Ai\Providers\LlmRequest;
 use App\Ai\Providers\LlmResponse;
+use App\Domain\Editorial\Versioning;
 use App\Models\AiRun;
 use App\Models\Project;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -82,7 +83,13 @@ class RunAgentJob implements ShouldQueue
         }
 
         DB::transaction(function () use ($agent, $project, $output, $run, $startedAt) {
-            $agent->persist($project, $output['data'], $run);
+            // CP-04C: as versoes que o agente criar ficam com a origem e a execucao.
+            Versioning::como(
+                $run->agent === 'rewriter' ? 'ai_rewrite' : 'ai_generation',
+                $run->created_by,
+                fn () => $agent->persist($project, $output['data'], $run),
+                aiRunId: $run->id,
+            );
 
             $run->update([
                 'status' => 'succeeded',

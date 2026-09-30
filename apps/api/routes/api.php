@@ -10,6 +10,7 @@ use App\Http\Controllers\Api\V1\ContentController;
 use App\Http\Controllers\Api\V1\ContentDecisionController;
 use App\Http\Controllers\Api\V1\ContentImageController;
 use App\Http\Controllers\Api\V1\ContentMediaController;
+use App\Http\Controllers\Api\V1\ContentVersionController;
 use App\Http\Controllers\Api\V1\CopyController;
 use App\Http\Controllers\Api\V1\DesignController;
 use App\Http\Controllers\Api\V1\ExportController;
@@ -115,6 +116,11 @@ Route::prefix('v1')->group(function () {
         Route::post('contents/{content}/reject', [ContentDecisionController::class, 'reject']);
         Route::post('contents/{content}/request-changes', [ContentDecisionController::class, 'requestChanges']);
         Route::get('contents/{content}/history', [ContentDecisionController::class, 'history']);
+        // CP-04C: versoes gravadas. Historica nao se edita; restaurar cria versao nova.
+        Route::get('contents/{content}/versions', [ContentVersionController::class, 'index']);
+        Route::get('contents/{content}/versions/compare', [ContentVersionController::class, 'compare']);
+        Route::get('contents/{content}/versions/{version}', [ContentVersionController::class, 'show'])->whereNumber('version');
+        Route::post('contents/{content}/versions/{version}/restore', [ContentVersionController::class, 'restore'])->whereNumber('version');
         Route::patch('strategies/{strategy}', [StrategyController::class, 'update']);
 
         // Biblioteca de imagens. A imagem sai daqui pronta para o Instagram.

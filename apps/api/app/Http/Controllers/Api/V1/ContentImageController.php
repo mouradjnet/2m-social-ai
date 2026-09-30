@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Domain\Editorial\Versioning;
 use App\Http\Controllers\Controller;
 use App\Models\Asset;
 use App\Models\Content;
@@ -25,6 +26,7 @@ class ContentImageController extends Controller
 
         $data = $request->validate([
             'asset_id' => ['present', 'nullable', 'integer'],
+            'expected_version' => ['required', 'integer', 'min:1'],
         ]);
 
         if (! in_array($content->status, self::EDITAVEIS, true)) {
@@ -45,16 +47,18 @@ class ContentImageController extends Controller
 
         $de = $content->image_asset_id;
 
-        if ($de !== $data['asset_id']) {
-            DB::transaction(function () use ($content, $de, $data, $request) {
+        DB::transaction(function () use ($content, $de, $data, $request) {
+            Versioning::exigir($content, (int) $data['expected_version']);
+
+            if ($de !== $data['asset_id']) {
                 $content->update(['image_asset_id' => $data['asset_id']]);
                 ContentRevision::create([
                     'content_id' => $content->id,
                     'user_id' => $request->user()->id,
                     'changes' => ['image_asset_id' => ['from' => $de, 'to' => $data['asset_id']]],
                 ]);
-            });
-        }
+            }
+        });
 
         return response()->json(['data' => $content->refresh()->load('image')]);
     }

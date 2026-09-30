@@ -140,7 +140,7 @@ class CarouselReelTest extends TestCase
         [$a, $b, $c] = [$this->asset('a.jpg'), $this->asset('b.jpg'), $this->asset('c.jpg')];
         $peca = $this->peca('carousel');
 
-        $this->putJson("/api/v1/contents/{$peca->id}/slides", ['asset_ids' => [$c->id, $a->id, $b->id]])
+        $this->putJson("/api/v1/contents/{$peca->id}/slides", ['expected_version' => $peca->fresh()->version, 'asset_ids' => [$c->id, $a->id, $b->id]])
             ->assertOk()
             ->assertJsonPath('data.slides.0.id', $c->id);
 
@@ -174,7 +174,7 @@ class CarouselReelTest extends TestCase
         $capa = $this->asset('capa.jpg');
         $peca = $this->peca('reel', ['image_asset_id' => $capa->id]);
 
-        $this->putJson("/api/v1/contents/{$peca->id}/video", ['asset_id' => $video->id])->assertOk();
+        $this->putJson("/api/v1/contents/{$peca->id}/video", ['expected_version' => $peca->fresh()->version, 'asset_id' => $video->id])->assertOk();
         $this->aprovarEAgendar($peca);
 
         // A Meta ainda processa o video na primeira consulta.
@@ -206,7 +206,7 @@ class CarouselReelTest extends TestCase
         $this->meta(['container-1']);
 
         $um = $this->peca('carousel');
-        $this->putJson("/api/v1/contents/{$um->id}/slides", ['asset_ids' => [$this->asset('so.jpg')->id]])->assertOk();
+        $this->putJson("/api/v1/contents/{$um->id}/slides", ['expected_version' => $um->fresh()->version, 'asset_ids' => [$this->asset('so.jpg')->id]])->assertOk();
         $this->aprovarEAgendar($um);
 
         $semVideo = $this->peca('reel', ['title' => 'Reel sem vídeo']);
@@ -232,12 +232,12 @@ class CarouselReelTest extends TestCase
         $url = "/api/v1/contents/{$peca->id}/slides";
         $img = $this->asset('i.jpg');
 
-        $this->putJson($url, ['asset_ids' => array_map(fn ($i) => $this->asset("x{$i}.jpg")->id, range(1, 11))])->assertStatus(422);
-        $this->putJson($url, ['asset_ids' => [$img->id, $img->id]])->assertStatus(422);
-        $this->putJson($url, ['asset_ids' => [$img->id, $this->asset('v.mp4', 'video')->id]])->assertStatus(422);
+        $this->putJson($url, ['expected_version' => $peca->fresh()->version, 'asset_ids' => array_map(fn ($i) => $this->asset("x{$i}.jpg")->id, range(1, 11))])->assertStatus(422);
+        $this->putJson($url, ['expected_version' => $peca->fresh()->version, 'asset_ids' => [$img->id, $img->id]])->assertStatus(422);
+        $this->putJson($url, ['expected_version' => $peca->fresh()->version, 'asset_ids' => [$img->id, $this->asset('v.mp4', 'video')->id]])->assertStatus(422);
         $outro = Project::factory()->create(['workspace_id' => $this->workspace->id]);
-        $this->putJson($url, ['asset_ids' => [$img->id, $this->asset('o.jpg', 'image', $outro)->id]])->assertStatus(422);
-        $this->putJson("/api/v1/contents/{$peca->id}/video", ['asset_id' => $img->id])->assertStatus(422);
+        $this->putJson($url, ['expected_version' => $peca->fresh()->version, 'asset_ids' => [$img->id, $this->asset('o.jpg', 'image', $outro)->id]])->assertStatus(422);
+        $this->putJson("/api/v1/contents/{$peca->id}/video", ['expected_version' => $peca->fresh()->version, 'asset_id' => $img->id])->assertStatus(422);
 
         $this->assertSame(0, $peca->slides()->count());
     }
@@ -247,25 +247,25 @@ class CarouselReelTest extends TestCase
         [$a, $b] = [$this->asset('a.jpg'), $this->asset('b.jpg')];
         $peca = $this->peca('carousel');
 
-        $this->putJson("/api/v1/contents/{$peca->id}/slides", ['asset_ids' => [$a->id, $b->id]])->assertOk();
+        $this->putJson("/api/v1/contents/{$peca->id}/slides", ['expected_version' => $peca->fresh()->version, 'asset_ids' => [$a->id, $b->id]])->assertOk();
 
         $rev = ContentRevision::where('content_id', $peca->id)->sole();
         $this->assertEquals(['from' => [], 'to' => [$a->id, $b->id]], $rev->changes['slides']);
 
         $this->postJson("/api/v1/contents/{$peca->id}/approve", Aprovar::pedido($peca))->assertOk();
-        $this->putJson("/api/v1/contents/{$peca->id}/slides", ['asset_ids' => [$b->id, $a->id]])->assertStatus(422);
-        $this->putJson("/api/v1/contents/{$peca->id}/video", ['asset_id' => null])->assertStatus(422);
+        $this->putJson("/api/v1/contents/{$peca->id}/slides", ['expected_version' => $peca->fresh()->version, 'asset_ids' => [$b->id, $a->id]])->assertStatus(422);
+        $this->putJson("/api/v1/contents/{$peca->id}/video", ['expected_version' => $peca->fresh()->version, 'asset_id' => null])->assertStatus(422);
     }
 
     public function test_imagem_que_e_slide_de_peca_aprovada_nao_sai_da_biblioteca(): void
     {
         [$a, $b, $solta] = [$this->asset('a.jpg'), $this->asset('b.jpg'), $this->asset('c.jpg')];
         $aprovada = $this->peca('carousel');
-        $this->putJson("/api/v1/contents/{$aprovada->id}/slides", ['asset_ids' => [$a->id, $b->id]])->assertOk();
+        $this->putJson("/api/v1/contents/{$aprovada->id}/slides", ['expected_version' => $aprovada->fresh()->version, 'asset_ids' => [$a->id, $b->id]])->assertOk();
         $this->postJson("/api/v1/contents/{$aprovada->id}/approve", Aprovar::pedido($aprovada))->assertOk();
 
         $rascunho = $this->peca('carousel', ['title' => 'Rascunho']);
-        $this->putJson("/api/v1/contents/{$rascunho->id}/slides", ['asset_ids' => [$solta->id, $b->id]])->assertOk();
+        $this->putJson("/api/v1/contents/{$rascunho->id}/slides", ['expected_version' => $rascunho->fresh()->version, 'asset_ids' => [$solta->id, $b->id]])->assertOk();
 
         $this->deleteJson("/api/v1/assets/{$a->id}")->assertStatus(409);
         $this->deleteJson("/api/v1/assets/{$solta->id}")->assertNoContent();
@@ -279,11 +279,11 @@ class CarouselReelTest extends TestCase
         $img = $this->asset('a.jpg');
 
         Sanctum::actingAs($this->memberOf(WorkspaceRole::Viewer));
-        $this->putJson("/api/v1/contents/{$peca->id}/slides", ['asset_ids' => [$img->id]])->assertForbidden();
-        $this->putJson("/api/v1/contents/{$peca->id}/video", ['asset_id' => null])->assertForbidden();
+        $this->putJson("/api/v1/contents/{$peca->id}/slides", ['expected_version' => $peca->fresh()->version, 'asset_ids' => [$img->id]])->assertForbidden();
+        $this->putJson("/api/v1/contents/{$peca->id}/video", ['expected_version' => $peca->fresh()->version, 'asset_id' => null])->assertForbidden();
 
         Sanctum::actingAs($this->memberOf(WorkspaceRole::Owner, Workspace::factory()->create()));
-        $this->putJson("/api/v1/contents/{$peca->id}/slides", ['asset_ids' => [$img->id]])->assertNotFound();
-        $this->putJson("/api/v1/contents/{$peca->id}/video", ['asset_id' => null])->assertNotFound();
+        $this->putJson("/api/v1/contents/{$peca->id}/slides", ['expected_version' => 1, 'asset_ids' => [$img->id]])->assertNotFound();
+        $this->putJson("/api/v1/contents/{$peca->id}/video", ['expected_version' => 1, 'asset_id' => null])->assertNotFound();
     }
 }
