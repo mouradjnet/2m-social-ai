@@ -9,12 +9,15 @@ use App\Models\ContentDecision;
 use App\Models\ContentReview;
 use App\Models\ContentRevision;
 use App\Models\Project;
+use App\Models\Publication;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Models\WorkspaceMember;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
 use Laravel\Sanctum\Sanctum;
 use RuntimeException;
@@ -254,6 +257,34 @@ class ApproveActionTest extends TestCase
 
         $this->expectException(UniqueConstraintViolationException::class);
         ContentDecision::create($linha());
+    }
+
+    /**
+     * Dois revisores aprovando a mesma peca, cada um com a sua chave: a linha travada
+     * deixa uma so passar; a outra ve a peca ja aprovada (409). E aprovar nao agenda,
+     * nao enfileira nada e nao fala com a rede.
+     */
+    public function test_aprovacao_simultanea_passa_uma_e_aprovar_nao_agenda_nem_publica(): void
+    {
+        Queue::fake();
+        Http::fake();
+        $peca = $this->peca();
+        $pedidoA = Aprovar::pedido($peca);
+        $pedidoB = [...$pedidoA, 'request_key' => (string) Str::uuid()];
+
+        Sanctum::actingAs($this->reviewer);
+        $this->aprovar($peca, $pedidoA)->assertOk();
+
+        Sanctum::actingAs($this->membro(WorkspaceRole::Reviewer));
+        $this->aprovar($peca, $pedidoB)->assertStatus(409);
+
+        $this->assertSame(1, ContentDecision::count());
+        $peca->refresh();
+        $this->assertSame('approved', $peca->status);
+        $this->assertNull($peca->scheduled_for);
+        $this->assertSame(0, Publication::withoutGlobalScopes()->count());
+        Queue::assertNothingPushed();
+        Http::assertNothingSent();
     }
 
     // --- Transacao ----------------------------------------------------------------------

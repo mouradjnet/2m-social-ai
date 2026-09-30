@@ -119,3 +119,13 @@ Rejeitar e pedir ajustes (outras ações do CP-04) ficam como estão; deploy; ba
 - `crypto.randomUUID()` exige contexto seguro (HTTPS ou localhost) — VPS e Render são HTTPS.
 - O replay devolve a decisão original mesmo que a peça tenha mudado depois; a resposta traz o estado atual da peça.
 - Rejeitar e pedir ajustes não têm idempotência (fora do escopo do CP-04A).
+
+## Verificação da autorização formal (30/09/2026)
+
+A autorização formal do CP-04A chegou depois da implementação (`5d36523`, já no GitHub e na VPS, com autorizações anteriores do responsável). Nada foi reimplementado. Verificação feita:
+
+- `main` limpa e igual a `origin/main`; sem alterações locais nem conflitos; 41 testes de aprovação verdes antes de qualquer mudança.
+- Os 12 requisitos da autorização conferidos contra o código (autenticação, permissão `approve`, marca pelo escopo, `pending_approval`, `expected_version`, 409 em versão velha, snapshot + sha256 com texto/legenda/hashtags/CTA/mídia/slides, responsável e data, auditoria na mesma transação, idempotência por `request_key`, invalidação por edição no model, aprovar não agenda nem publica).
+- Lacuna de teste fechada: `ApproveActionTest::test_aprovacao_simultanea_passa_uma_e_aprovar_nao_agenda_nem_publica` (dois revisores, chaves diferentes: um 200, outro 409; nenhuma publicação, nenhum job, nenhuma requisição externa).
+- Gate: 573 PHPUnit, 183 vitest, pint, lint (2 avisos antigos), tsc + build.
+- Nenhuma migration nova (a de idempotência já tinha sido autorizada e aplicada).
