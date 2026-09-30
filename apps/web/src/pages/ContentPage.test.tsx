@@ -102,6 +102,34 @@ test('avançar uma peça faz PATCH com o próximo status', async () => {
   await waitFor(() => expect(recebido).toEqual({ status: 'production' }))
 })
 
+/** CP-04: aprovar pelo quadro é a mesma decisão da Central, presa à versão do card. */
+test('avançar uma peça em revisão aprova pelo endpoint, com a versão exibida', async () => {
+  const user = setup()
+  let recebido: unknown = null
+  let patch = false
+
+  server.use(
+    http.get('/api/v1/projects/1/contents', () =>
+      HttpResponse.json({ data: [{ ...content(1, 'review'), version: 4 }] }),
+    ),
+    http.post('/api/v1/contents/1/approve', async ({ request }) => {
+      recebido = await request.json()
+      return HttpResponse.json({ data: { ...content(1, 'approved'), version: 4 } })
+    }),
+    http.patch('/api/v1/contents/1', () => {
+      patch = true
+      return HttpResponse.json({ data: content(1, 'approved') })
+    }),
+  )
+
+  renderWithProviders(<ContentPage />, ROUTE)
+
+  await user.click(await screen.findByRole('button', { name: /avançar/i }))
+
+  await waitFor(() => expect(recebido).toEqual({ version: 4 }))
+  expect(patch).toBe(false)
+})
+
 test('o card de source=ai mostra o chip Gerado por IA', async () => {
   server.use(
     http.get('/api/v1/projects/1/contents', () => HttpResponse.json({ data: [content(1, 'idea')] })),

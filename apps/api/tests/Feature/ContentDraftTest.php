@@ -82,7 +82,7 @@ class ContentDraftTest extends TestCase
         $reviewer = $this->memberOf($workspace, WorkspaceRole::Reviewer);
         Sanctum::actingAs($reviewer);
 
-        $this->patchJson("/api/v1/contents/{$content->id}", ['status' => 'approved'])->assertOk();
+        $this->postJson("/api/v1/contents/{$content->id}/approve", ['version' => $content->fresh()->version])->assertOk();
         $this->patchJson("/api/v1/contents/{$content->id}/draft", ['caption' => 'x'])->assertStatus(422);
 
         $this->patchJson("/api/v1/contents/{$content->id}", ['status' => 'review'])->assertOk();
@@ -94,7 +94,7 @@ class ContentDraftTest extends TestCase
             'approved_by' => $reviewer->id, 'approved_at' => now(),
         ]);
 
-        $this->assertSame('O texto mudou depois da aprovação. Aprove de novo.', PublishGate::refusal($content->fresh()));
+        $this->assertSame('A aprovação não vale para esta versão da peça (o conteúdo mudou, ou foi aprovada antes do controle de versões). Aprove de novo.', PublishGate::refusal($content->fresh()));
     }
 
     public function test_valida_limites_do_instagram(): void

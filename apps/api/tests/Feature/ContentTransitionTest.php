@@ -11,6 +11,7 @@ use App\Models\Workspace;
 use App\Models\WorkspaceMember;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
+use Tests\Support\Aprovar;
 use Tests\TestCase;
 
 class ContentTransitionTest extends TestCase
@@ -231,8 +232,9 @@ class ContentTransitionTest extends TestCase
         $workspace = Workspace::factory()->create();
         $editor = $this->memberOf($workspace, WorkspaceRole::Editor);
         $project = Project::factory()->create(['workspace_id' => $workspace->id]);
-        $content = $this->content($project, 'scheduled');
-        $content->update(['scheduled_for' => '2026-08-03 10:00:00']);
+        // CP-04: remarcar exige aprovacao valida para a versao (a data nao muda a versao).
+        $content = Aprovar::peca($this->content($project, 'review'));
+        $content->update(['status' => 'scheduled', 'scheduled_for' => '2026-08-03 10:00:00']);
 
         Sanctum::actingAs($editor);
 

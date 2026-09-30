@@ -112,16 +112,60 @@ export interface ContentStructure {
   production_notes?: string
 }
 
-/** Estado editorial explícito, derivado de status + último veredito (servidor). */
+/**
+ * Estado editorial explícito (CP-03/CP-04). Derivado NO SERVIDOR de status, último
+ * veredito da IA, última decisão humana e última publicação — o cliente só lê.
+ */
 export type EditorialState =
   | 'draft'
-  | 'in_review'
   | 'needs_revision'
-  | 'ready_for_approval'
+  | 'in_review'
+  | 'pending_approval'
   | 'approved'
+  | 'rejected'
   | 'scheduled'
+  | 'publishing'
   | 'published'
+  | 'failed'
+  | 'cancelled'
   | 'archived'
+
+/** CP-04: uma decisão humana sobre UMA versão da peça (append-only). */
+export interface ContentDecision {
+  id: number
+  decision: 'approved' | 'rejected' | 'changes_requested'
+  version: number
+  reason: string | null
+  snapshot_hash?: string | null
+  created_at: string
+}
+
+/** GET /contents/{id}/history */
+export interface ContentHistory {
+  content_id: number
+  project_id: number
+  version: number
+  approval_valid: boolean
+  decisions: {
+    id: number
+    decision: ContentDecision['decision']
+    version: number
+    reason: string | null
+    from_status: string
+    to_status: string
+    snapshot_hash: string | null
+    user: { id: number; name: string } | null
+    at: string
+  }[]
+  revisions: {
+    type: 'change' | 'status'
+    from_status: string | null
+    to_status: string | null
+    fields: string[]
+    user_id: number
+    at: string
+  }[]
+}
 
 export type ContentStatus =
   | 'idea'
@@ -179,6 +223,10 @@ export interface Content {
   structure?: ContentStructure | null
   /** CP-03: o estado editorial explícito. */
   editorial_state?: EditorialState
+  /** CP-04: sobe a cada mudança no que vai ao ar. A aprovação vale para UMA versão. */
+  version?: number
+  /** CP-04: a última decisão humana (aprovar, rejeitar, pedir ajustes). */
+  latest_decision?: ContentDecision | null
   /** A ultima revisao (as reviews sao append-only). Null se nunca foi revisada. */
   latest_review: ContentReview | null
   /** A ultima sugestao de SEO. Null se o agente nunca rodou nesta peca. */

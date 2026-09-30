@@ -17,6 +17,7 @@ use App\Models\WorkspaceMember;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
@@ -92,7 +93,7 @@ class PublishingTest extends TestCase
      * Uma peca que um reviewer aprovou pela rota, com imagem, agendada para `$quando`
      * (padrao: um minuto atras — a hora ja chegou).
      */
-    private function pecaAprovada(?string $quando = null, bool $comImagem = true): Content
+    private function pecaAprovada(?string $quando = null, bool $comImagem = true, ?string $legenda = null): Content
     {
         $asset = $comImagem ? Asset::create([
             'workspace_id' => $this->workspace->id, 'project_id' => $this->project->id, 'type' => 'image',
@@ -104,7 +105,7 @@ class PublishingTest extends TestCase
             'workspace_id' => $this->workspace->id,
             'project_id' => $this->project->id,
             'title' => 'Ciclo menstrual',
-            'caption' => 'Seu ciclo diz muito sobre sua saúde.',
+            'caption' => $legenda ?? 'Seu ciclo diz muito sobre sua saúde.',
             'cta' => 'Agende sua consulta.',
             'hashtags' => ['saudefeminina', '#ginecologia'],
             'format' => 'post',
@@ -115,7 +116,7 @@ class PublishingTest extends TestCase
         ]);
 
         Sanctum::actingAs($this->reviewer);
-        $this->patchJson("/api/v1/contents/{$content->id}", ['status' => 'approved'])->assertOk();
+        $this->postJson("/api/v1/contents/{$content->id}/approve", ['version' => $content->fresh()->version])->assertOk();
 
         $content->refresh()->update([
             'status' => 'scheduled',
@@ -253,15 +254,13 @@ class PublishingTest extends TestCase
     {
         $this->conta();
         $content = $this->pecaAprovada();
-        ContentRevision::create([
-            'content_id' => $content->id, 'user_id' => $this->reviewer->id,
-            'changes' => ['caption' => ['from' => 'a', 'to' => 'b']],
-        ]);
+        // CP-04: SQL cru, contornando o model — o hash do snapshot pega mesmo assim.
+        DB::table('contents')->where('id', $content->id)->update(['caption' => 'Outra legenda']);
         $this->meta();
 
         $this->dispatch();
 
-        $this->assertSame('O texto mudou depois da aprovação. Aprove de novo.', Publication::withoutGlobalScopes()->sole()->last_error);
+        $this->assertSame('A aprovação não vale para esta versão da peça (o conteúdo mudou, ou foi aprovada antes do controle de versões). Aprove de novo.', Publication::withoutGlobalScopes()->sole()->last_error);
         Http::assertNothingSent();
     }
 
@@ -300,7 +299,9 @@ class PublishingTest extends TestCase
     public function test_legenda_acima_do_limite_do_instagram_nao_publica(): void
     {
         $this->conta();
-        $this->pecaAprovada()->update(['caption' => str_repeat('a', 2300)]);
+        // CP-04: a legenda longa ja estava na versao aprovada (mudar depois derrubaria
+        // a aprovacao e nem chegaria aqui). Quem barra e o limite da Meta.
+        $this->pecaAprovada(legenda: str_repeat('a', 2300));
 
         $this->dispatch();
 

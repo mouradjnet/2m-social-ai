@@ -96,7 +96,7 @@ class CarouselReelTest extends TestCase
     /** Aprova pela rota (reviewer) e agenda para um minuto atras. */
     private function aprovarEAgendar(Content $content): void
     {
-        $this->patchJson("/api/v1/contents/{$content->id}", ['status' => 'approved'])->assertOk();
+        $this->postJson("/api/v1/contents/{$content->id}/approve", ['version' => $content->fresh()->version])->assertOk();
         $content->refresh()->update(['status' => 'scheduled', 'scheduled_for' => now()->subMinute()]);
     }
 
@@ -251,7 +251,7 @@ class CarouselReelTest extends TestCase
         $rev = ContentRevision::where('content_id', $peca->id)->sole();
         $this->assertEquals(['from' => [], 'to' => [$a->id, $b->id]], $rev->changes['slides']);
 
-        $this->patchJson("/api/v1/contents/{$peca->id}", ['status' => 'approved'])->assertOk();
+        $this->postJson("/api/v1/contents/{$peca->id}/approve", ['version' => $peca->fresh()->version])->assertOk();
         $this->putJson("/api/v1/contents/{$peca->id}/slides", ['asset_ids' => [$b->id, $a->id]])->assertStatus(422);
         $this->putJson("/api/v1/contents/{$peca->id}/video", ['asset_id' => null])->assertStatus(422);
     }
@@ -261,7 +261,7 @@ class CarouselReelTest extends TestCase
         [$a, $b, $solta] = [$this->asset('a.jpg'), $this->asset('b.jpg'), $this->asset('c.jpg')];
         $aprovada = $this->peca('carousel');
         $this->putJson("/api/v1/contents/{$aprovada->id}/slides", ['asset_ids' => [$a->id, $b->id]])->assertOk();
-        $this->patchJson("/api/v1/contents/{$aprovada->id}", ['status' => 'approved'])->assertOk();
+        $this->postJson("/api/v1/contents/{$aprovada->id}/approve", ['version' => $aprovada->fresh()->version])->assertOk();
 
         $rascunho = $this->peca('carousel', ['title' => 'Rascunho']);
         $this->putJson("/api/v1/contents/{$rascunho->id}/slides", ['asset_ids' => [$solta->id, $b->id]])->assertOk();

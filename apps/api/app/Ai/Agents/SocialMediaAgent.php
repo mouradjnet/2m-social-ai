@@ -3,6 +3,7 @@
 namespace App\Ai\Agents;
 
 use App\Ai\Exceptions\OutputRejectedException;
+use App\Domain\Publishing\PublishGate;
 use App\Models\AiRun;
 use App\Models\Content;
 use App\Models\ContentRevision;
@@ -153,6 +154,12 @@ class SocialMediaAgent implements Agent
                 ->where('project_id', $project->id)
                 ->where('status', 'approved')
                 ->findOrFail($entrada['content_id']);
+
+            // CP-04: o agente nao aprova nem agenda aprovacao vencida. A aprovacao caiu
+            // entre o POST e aqui (a peca mudou): nao agenda; o humano aprova de novo.
+            if (PublishGate::approvalRefusal($content) !== null) {
+                continue;
+            }
 
             $content->update([
                 // `->utc()` e explicito de proposito: o banco guarda instante em UTC,

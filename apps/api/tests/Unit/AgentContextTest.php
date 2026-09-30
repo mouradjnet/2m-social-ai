@@ -9,6 +9,7 @@ use App\Models\Strategy;
 use App\Models\User;
 use App\Models\Workspace;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Support\Aprovar;
 use Tests\TestCase;
 
 class AgentContextTest extends TestCase
@@ -17,7 +18,7 @@ class AgentContextTest extends TestCase
 
     private function content(Project $project, string $status): Content
     {
-        return Content::create([
+        $content = Content::create([
             'workspace_id' => $project->workspace_id,
             'project_id' => $project->id,
             'title' => "Peca {$status}",
@@ -26,10 +27,13 @@ class AgentContextTest extends TestCase
             'hashtags' => ['#a'],
             'format' => 'post',
             'channel' => 'instagram',
-            'status' => $status,
+            'status' => $status === 'approved' ? 'review' : $status,
             'source' => 'ai',
             'created_by' => User::factory()->create()->id,
         ]);
+
+        // CP-04: aprovada pela decisao humana presa a versao, nao por status no banco.
+        return $status === 'approved' ? Aprovar::peca($content) : $content;
     }
 
     private function strategy(Project $project, string $status): Strategy

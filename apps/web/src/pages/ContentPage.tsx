@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { ContentBoard } from '@/components/content/ContentBoard'
 import { PublicationEditor } from '@/components/content/PublicationEditor'
 import { WeekPlanPanel } from '@/components/content/WeekPlanPanel'
@@ -33,7 +33,9 @@ export function ContentPage() {
   const [pillar, setPillar] = useState('')
   // A peca aberta no editor de publicacao. O id, nao o objeto: a lista se atualiza
   // e o editor le a versao nova.
-  const [editando, setEditando] = useState<number | null>(null)
+  // CP-04: a Central de Aprovação abre o editor daqui por `?editar=<id>` (um editor so).
+  const [searchParams] = useSearchParams()
+  const [editando, setEditando] = useState<number | null>(() => Number(searchParams.get('editar')) || null)
 
   // Um hook so: o ai_run_id mora no `?run=`, e duas instancias brigariam por ele.
   // Escrever e agendar invalidam a mesma query, entao o endpoint vai na chamada.
@@ -55,8 +57,20 @@ export function ContentPage() {
   })
 
   const move = useMutation({
-    mutationFn: ({ id, status }: { id: number; status: Content['status'] }) =>
-      api(`/contents/${id}`, { method: 'PATCH', body: JSON.stringify({ status }) }),
+    mutationFn: ({ id, status }: { id: number; status: Content['status'] }) => {
+      const atual = contents.data?.data.find((c) => c.id === id)
+
+      // CP-04: aprovar é decisão presa à versão que está na tela. Se a peça mudou
+      // nesse meio tempo, o servidor devolve 409 e ninguém aprova o que não viu.
+      if (status === 'approved' && atual?.status === 'review') {
+        return api(`/contents/${id}/approve`, {
+          method: 'POST',
+          body: JSON.stringify({ version: atual.version ?? 1 }),
+        })
+      }
+
+      return api(`/contents/${id}`, { method: 'PATCH', body: JSON.stringify({ status }) })
+    },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['contents', projectId] }),
   })
 
@@ -119,7 +133,14 @@ export function ContentPage() {
           ← Estratégia
         </Link>
 
-        <div className="flex gap-4">
+        <div className="flex flex-wrap gap-4">
+          <Link
+            to={`/projects/${projectId}/aprovacoes`}
+            className="text-body-sm text-primary font-medium hover:underline"
+          >
+            Central de Aprovação →
+          </Link>
+
           <Link
             to={`/projects/${projectId}/library`}
             className="text-body-sm text-on-surface-variant hover:text-primary"

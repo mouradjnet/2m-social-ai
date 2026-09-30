@@ -5,29 +5,43 @@ namespace App\Domain\Editorial;
 use App\Models\Content;
 
 /**
- * O estado editorial EXPLICITO (CP-03), derivado do que ja existe — sem coluna nova:
+ * O estado editorial EXPLICITO (CP-03/CP-04), derivado do que ja existe — status da
+ * peca, ultimo veredito do revisor de IA, ultima decisao humana e ultima publicacao —
+ * sem coluna nova:
  *
- *   draft              idea ou production (ainda sendo escrita)
- *   in_review          em `review` sem veredito valido (nenhum, ou o texto mudou depois)
- *   needs_revision     em `review` e o ultimo veredito, sobre este texto, foi `fail`
- *   ready_for_approval em `review` e o ultimo veredito, sobre este texto, foi `pass`
- *   approved / scheduled / published / archived: o proprio status
+ *   draft             idea ou production
+ *   needs_revision    o revisor de IA reprovou, ou uma pessoa pediu ajustes
+ *   in_review         em `review` sem veredito valido da IA
+ *   pending_approval  aguardando decisao HUMANA: IA aprovou, ou a aprovacao antiga caiu
+ *   approved          `approved` com aprovacao valida para a versao atual
+ *   rejected          uma pessoa rejeitou (a peca foi arquivada)
+ *   scheduled         agendada, publicacao pendente
+ *   publishing        o Publisher esta falando com a Meta
+ *   published         publicada
+ *   failed            a publicacao falhou (ou ficou sem resposta da Meta)
+ *   cancelled         a publicacao foi cancelada (desagendada, remarcada, porta fechou)
+ *   archived          arquivada sem rejeicao
  *
- * Ready_for_approval NAO aprova: aprovar continua gesto humano (ADR-13), e nenhum
- * estado aqui publica nada.
+ * O estado e LIDO pelo frontend, nunca escrito por ele: quem muda o status e o
+ * servidor (ContentController, Approval, Publisher). Nenhum estado aqui aprova.
  */
 class EditorialState
 {
     public const STATES = [
-        'draft', 'in_review', 'needs_revision', 'ready_for_approval',
-        'approved', 'scheduled', 'published', 'archived',
+        'draft', 'needs_revision', 'in_review', 'pending_approval', 'approved', 'rejected',
+        'scheduled', 'publishing', 'published', 'failed', 'cancelled', 'archived',
     ];
 
     public static function for(Content $content): string
     {
+        $decisao = $content->latestDecision;
+
         return match ($content->status) {
-            'idea', 'production' => 'draft',
+            'idea', 'production' => $decisao?->decision === 'changes_requested' ? 'needs_revision' : 'draft',
             'review' => self::review($content),
+            'approved' => Approval::validApproval($content) !== null ? 'approved' : 'pending_approval',
+            'scheduled' => self::publicacao($content),
+            'archived' => $decisao?->decision === 'rejected' ? 'rejected' : 'archived',
             default => $content->status,
         };
     }
@@ -47,6 +61,17 @@ class EditorialState
             return 'in_review';
         }
 
-        return $veredito->verdict === 'fail' ? 'needs_revision' : 'ready_for_approval';
+        return $veredito->verdict === 'fail' ? 'needs_revision' : 'pending_approval';
+    }
+
+    private static function publicacao(Content $content): string
+    {
+        return match ($content->latestPublication?->status) {
+            'publishing' => 'publishing',
+            'published' => 'published',
+            'failed', 'unknown' => 'failed',
+            'cancelled' => 'cancelled',
+            default => 'scheduled',
+        };
     }
 }

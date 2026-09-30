@@ -2,6 +2,7 @@
 
 namespace App\Domain\Publishing;
 
+use App\Domain\Editorial\Approval;
 use App\Jobs\PublishJob;
 use App\Models\Content;
 use App\Models\InstagramAccount;
@@ -93,6 +94,9 @@ class Dispatcher
                 'account_username' => $conta?->username,
                 'approved_by' => $content->approved_by,
                 'approved_at' => $content->approved_at,
+                // CP-04: presa a versao e a aprovacao exatas; o Publisher confere de novo.
+                'content_version' => $content->version,
+                'decision_id' => Approval::validApproval($content)?->id,
                 'scheduled_for' => $content->scheduled_for,
                 'status' => $recusa === null ? 'pending' : 'failed',
                 'error_kind' => $recusa === null ? null : 'refused',

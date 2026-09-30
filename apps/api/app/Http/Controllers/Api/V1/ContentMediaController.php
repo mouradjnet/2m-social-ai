@@ -58,6 +58,8 @@ class ContentMediaController extends Controller
                     'user_id' => $request->user()->id,
                     'changes' => ['slides' => ['from' => $de, 'to' => $ids]],
                 ]);
+                // CP-04: os slides vao ao ar; trocar e mudar de versao.
+                $content->markContentChanged();
             });
         }
 

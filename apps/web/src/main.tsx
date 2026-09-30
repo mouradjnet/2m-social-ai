@@ -6,6 +6,7 @@ import { BrandProfilePage } from '@/pages/BrandProfilePage'
 import { LoginPage } from '@/pages/LoginPage'
 import { ProjectsPage } from '@/pages/ProjectsPage'
 import { CalendarPage } from '@/pages/CalendarPage'
+import { ApprovalsPage } from '@/pages/ApprovalsPage'
 import { ContentPage } from '@/pages/ContentPage'
 import { InsightsPage } from '@/pages/InsightsPage'
 import { StrategyPage } from '@/pages/StrategyPage'
@@ -81,6 +82,14 @@ createRoot(document.getElementById('root')!).render(
             element={
               <RequireAuth>
                 <StrategyPage />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/projects/:projectId/aprovacoes"
+            element={
+              <RequireAuth>
+                <ApprovalsPage />
               </RequireAuth>
             }
           />

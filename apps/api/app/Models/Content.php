@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 
 #[ScopedBy(WorkspaceMemberScope::class)]
@@ -26,6 +27,82 @@ class Content extends Model
 
     /** CP-03: o estado editorial explicito vai em toda resposta (ver EditorialState). */
     protected $appends = ['editorial_state'];
+
+    /** O default do banco tambem em memoria: peca recem-criada ja e a versao 1. */
+    protected $attributes = ['version' => 1];
+
+    /**
+     * CP-04: o que vai ao ar. Mudar qualquer um sobe a `version` — e a aprovacao, que
+     * vale para uma versao, deixa de valer. (Slides moram noutra tabela: quem os troca
+     * chama markContentChanged().)
+     */
+    public const VERSIONED = [
+        'title', 'caption', 'cta', 'hashtags', 'structure', 'format', 'channel',
+        'image_asset_id', 'video_asset_id',
+    ];
+
+    protected static function booted(): void
+    {
+        static::updating(function (Content $content) {
+            if ($content->isDirty(self::VERSIONED)) {
+                $content->applyContentChange();
+            }
+        });
+
+        static::updated(function (Content $content) {
+            if ($content->aprovacaoCaiu) {
+                $content->aprovacaoCaiu = false;
+                $content->cancelarPublicacoesPendentes();
+            }
+        });
+    }
+
+    /** Marcado no `updating` quando a mudanca derrubou uma aprovacao ja dada. */
+    private bool $aprovacaoCaiu = false;
+
+    /**
+     * Fail-closed, em qualquer caminho de codigo (endpoint, agente, job): conteudo que
+     * mudou depois de aprovado volta para revisao, sem aprovador e sem data. Os
+     * endpoints ja recusam editar peca aprovada; isto e a ultima linha.
+     */
+    private function applyContentChange(): void
+    {
+        $this->version = (int) $this->getOriginal('version') + 1;
+
+        if (in_array($this->getOriginal('status'), ['approved', 'scheduled'], true)) {
+            $this->status = 'review';
+            $this->approved_by = null;
+            $this->approved_at = null;
+            $this->scheduled_for = null;
+            $this->aprovacaoCaiu = true;
+        }
+    }
+
+    /** Para mudancas fora das colunas da peca (os slides do carrossel). */
+    public function markContentChanged(): void
+    {
+        $this->applyContentChange();
+        $this->saveQuietly();
+
+        if ($this->aprovacaoCaiu) {
+            $this->aprovacaoCaiu = false;
+            $this->cancelarPublicacoesPendentes();
+        }
+    }
+
+    private function cancelarPublicacoesPendentes(): void
+    {
+        Publication::withoutGlobalScopes()
+            ->where('content_id', $this->id)
+            ->whereIn('status', ['pending'])
+            ->whereNull('container_id')
+            ->update([
+                'status' => 'cancelled',
+                'last_error' => 'O conteúdo mudou depois da aprovação. Aprove de novo.',
+                'error_kind' => 'gate',
+                'updated_at' => now(),
+            ]);
+    }
 
     protected function casts(): array
     {
@@ -72,6 +149,17 @@ class Content extends Model
     public function video(): BelongsTo
     {
         return $this->belongsTo(Asset::class, 'video_asset_id');
+    }
+
+    /** CP-04: as decisoes humanas (append-only), da mais antiga para a mais nova. */
+    public function decisions(): HasMany
+    {
+        return $this->hasMany(ContentDecision::class)->orderBy('id');
+    }
+
+    public function latestDecision(): HasOne
+    {
+        return $this->hasOne(ContentDecision::class)->latestOfMany();
     }
 
     /** Quem aprovou (ADR-13). So id e nome: a tela nao precisa de mais nada do usuario. */

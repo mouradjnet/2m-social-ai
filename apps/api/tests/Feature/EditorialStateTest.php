@@ -10,6 +10,7 @@ use App\Models\ContentRevision;
 use App\Models\Project;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Support\Aprovar;
 use Tests\TestCase;
 
 /**
@@ -79,7 +80,7 @@ class EditorialStateTest extends TestCase
 
         $aprovada = $this->peca('review');
         $this->veredito($aprovada, 'pass', '2026-09-30 10:00:00');
-        $this->assertSame('ready_for_approval', $this->estado($aprovada));
+        $this->assertSame('pending_approval', $this->estado($aprovada));
     }
 
     /** O texto mudou DEPOIS do veredito (reescrita): o veredito fala de outro texto. */
@@ -99,9 +100,14 @@ class EditorialStateTest extends TestCase
 
     public function test_estados_do_fluxo_humano_passam_como_estao(): void
     {
-        foreach (['approved', 'scheduled', 'published', 'archived'] as $status) {
+        foreach (['scheduled', 'published', 'archived'] as $status) {
             $this->assertSame($status, $this->estado($this->peca($status)));
         }
+
+        // CP-04: `approved` so e "aprovada" com decisao humana valida para a versao.
+        $this->assertSame('approved', $this->estado(Aprovar::peca($this->peca('review'), $this->autor)));
+        // Status `approved` no banco, sem decisao (antes do CP-04): aguarda aprovacao.
+        $this->assertSame('pending_approval', $this->estado($this->peca('approved')));
     }
 
     public function test_estado_vai_na_resposta_json_da_peca(): void

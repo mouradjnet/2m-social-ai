@@ -26,6 +26,7 @@ class Publication extends Model
         'media_type', 'media', 'caption', 'image_url', 'account_username', 'approved_by', 'approved_at', 'scheduled_for',
         'status', 'container_id', 'media_id', 'permalink', 'published_at',
         'attempts', 'next_attempt_at', 'error_kind', 'last_error',
+        'content_version', 'decision_id',
     ];
 
     protected function casts(): array

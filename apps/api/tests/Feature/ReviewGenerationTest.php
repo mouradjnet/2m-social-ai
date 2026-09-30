@@ -139,7 +139,7 @@ class ReviewGenerationTest extends TestCase
         $this->generate($project)->assertStatus(202);
 
         $this->assertSame('pass', ContentReview::where('content_id', $b->id)->sole()->verdict);
-        $this->assertSame('ready_for_approval', $b->fresh()->editorial_state);
+        $this->assertSame('pending_approval', $b->fresh()->editorial_state);
         // Pronta para aprovar nao e aprovada: isso e gesto humano.
         $this->assertSame('review', $b->fresh()->status);
         $this->assertNull($b->fresh()->approved_at);

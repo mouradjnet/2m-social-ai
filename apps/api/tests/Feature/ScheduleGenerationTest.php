@@ -14,6 +14,7 @@ use App\Models\WorkspaceMember;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Testing\TestResponse;
 use Laravel\Sanctum\Sanctum;
+use Tests\Support\Aprovar;
 use Tests\TestCase;
 
 class ScheduleGenerationTest extends TestCase
@@ -36,7 +37,7 @@ class ScheduleGenerationTest extends TestCase
 
     private function content(Project $project, string $status = 'approved'): Content
     {
-        return Content::create([
+        $content = Content::create([
             'workspace_id' => $project->workspace_id,
             'project_id' => $project->id,
             'title' => 'Peca',
@@ -45,10 +46,13 @@ class ScheduleGenerationTest extends TestCase
             'hashtags' => ['#a'],
             'format' => 'post',
             'channel' => 'instagram',
-            'status' => $status,
+            'status' => $status === 'approved' ? 'review' : $status,
             'source' => 'ai',
             'created_by' => User::factory()->create()->id,
         ]);
+
+        // CP-04: aprovada pela decisao humana presa a versao, nao por status no banco.
+        return $status === 'approved' ? Aprovar::peca($content) : $content;
     }
 
     private function generate(Project $project, array $body = []): TestResponse
@@ -91,7 +95,8 @@ class ScheduleGenerationTest extends TestCase
         $this->assertSame('idea', $ideia->refresh()->status);
         $this->assertNull($ideia->scheduled_for);
 
-        $revisoes = ContentRevision::whereIn('content_id', [$a->id, $b->id])->get();
+        // So o agendamento (a aprovacao humana grava a propria revisao, antes).
+        $revisoes = ContentRevision::whereIn('content_id', [$a->id, $b->id])->where('to_status', 'scheduled')->get();
         $this->assertCount(2, $revisoes);
         $this->assertSame('approved', $revisoes[0]->from_status);
         $this->assertSame('scheduled', $revisoes[0]->to_status);

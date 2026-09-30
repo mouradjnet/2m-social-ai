@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\V1\AssetController;
 use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\BrandProfileController;
 use App\Http\Controllers\Api\V1\ContentController;
+use App\Http\Controllers\Api\V1\ContentDecisionController;
 use App\Http\Controllers\Api\V1\ContentImageController;
 use App\Http\Controllers\Api\V1\ContentMediaController;
 use App\Http\Controllers\Api\V1\CopyController;
@@ -109,6 +110,11 @@ Route::prefix('v1')->group(function () {
         // Rota propria, e nao um `status` no PATCH acima: quem decide o destino e o
         // servidor, lendo de onde a peca saiu. O cliente nao tem essa informacao.
         Route::post('contents/{content}/unarchive', [ContentController::class, 'unarchive']);
+        // CP-04: a decisao humana, presa a `version` que a pessoa conferiu (revisor+).
+        Route::post('contents/{content}/approve', [ContentDecisionController::class, 'approve']);
+        Route::post('contents/{content}/reject', [ContentDecisionController::class, 'reject']);
+        Route::post('contents/{content}/request-changes', [ContentDecisionController::class, 'requestChanges']);
+        Route::get('contents/{content}/history', [ContentDecisionController::class, 'history']);
         Route::patch('strategies/{strategy}', [StrategyController::class, 'update']);
 
         // Biblioteca de imagens. A imagem sai daqui pronta para o Instagram.

@@ -45,7 +45,11 @@ const FORMATOS: Record<ContentFormat, string> = {
 const ESTADOS: Partial<Record<EditorialState, string>> = {
   in_review: 'Aguardando revisão',
   needs_revision: 'Precisa de ajuste',
-  ready_for_approval: 'Pronta para aprovação',
+  pending_approval: 'Aguardando aprovação humana',
+  rejected: 'Rejeitada',
+  publishing: 'Publicando',
+  failed: 'Falha na publicação',
+  cancelled: 'Publicação cancelada',
 }
 
 // A mesma ordem do FLOW do backend. No cliente e so para habilitar/desabilitar;

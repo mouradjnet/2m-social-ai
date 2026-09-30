@@ -3,6 +3,7 @@
 namespace App\Ai\Agents;
 
 use App\Domain\Analytics\Metrics;
+use App\Domain\Publishing\PublishGate;
 use App\Models\ContentPlan;
 use App\Models\ContentReview;
 use App\Models\Project;
@@ -404,11 +405,15 @@ readonly class AgentContext
     /** As aprovadas no momento da execucao — nao no momento do POST. */
     private static function approvedContents(Project $project): array
     {
+        // CP-04: so o que tem aprovacao humana VALIDA para a versao atual entra no lote
+        // a agendar. Aprovada antes do controle de versoes, ou mudada depois, fica fora.
         return $project->contents()
             ->where('status', 'approved')
             ->orderBy('id')
-            ->get(['id', 'title', 'format', 'channel'])
+            ->get()
+            ->filter(fn ($c) => PublishGate::approvalRefusal($c) === null)
             ->map->only(['id', 'title', 'format', 'channel'])
+            ->values()
             ->all();
     }
 

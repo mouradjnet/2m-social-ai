@@ -86,6 +86,15 @@ class Publisher
             return;
         }
 
+        // CP-04: o worker confere a aprovacao de novo, nao confia no Dispatcher. Uma
+        // retentativa pode rodar horas depois; a peca pode ter mudado.
+        if (! $reconciliar && $this->publicacao->container_id === null
+            && ($recusa = PublishGate::publicationRefusal($this->publicacao, $content))) {
+            $this->encerrar('cancelled', $recusa, 'gate', 'refused');
+
+            return;
+        }
+
         if ($conta === null || ! $conta->isUsable()) {
             throw new InstagramException('A conexão com o Instagram não está ativa. Reconecte a conta.', 'auth');
         }
@@ -162,6 +171,15 @@ class Publisher
 
     private function publicar(InstagramAccount $conta, string $token): void
     {
+        // CP-04: a ultima conferencia, no instante do media_publish (tambem apos
+        // reconciliar). Recusou: nada sai; o container orfao expira na Meta em 24 h.
+        $content = $this->publicacao->content()->withoutGlobalScopes()->first();
+        if ($recusa = PublishGate::publicationRefusal($this->publicacao, $content)) {
+            $this->encerrar('cancelled', $recusa, 'gate', 'refused');
+
+            return;
+        }
+
         $this->publicandoAgora = true;
         $mediaId = $this->gateway->publishContainer($conta->ig_user_id, $token, (string) $this->publicacao->container_id);
         $this->publicandoAgora = false;

@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers\Api\V1;
 
-use App\Enums\WorkspaceRole;
+use App\Domain\Publishing\PublishGate;
 use App\Http\Controllers\Controller;
 use App\Models\Content;
 use App\Models\ContentRevision;
@@ -32,7 +32,7 @@ class ContentController extends Controller
         return response()->json([
             // A ultima review e a ultima sugestao de SEO vem juntas: o board mostra
             // veredito e sugestao sem uma chamada por card.
-            'data' => $project->contents()->with(['latestReview', 'latestSeo', 'latestTextRevision', 'approver', 'image', 'slides', 'video', 'latestPublication'])->latest()->get(),
+            'data' => $project->contents()->with(['latestReview', 'latestSeo', 'latestTextRevision', 'approver', 'image', 'slides', 'video', 'latestPublication', 'latestDecision'])->latest()->get(),
         ]);
     }
 
@@ -70,11 +70,12 @@ class ContentController extends Controller
 
         // Aprovar e o gesto que autoriza o sistema a publicar (ADR-13): so reviewer+.
         // Editor escreve e manda para revisao; quem aprova responde pelo que vai ao ar.
-        if ($this->isAprovacao($from, $to)
-            && ! $content->project->workspace->roleFor($request->user())?->atLeast(WorkspaceRole::Reviewer)) {
+        // CP-04: aprovar e decisao presa a uma versao (POST /contents/{id}/approve, com
+        // a `version` que a pessoa viu). Mudar o status a seco nao aprova nada.
+        if ($this->isAprovacao($from, $to)) {
             return response()->json([
-                'message' => 'Só quem revisa pode aprovar uma peça.',
-            ], 403);
+                'message' => 'Aprovação é pela Central de Aprovação, com a versão da peça que você conferiu.',
+            ], 422);
         }
 
         DB::transaction(function () use ($content, $from, $to, $request) {
@@ -158,6 +159,10 @@ class ContentController extends Controller
             return response()->json([
                 'message' => 'Só uma peça agendada pode ser remarcada.',
             ], 422);
+        }
+
+        if ($recusa = PublishGate::approvalRefusal($content)) {
+            return response()->json(['message' => $recusa], 422);
         }
 
         $de = $content->scheduled_for;
@@ -245,6 +250,11 @@ class ContentController extends Controller
             ], 422);
         }
 
+        // CP-04: aprovada E com a aprovacao valendo para esta versao exata.
+        if ($recusa = PublishGate::approvalRefusal($content)) {
+            return response()->json(['message' => $recusa], 422);
+        }
+
         $quando = self::horaLocal($data['scheduled_for'], $content->project->timezone);
 
         if ($quando->lt(now()->addMinute())) {
@@ -280,6 +290,19 @@ class ContentController extends Controller
 
     private function publicacaoEmAndamento(Content $content): ?JsonResponse
     {
+        // CP-04 (cancelamento): o que ainda nao mandou nada a Meta (pendente, sem
+        // container) e cancelado junto com o gesto humano. Atomico: se o worker ja a
+        // pegou (`publishing`), o update nao a acha e o 409 abaixo vale.
+        Publication::where('content_id', $content->id)
+            ->where('status', 'pending')
+            ->whereNull('container_id')
+            ->update([
+                'status' => 'cancelled',
+                'last_error' => 'Cancelada por uma pessoa antes do envio.',
+                'error_kind' => 'gate',
+                'updated_at' => now(),
+            ]);
+
         $viva = Publication::where('content_id', $content->id)
             ->whereIn('status', Publication::IN_FLIGHT)
             ->exists();

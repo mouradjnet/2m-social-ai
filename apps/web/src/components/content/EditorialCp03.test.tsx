@@ -127,9 +127,9 @@ test('peça sem roteiro (manual ou antiga) não mostra bloco de roteiro', () => 
 
 test('o estado editorial aparece na revisão', () => {
   const { rerender } = render(
-    <ContentCard {...noop} content={peca({ status: 'review', editorial_state: 'ready_for_approval' })} />,
+    <ContentCard {...noop} content={peca({ status: 'review', editorial_state: 'pending_approval' })} />,
   )
-  expect(screen.getByText('Estado editorial: Pronta para aprovação')).toBeInTheDocument()
+  expect(screen.getByText('Estado editorial: Aguardando aprovação humana')).toBeInTheDocument()
 
   rerender(<ContentCard {...noop} content={peca({ status: 'review', editorial_state: 'needs_revision' })} />)
   expect(screen.getByText('Estado editorial: Precisa de ajuste')).toBeInTheDocument()

@@ -5,12 +5,12 @@ namespace Tests\Feature;
 use App\Domain\Publishing\PublishGate;
 use App\Enums\WorkspaceRole;
 use App\Models\Content;
-use App\Models\ContentRevision;
 use App\Models\Project;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Models\WorkspaceMember;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
@@ -68,7 +68,7 @@ class ApprovalTest extends TestCase
         $content = $this->content($project, 'review');
         Sanctum::actingAs($this->memberOf($workspace, WorkspaceRole::Reviewer));
 
-        $this->patchJson("/api/v1/contents/{$content->id}", ['status' => 'approved'])->assertOk();
+        $this->postJson("/api/v1/contents/{$content->id}/approve", ['version' => $content->fresh()->version])->assertOk();
 
         $content->refresh()->update(['status' => 'scheduled', 'scheduled_for' => now()->addDay()]);
 
@@ -81,9 +81,9 @@ class ApprovalTest extends TestCase
         $content = $this->content($project, 'review');
         Sanctum::actingAs($this->memberOf($workspace, WorkspaceRole::Editor));
 
-        $this->patchJson("/api/v1/contents/{$content->id}", ['status' => 'approved'])
+        $this->postJson("/api/v1/contents/{$content->id}/approve", ['version' => $content->fresh()->version])
             ->assertForbidden()
-            ->assertJsonPath('message', 'Só quem revisa pode aprovar uma peça.');
+            ->assertJsonPath('message', 'Só quem revisa pode decidir sobre uma peça.');
 
         $this->assertSame('review', $content->fresh()->status);
         $this->assertNull($content->fresh()->approved_by);
@@ -105,7 +105,7 @@ class ApprovalTest extends TestCase
         $reviewer = $this->memberOf($workspace, WorkspaceRole::Reviewer);
         Sanctum::actingAs($reviewer);
 
-        $this->patchJson("/api/v1/contents/{$content->id}", ['status' => 'approved'])
+        $this->postJson("/api/v1/contents/{$content->id}/approve", ['version' => $content->fresh()->version])
             ->assertOk()
             ->assertJsonPath('data.approved_by', $reviewer->id)
             ->assertJsonPath('data.approver.name', $reviewer->name);
@@ -127,7 +127,7 @@ class ApprovalTest extends TestCase
         $content = $this->content($project, 'review');
         Sanctum::actingAs($this->memberOf($workspace, WorkspaceRole::Owner));
 
-        $this->patchJson("/api/v1/contents/{$content->id}", ['status' => 'approved'])->assertOk();
+        $this->postJson("/api/v1/contents/{$content->id}/approve", ['version' => $content->fresh()->version])->assertOk();
     }
 
     public function test_devolver_para_revisao_desfaz_a_aprovacao(): void
@@ -136,7 +136,7 @@ class ApprovalTest extends TestCase
         $content = $this->content($project, 'review');
         Sanctum::actingAs($this->memberOf($workspace, WorkspaceRole::Reviewer));
 
-        $this->patchJson("/api/v1/contents/{$content->id}", ['status' => 'approved'])->assertOk();
+        $this->postJson("/api/v1/contents/{$content->id}/approve", ['version' => $content->fresh()->version])->assertOk();
         $this->patchJson("/api/v1/contents/{$content->id}", ['status' => 'review'])->assertOk();
 
         $this->assertNull($content->fresh()->approved_by);
@@ -195,20 +195,18 @@ class ApprovalTest extends TestCase
 
     /**
      * O status continua `scheduled`, o aprovador continua gravado — e mesmo assim nao
-     * publica: o texto que vai ao ar nao e o que o humano aprovou.
+     * publica: o texto que vai ao ar nao e o que o humano aprovou. CP-04: a mudanca e
+     * feita por SQL cru, contornando o model (o pior caso); o hash do snapshot pega.
      */
     public function test_porta_recusa_se_o_texto_mudou_depois_da_aprovacao(): void
     {
         [$workspace, $project] = $this->scene();
         $content = $this->aprovadaEAgendada($workspace, $project);
 
-        ContentRevision::create([
-            'content_id' => $content->id,
-            'user_id' => $content->approved_by,
-            'changes' => ['caption' => ['from' => 'Legenda', 'to' => 'Outra']],
-        ]);
+        DB::table('contents')->where('id', $content->id)->update(['caption' => 'Outra']);
 
-        $this->assertSame('O texto mudou depois da aprovação. Aprove de novo.', PublishGate::refusal($content));
+        $this->assertSame('scheduled', $content->fresh()->status);
+        $this->assertSame('A aprovação não vale para esta versão da peça (o conteúdo mudou, ou foi aprovada antes do controle de versões). Aprove de novo.', PublishGate::refusal($content->fresh()));
     }
 
     public function test_remarcar_nao_pede_nova_aprovacao(): void
