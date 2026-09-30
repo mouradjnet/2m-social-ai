@@ -19,5 +19,9 @@ export const rotulo = (role: Role) => PAPEIS.find((p) => p.value === role)?.labe
  */
 export const podeConvidar = (role: Role) => role === 'owner' || role === 'admin'
 
+/** CP-04A: espelha a policy `approve` (revisor+). Quem decide de verdade e o servidor. */
+export const podeAprovar = (role: Role | null | undefined) =>
+  role === 'owner' || role === 'admin' || role === 'reviewer'
+
 export const podeCriarProjeto = (role: Role) =>
   role === 'owner' || role === 'admin' || role === 'editor'

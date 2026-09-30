@@ -7,6 +7,7 @@ use App\Models\Content;
 use App\Models\ContentDecision;
 use App\Models\ContentRevision;
 use App\Models\User;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -73,10 +74,45 @@ class Approval
         return $ultima;
     }
 
-    /** @throws ApprovalConflict */
-    public static function approve(Content $content, int $version, User $user): ContentDecision
+    /**
+     * CP-04A. Idempotente pela `request_key` (gerada pelo cliente por intencao de
+     * aprovar): a mesma chave com o mesmo pedido devolve a decisao original, sem
+     * gravar nada; com outro pedido, IdempotencyConflict. So peca em
+     * `pending_approval` (a IA revisou e aprovou ESTA versao, ou a aprovacao antiga
+     * caiu) pode ser aprovada.
+     *
+     * @throws ApprovalConflict estado ou versao nao batem (409)
+     * @throws IdempotencyConflict chave reutilizada com outro pedido (422)
+     */
+    public static function approve(Content $content, int $version, User $user, string $requestKey): ApprovalOutcome
     {
-        return self::decidir($content, $version, $user, 'approved', null, 'approved');
+        $impressao = hash('sha256', "approve|{$content->id}|{$version}");
+
+        if ($original = self::pedidoAnterior($user, $requestKey, $impressao)) {
+            return new ApprovalOutcome($original, replayed: true);
+        }
+
+        try {
+            $registro = self::decidir($content, $version, $user, 'approved', null, 'approved', $requestKey, $impressao);
+        } catch (UniqueConstraintViolationException) {
+            // Duas requisicoes com a mesma chave ao mesmo tempo: o indice unico deixou
+            // passar so uma. Esta devolve a que ficou.
+            return new ApprovalOutcome(self::pedidoAnterior($user, $requestKey, $impressao)
+                ?? throw new IdempotencyConflict('Chave de requisição em uso. Tente de novo.'), replayed: true);
+        }
+
+        return new ApprovalOutcome($registro, replayed: false);
+    }
+
+    private static function pedidoAnterior(User $user, string $requestKey, string $impressao): ?ContentDecision
+    {
+        $anterior = ContentDecision::where('user_id', $user->id)->where('request_key', $requestKey)->first();
+
+        if ($anterior !== null && ! hash_equals((string) $anterior->request_fingerprint, $impressao)) {
+            throw new IdempotencyConflict('Esta chave de requisição já foi usada para outro pedido. Gere uma nova e confira a peça.');
+        }
+
+        return $anterior;
     }
 
     /** Rejeitar tira a peca do fluxo (arquivada), com o motivo registrado. */
@@ -91,9 +127,11 @@ class Approval
         return self::decidir($content, $version, $user, 'changes_requested', $reason, 'production');
     }
 
-    private static function decidir(Content $content, int $version, User $user, string $decisao, ?string $motivo, string $para): ContentDecision
-    {
-        return DB::transaction(function () use ($content, $version, $user, $decisao, $motivo, $para) {
+    private static function decidir(
+        Content $content, int $version, User $user, string $decisao, ?string $motivo, string $para,
+        ?string $requestKey = null, ?string $impressao = null,
+    ): ContentDecision {
+        return DB::transaction(function () use ($content, $version, $user, $decisao, $motivo, $para, $requestKey, $impressao) {
             // Relida COM trava: a versao conferida e a gravada sao a mesma.
             $atual = Content::withoutGlobalScopes()->whereKey($content->id)->lockForUpdate()->firstOrFail();
 
@@ -106,6 +144,12 @@ class Approval
             }
 
             $de = $atual->status;
+
+            // CP-04A: aprovar exige `pending_approval` — nao se aprova o que a IA
+            // reprovou ou ainda nao revisou nesta versao.
+            if ($decisao === 'approved' && ($estado = EditorialState::for($atual)) !== 'pending_approval') {
+                throw new ApprovalConflict("A peça está em '{$estado}': só peça aguardando aprovação humana (revisada pela IA nesta versão) pode ser aprovada.");
+            }
 
             if ((int) $atual->version !== $version) {
                 throw new ApprovalConflict(
@@ -127,6 +171,8 @@ class Approval
                 'snapshot' => $snapshot,
                 'snapshot_hash' => $snapshot === null ? null : self::hash($snapshot),
                 'user_id' => $user->id,
+                'request_key' => $requestKey,
+                'request_fingerprint' => $impressao,
             ]);
 
             // Mudar status nao e mudar conteudo: a versao fica (ver Content::booted()).

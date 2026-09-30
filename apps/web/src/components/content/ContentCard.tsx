@@ -301,7 +301,7 @@ export function ContentCard({
               ← Voltar
             </Button>
             <Button size="sm" disabled={pending || !canAdvance} onClick={onAdvance}>
-              Avançar →
+              {content.status === 'review' ? 'Decidir na Central →' : 'Avançar →'}
             </Button>
             <Button size="sm" variant="ghost" disabled={pending} onClick={onArchive}>
               Arquivar

@@ -24,6 +24,7 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use Laravel\Sanctum\Sanctum;
 use LogicException;
+use Tests\Support\Aprovar;
 use Tests\TestCase;
 
 /**
@@ -93,7 +94,13 @@ class ApprovalFlowTest extends TestCase
 
     private function aprovar(Content $peca, ?int $versao = null)
     {
-        return $this->postJson("/api/v1/contents/{$peca->id}/approve", ['version' => $versao ?? $peca->fresh()->version]);
+        // CP-04A: em pending_approval (revisada pela IA nesta versao), com request_key.
+        $payload = Aprovar::pedido($peca);
+
+        return $this->postJson("/api/v1/contents/{$peca->id}/approve", [
+            ...$payload,
+            'expected_version' => $versao ?? $payload['expected_version'],
+        ]);
     }
 
     private function conta(): void
@@ -246,18 +253,21 @@ class ApprovalFlowTest extends TestCase
     public function test_regeneracao_de_peca_aprovada_volta_para_revisao_e_nao_sobrescreve_calada(): void
     {
         $peca = $this->peca();
+
+        // A IA aprovou, a pessoa aprovou...
+        Sanctum::actingAs($this->reviewer);
+        $this->aprovar($peca)->assertOk();
+
+        // ...e uma revisao tardia da IA reprova (o reescritor so age sobre reprovada).
         $run = AiRun::create([
             'workspace_id' => $this->workspace->id, 'project_id' => $this->project->id, 'agent' => 'reviewer',
             'provider' => 'mock', 'model' => 'm', 'status' => 'succeeded', 'input' => [], 'created_by' => $this->reviewer->id,
         ]);
-        ContentReview::create([
+        $tardia = ContentReview::create([
             'content_id' => $peca->id, 'ai_run_id' => $run->id, 'verdict' => 'fail', 'summary' => 's',
             'violations' => [['rule' => 'tom', 'excerpt' => 'e', 'suggestion' => 's']],
         ]);
-
-        // Uma pessoa aprovou mesmo com a IA reprovando (a decisao e humana).
-        Sanctum::actingAs($this->reviewer);
-        $this->aprovar($peca)->assertOk();
+        $tardia->forceFill(['created_at' => now()->addSeconds(5)])->save();
 
         // Depois, alguem manda a IA reescrever.
         $this->postJson("/api/v1/contents/{$peca->id}/rewrite:generate")->assertStatus(202);

@@ -12,6 +12,7 @@ use App\Models\Workspace;
 use App\Models\WorkspaceMember;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
+use Tests\Support\Aprovar;
 use Tests\TestCase;
 
 class ContentDraftTest extends TestCase
@@ -82,7 +83,7 @@ class ContentDraftTest extends TestCase
         $reviewer = $this->memberOf($workspace, WorkspaceRole::Reviewer);
         Sanctum::actingAs($reviewer);
 
-        $this->postJson("/api/v1/contents/{$content->id}/approve", ['version' => $content->fresh()->version])->assertOk();
+        $this->postJson("/api/v1/contents/{$content->id}/approve", Aprovar::pedido($content))->assertOk();
         $this->patchJson("/api/v1/contents/{$content->id}/draft", ['caption' => 'x'])->assertStatus(422);
 
         $this->patchJson("/api/v1/contents/{$content->id}", ['status' => 'review'])->assertOk();

@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
-import { Link, useParams, useSearchParams } from 'react-router-dom'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { ContentBoard } from '@/components/content/ContentBoard'
 import { PublicationEditor } from '@/components/content/PublicationEditor'
 import { WeekPlanPanel } from '@/components/content/WeekPlanPanel'
@@ -25,6 +25,7 @@ function tomorrow(): string {
 export function ContentPage() {
   const { projectId } = useParams()
   const queryClient = useQueryClient()
+  const navigate = useNavigate()
   const [startsOn, setStartsOn] = useState(tomorrow)
   const [days, setDays] = useState(14)
   // Vazio = distribuir pelos pesos (o default). Escolher um pilar serve para cobrir
@@ -60,13 +61,11 @@ export function ContentPage() {
     mutationFn: ({ id, status }: { id: number; status: Content['status'] }) => {
       const atual = contents.data?.data.find((c) => c.id === id)
 
-      // CP-04: aprovar é decisão presa à versão que está na tela. Se a peça mudou
-      // nesse meio tempo, o servidor devolve 409 e ninguém aprova o que não viu.
+      // CP-04A: aprovar é na Central (confirmação, versão exibida e chave de
+      // idempotência). O quadro só leva até lá.
       if (status === 'approved' && atual?.status === 'review') {
-        return api(`/contents/${id}/approve`, {
-          method: 'POST',
-          body: JSON.stringify({ version: atual.version ?? 1 }),
-        })
+        navigate(`/projects/${projectId}/aprovacoes`)
+        return Promise.resolve(null)
       }
 
       return api(`/contents/${id}`, { method: 'PATCH', body: JSON.stringify({ status }) })

@@ -19,6 +19,7 @@ class ContentDecision extends Model
     protected $fillable = [
         'workspace_id', 'project_id', 'content_id', 'version', 'decision', 'reason',
         'from_status', 'to_status', 'snapshot', 'snapshot_hash', 'user_id',
+        'request_key', 'request_fingerprint',
     ];
 
     protected function casts(): array

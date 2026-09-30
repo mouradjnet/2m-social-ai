@@ -4,7 +4,7 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Domain\Editorial\Approval;
 use App\Domain\Editorial\ApprovalConflict;
-use App\Enums\WorkspaceRole;
+use App\Domain\Editorial\IdempotencyConflict;
 use App\Http\Controllers\Controller;
 use App\Models\Content;
 use App\Models\ContentDecision;
@@ -20,11 +20,51 @@ use Illuminate\Support\Facades\Gate;
  */
 class ContentDecisionController extends Controller
 {
+    /**
+     * CP-04A. Ordem das portas: autenticado (401, middleware) -> a peca existe no
+     * escopo de quem pede (404, cobre marca alheia) -> permissao `approve` (403) ->
+     * payload (422) -> estado e versao (409). Quem aprova e a marca vem do servidor;
+     * nada do corpo e autoridade.
+     */
     public function approve(Request $request, Content $content): JsonResponse
     {
-        $data = $this->validar($request, motivoObrigatorio: false);
+        Gate::authorize('approve', $content->project);
 
-        return $this->decidir($request, $content, fn () => Approval::approve($content, $data['version'], $request->user()));
+        $data = $request->validate([
+            'expected_version' => ['required_without:version', 'integer', 'min:1'],
+            'version' => ['required_without:expected_version', 'integer', 'min:1'],
+            'request_key' => ['required', 'uuid'],
+        ], [
+            'request_key.required' => 'Falta a chave da requisição (request_key).',
+        ]);
+
+        try {
+            $resultado = Approval::approve(
+                $content,
+                (int) ($data['expected_version'] ?? $data['version']),
+                $request->user(),
+                $data['request_key'],
+            );
+        } catch (ApprovalConflict $e) {
+            return response()->json(['message' => $e->getMessage(), 'version' => $content->fresh()?->version], 409);
+        } catch (IdempotencyConflict $e) {
+            return response()->json([
+                'message' => $e->getMessage(),
+                'errors' => ['request_key' => [$e->getMessage()]],
+            ], 422);
+        }
+
+        $decisao = $resultado->decision->load('user');
+
+        return response()->json([
+            'data' => $content->fresh()->load(['approver', 'latestDecision', 'latestReview', 'latestTextRevision']),
+            'decision' => [
+                ...$decisao->only(['id', 'decision', 'version', 'snapshot_hash', 'created_at']),
+                'user' => $decisao->user,
+            ],
+            // Mesma chave, mesmo pedido: a decisao original, sem gravar outra.
+            'replayed' => $resultado->replayed,
+        ]);
     }
 
     public function reject(Request $request, Content $content): JsonResponse
@@ -98,10 +138,8 @@ class ContentDecisionController extends Controller
 
     private function decidir(Request $request, Content $content, callable $decisao): JsonResponse
     {
-        Gate::authorize('update', $content->project);
-
-        // Fail-closed: sem papel de revisao explicito, nao decide.
-        if (! $content->project->workspace->roleFor($request->user())?->atLeast(WorkspaceRole::Reviewer)) {
+        // Fail-closed: a mesma permissao de aprovar vale para rejeitar e pedir ajustes.
+        if (! Gate::allows('approve', $content->project)) {
             return response()->json(['message' => 'Só quem revisa pode decidir sobre uma peça.'], 403);
         }
 

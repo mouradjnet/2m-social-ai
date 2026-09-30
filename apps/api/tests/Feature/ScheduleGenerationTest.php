@@ -261,7 +261,8 @@ class ScheduleGenerationTest extends TestCase
 
         $this->generate($project, ['days' => 0])->assertStatus(422);
         $this->generate($project, ['days' => 90])->assertStatus(422);
-        $this->assertSame(0, AiRun::count());
+        // So o agendamento conta: a peca aprovada (CP-04A) ja passou pela revisao da IA.
+        $this->assertSame(0, AiRun::where('agent', 'social_media')->count());
     }
 
     public function test_viewer_nao_pode_agendar(): void

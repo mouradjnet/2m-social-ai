@@ -20,6 +20,7 @@ use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Laravel\Sanctum\Sanctum;
+use Tests\Support\Aprovar;
 use Tests\TestCase;
 
 /**
@@ -116,7 +117,7 @@ class PublishingTest extends TestCase
         ]);
 
         Sanctum::actingAs($this->reviewer);
-        $this->postJson("/api/v1/contents/{$content->id}/approve", ['version' => $content->fresh()->version])->assertOk();
+        $this->postJson("/api/v1/contents/{$content->id}/approve", Aprovar::pedido($content))->assertOk();
 
         $content->refresh()->update([
             'status' => 'scheduled',

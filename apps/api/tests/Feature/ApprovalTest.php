@@ -12,6 +12,7 @@ use App\Models\WorkspaceMember;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Laravel\Sanctum\Sanctum;
+use Tests\Support\Aprovar;
 use Tests\TestCase;
 
 /**
@@ -68,7 +69,7 @@ class ApprovalTest extends TestCase
         $content = $this->content($project, 'review');
         Sanctum::actingAs($this->memberOf($workspace, WorkspaceRole::Reviewer));
 
-        $this->postJson("/api/v1/contents/{$content->id}/approve", ['version' => $content->fresh()->version])->assertOk();
+        $this->postJson("/api/v1/contents/{$content->id}/approve", Aprovar::pedido($content))->assertOk();
 
         $content->refresh()->update(['status' => 'scheduled', 'scheduled_for' => now()->addDay()]);
 
@@ -81,7 +82,7 @@ class ApprovalTest extends TestCase
         $content = $this->content($project, 'review');
         Sanctum::actingAs($this->memberOf($workspace, WorkspaceRole::Editor));
 
-        $this->postJson("/api/v1/contents/{$content->id}/approve", ['version' => $content->fresh()->version])
+        $this->postJson("/api/v1/contents/{$content->id}/approve", Aprovar::pedido($content))
             ->assertForbidden()
             ->assertJsonPath('message', 'Só quem revisa pode decidir sobre uma peça.');
 
@@ -105,7 +106,7 @@ class ApprovalTest extends TestCase
         $reviewer = $this->memberOf($workspace, WorkspaceRole::Reviewer);
         Sanctum::actingAs($reviewer);
 
-        $this->postJson("/api/v1/contents/{$content->id}/approve", ['version' => $content->fresh()->version])
+        $this->postJson("/api/v1/contents/{$content->id}/approve", Aprovar::pedido($content))
             ->assertOk()
             ->assertJsonPath('data.approved_by', $reviewer->id)
             ->assertJsonPath('data.approver.name', $reviewer->name);
@@ -127,7 +128,7 @@ class ApprovalTest extends TestCase
         $content = $this->content($project, 'review');
         Sanctum::actingAs($this->memberOf($workspace, WorkspaceRole::Owner));
 
-        $this->postJson("/api/v1/contents/{$content->id}/approve", ['version' => $content->fresh()->version])->assertOk();
+        $this->postJson("/api/v1/contents/{$content->id}/approve", Aprovar::pedido($content))->assertOk();
     }
 
     public function test_devolver_para_revisao_desfaz_a_aprovacao(): void
@@ -136,7 +137,7 @@ class ApprovalTest extends TestCase
         $content = $this->content($project, 'review');
         Sanctum::actingAs($this->memberOf($workspace, WorkspaceRole::Reviewer));
 
-        $this->postJson("/api/v1/contents/{$content->id}/approve", ['version' => $content->fresh()->version])->assertOk();
+        $this->postJson("/api/v1/contents/{$content->id}/approve", Aprovar::pedido($content))->assertOk();
         $this->patchJson("/api/v1/contents/{$content->id}", ['status' => 'review'])->assertOk();
 
         $this->assertNull($content->fresh()->approved_by);

@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { type QueryClient, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { StructurePreview } from '@/components/content/StructurePreview'
@@ -8,7 +8,8 @@ import { Card } from '@/components/ui/Card'
 import { Shell } from '@/components/ui/Shell'
 import { Textarea } from '@/components/ui/Textarea'
 import { ApiError, api } from '@/lib/api'
-import type { Content, ContentFormat, ContentHistory, EditorialState, Project } from '@/lib/types'
+import { podeAprovar } from '@/lib/roles'
+import type { Content, ContentFormat, ContentHistory, EditorialState, Me, Project } from '@/lib/types'
 
 /**
  * CP-04 — a Central de Aprovação. A regra: nada é agendado nem publicado sem uma
@@ -68,6 +69,12 @@ export function ApprovalsPage() {
     queryFn: () => api<{ data: Content[] }>(`/projects/${projectId}/contents`),
   })
 
+  // O papel neste workspace, so para mostrar ou esconder os botoes de decisao. A
+  // autorizacao de verdade e a policy `approve` no servidor.
+  const me = useQuery({ queryKey: ['me'], queryFn: () => api<Me>('/me') })
+  const papel = me.data?.workspaces.find((w) => w.id === project.data?.data.workspace_id)?.role
+  const [aviso, setAviso] = useState<string | null>(null)
+
   const pendentes = (contents.data?.data ?? []).filter(
     (c) => (c.status === 'review' || c.status === 'approved') && AGUARDANDO.includes(c.editorial_state ?? 'draft'),
   )
@@ -87,6 +94,12 @@ export function ApprovalsPage() {
         peça. A revisão da IA ajuda, mas não aprova.
       </p>
 
+      {aviso && (
+        <p role="status" className="text-body-md bg-secondary-container text-secondary mt-4 rounded p-3">
+          {aviso}
+        </p>
+      )}
+
       {contents.isLoading && <p className="text-body-md text-on-surface-variant mt-6">Carregando…</p>}
 
       {contents.isSuccess && pendentes.length === 0 && (
@@ -95,41 +108,87 @@ export function ApprovalsPage() {
 
       <div className="mt-6 flex flex-col gap-6">
         {pendentes.map((peca) => (
-          <PecaParaDecidir key={peca.id} peca={peca} marca={project.data?.data.name ?? ''} projectId={projectId!} />
+          <PecaParaDecidir
+            key={peca.id}
+            peca={peca}
+            marca={project.data?.data.name ?? ''}
+            projectId={projectId!}
+            podeDecidir={podeAprovar(papel)}
+            onAviso={setAviso}
+          />
         ))}
       </div>
     </Shell>
   )
 }
 
-function PecaParaDecidir({ peca, marca, projectId }: { peca: Content; marca: string; projectId: string }) {
+interface Props {
+  peca: Content
+  marca: string
+  projectId: string
+  /** O papel do usuário permite decidir (espelho da policy `approve`; o servidor confere). */
+  podeDecidir: boolean
+  onAviso: (texto: string) => void
+}
+
+interface RespostaAprovacao {
+  decision: { version: number; user: { id: number; name: string } | null }
+  replayed: boolean
+}
+
+function PecaParaDecidir({ peca, marca, projectId, podeDecidir, onAviso }: Props) {
   const queryClient = useQueryClient()
   const [acao, setAcao] = useState<'reject' | 'request-changes' | null>(null)
   const [motivo, setMotivo] = useState('')
   const [verHistorico, setVerHistorico] = useState(false)
+  // CP-04A: a chave nasce quando a pessoa abre a confirmação e vale para ESTA
+  // intenção. Nova tentativa depois de falha de rede reusa a mesma (o servidor devolve
+  // o resultado original); depois de um 409 a peça mudou, e a chave é descartada.
+  const [chave, setChave] = useState<string | null>(null)
+
+  const versao = peca.version ?? 1
+
+  const aprovar = useMutation({
+    mutationFn: (requestKey: string) =>
+      api<RespostaAprovacao>(`/contents/${peca.id}/approve`, {
+        method: 'POST',
+        body: JSON.stringify({ expected_version: versao, request_key: requestKey }),
+      }),
+    onSuccess: (r) => {
+      setChave(null)
+      onAviso(
+        r.replayed
+          ? `A versão ${r.decision.version} de “${peca.title}” já estava aprovada por ${r.decision.user?.name ?? 'alguém'} — resultado original, nada novo foi gravado.`
+          : `Versão ${r.decision.version} de “${peca.title}” aprovada por ${r.decision.user?.name ?? 'você'}.`,
+      )
+    },
+    onError: (e) => {
+      if (e instanceof ApiError && (e.status === 409 || e.status === 422)) setChave(null)
+    },
+    // Atualiza só depois da resposta: nada de aprovação otimista.
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ['contents', projectId] }),
+  })
 
   const decidir = useMutation({
-    mutationFn: ({ rota, reason }: { rota: 'approve' | 'reject' | 'request-changes'; reason?: string }) =>
+    mutationFn: ({ rota, reason }: { rota: 'reject' | 'request-changes'; reason: string }) =>
       api(`/contents/${peca.id}/${rota}`, {
         method: 'POST',
-        body: JSON.stringify({ version: peca.version ?? 1, ...(reason ? { reason } : {}) }),
+        body: JSON.stringify({ version: versao, reason }),
       }),
     onSettled: () => queryClient.invalidateQueries({ queryKey: ['contents', projectId] }),
-    onSuccess: () => {
+    onSuccess: (_d, v) => {
       setAcao(null)
       setMotivo('')
+      onAviso(v.rota === 'reject' ? `“${peca.title}” rejeitada.` : `Ajustes pedidos em “${peca.title}”.`)
     },
   })
 
-  const regerar = useMutation({
-    mutationFn: () => api(`/contents/${peca.id}/rewrite:generate`, { method: 'POST' }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['contents', projectId] }),
-  })
-
-  const erro = decidir.error instanceof ApiError ? decidir.error : null
+  const erroDe = (e: unknown) => (e instanceof ApiError ? e : null)
+  const erro = erroDe(aprovar.error) ?? erroDe(decidir.error)
   const review = peca.latest_review
   const imagem = peca.format === 'carousel' ? (peca.slides?.[0]?.url ?? null) : (peca.image?.url ?? null)
   const data = quando(peca.scheduled_for) ?? quando(peca.planned_for)
+  const ocupado = aprovar.isPending || decidir.isPending
 
   return (
     <Card aria-label={`Peça ${peca.title}`}>
@@ -140,7 +199,7 @@ function PecaParaDecidir({ peca, marca, projectId }: { peca: Content; marca: str
         <span className="text-label-sm bg-surface-container text-on-surface-variant rounded-full px-2 py-0.5">
           {ESTADOS[peca.editorial_state ?? 'draft']}
         </span>
-        <span className="text-label-sm text-on-surface-variant">Versão {peca.version ?? 1}</span>
+        <span className="text-label-sm text-on-surface-variant">Versão {versao}</span>
         {marca && <span className="text-label-sm text-on-surface-variant">· {marca}</span>}
       </div>
 
@@ -190,6 +249,19 @@ function PecaParaDecidir({ peca, marca, projectId }: { peca: Content; marca: str
             username={null}
             videoUrl={peca.format === 'reel' ? (peca.video?.url ?? null) : undefined}
           />
+
+          {/* O carrossel inteiro, na ordem em que vai ao ar. */}
+          {peca.format === 'carousel' && (peca.slides?.length ?? 0) > 0 && (
+            <ol className="mt-3 flex gap-2 overflow-x-auto" aria-label="Slides do carrossel">
+              {peca.slides!.map((slide, i) => (
+                <li key={slide.id} className="shrink-0">
+                  <img src={slide.url} alt={`Slide ${i + 1}`} className="h-20 w-20 rounded object-cover" />
+                  <span className="text-label-sm text-on-surface-variant">{i + 1}</span>
+                </li>
+              ))}
+            </ol>
+          )}
+
           {!imagem && peca.format !== 'reel' && (
             <p className="text-body-sm text-on-surface-variant mt-2">Sem mídia ainda: a peça não publica sem ela.</p>
           )}
@@ -199,12 +271,35 @@ function PecaParaDecidir({ peca, marca, projectId }: { peca: Content; marca: str
       {erro && (
         <p role="alert" className="text-body-sm text-error mt-4">
           {erro.status === 409
-            ? `${erro.message422 ?? 'A peça mudou.'} A tela foi atualizada com a versão atual; confira antes de decidir.`
-            : (erro.fieldError('reason') ?? erro.message422 ?? 'Não foi possível registrar a decisão.')}
+            ? `${erro.message422 ?? 'A peça mudou.'} A tela foi atualizada; confira antes de decidir.`
+            : (erro.fieldError('reason') ?? erro.fieldError('request_key') ?? erro.message422 ?? 'Não foi possível registrar a decisão.')}
         </p>
       )}
 
-      {acao && (
+      {!podeDecidir && (
+        <p className="text-body-sm text-on-surface-variant mt-4">
+          Aguardando um revisor: você pode editar a peça, mas aprovar e rejeitar é de quem revisa.
+        </p>
+      )}
+
+      {podeDecidir && chave && (
+        <div role="dialog" aria-label="Confirmar aprovação" className="border-outline-variant mt-4 rounded border p-3">
+          <p className="text-body-md text-on-surface">
+            Aprovar a versão {versao} de “{peca.title}”? A aprovação vale só para esta versão: qualquer mudança
+            depois a derruba.
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Button disabled={ocupado} onClick={() => aprovar.mutate(chave)}>
+              {aprovar.isPending ? 'Aprovando…' : 'Confirmar aprovação'}
+            </Button>
+            <Button variant="ghost" disabled={ocupado} onClick={() => setChave(null)}>
+              Cancelar
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {podeDecidir && acao && (
         <div className="mt-4">
           <Textarea
             label={acao === 'reject' ? 'Motivo da rejeição' : 'O que precisa mudar'}
@@ -214,7 +309,7 @@ function PecaParaDecidir({ peca, marca, projectId }: { peca: Content; marca: str
           />
           <div className="mt-2 flex flex-wrap gap-2">
             <Button
-              disabled={decidir.isPending || motivo.trim().length < 3}
+              disabled={ocupado || motivo.trim().length < 3}
               onClick={() => decidir.mutate({ rota: acao, reason: motivo.trim() })}
             >
               {acao === 'reject' ? 'Confirmar rejeição' : 'Enviar pedido de ajuste'}
@@ -226,17 +321,24 @@ function PecaParaDecidir({ peca, marca, projectId }: { peca: Content; marca: str
         </div>
       )}
 
-      {!acao && (
+      {!acao && !chave && (
         <div className="mt-4 flex flex-wrap gap-2">
-          <Button disabled={decidir.isPending} onClick={() => decidir.mutate({ rota: 'approve' })}>
-            Aprovar versão {peca.version ?? 1}
-          </Button>
-          <Button variant="secondary" disabled={decidir.isPending} onClick={() => setAcao('request-changes')}>
-            Solicitar ajustes
-          </Button>
-          <Button variant="secondary" disabled={decidir.isPending} onClick={() => setAcao('reject')}>
-            Rejeitar
-          </Button>
+          {podeDecidir && (
+            <>
+              <Button
+                disabled={ocupado || peca.editorial_state !== 'pending_approval'}
+                onClick={() => setChave(crypto.randomUUID())}
+              >
+                Aprovar versão {versao}
+              </Button>
+              <Button variant="secondary" disabled={ocupado} onClick={() => setAcao('request-changes')}>
+                Solicitar ajustes
+              </Button>
+              <Button variant="secondary" disabled={ocupado} onClick={() => setAcao('reject')}>
+                Rejeitar
+              </Button>
+            </>
+          )}
           <Link
             to={`/projects/${projectId}/content?editar=${peca.id}`}
             className="text-label-md text-primary inline-flex items-center px-3 py-2 hover:underline"
@@ -244,7 +346,7 @@ function PecaParaDecidir({ peca, marca, projectId }: { peca: Content; marca: str
             Editar
           </Link>
           {review?.verdict === 'fail' && (
-            <Button variant="ghost" disabled={regerar.isPending} onClick={() => regerar.mutate()}>
+            <Button variant="ghost" onClick={() => regenerar(queryClient, peca.id, projectId)}>
               Nova geração (reescrever)
             </Button>
           )}
@@ -254,9 +356,21 @@ function PecaParaDecidir({ peca, marca, projectId }: { peca: Content; marca: str
         </div>
       )}
 
+      {podeDecidir && peca.editorial_state !== 'pending_approval' && !chave && !acao && (
+        <p className="text-body-sm text-on-surface-variant mt-2">
+          Para aprovar, a IA precisa revisar e aprovar esta versão (a peça está em “
+          {ESTADOS[peca.editorial_state ?? 'draft']}”).
+        </p>
+      )}
+
       {verHistorico && <Historico contentId={peca.id} />}
     </Card>
   )
+}
+
+async function regenerar(queryClient: QueryClient, id: number, projectId: string) {
+  await api(`/contents/${id}/rewrite:generate`, { method: 'POST' })
+  await queryClient.invalidateQueries({ queryKey: ['contents', projectId] })
 }
 
 function Historico({ contentId }: { contentId: number }) {

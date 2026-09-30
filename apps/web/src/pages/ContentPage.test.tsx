@@ -102,32 +102,32 @@ test('avançar uma peça faz PATCH com o próximo status', async () => {
   await waitFor(() => expect(recebido).toEqual({ status: 'production' }))
 })
 
-/** CP-04: aprovar pelo quadro é a mesma decisão da Central, presa à versão do card. */
-test('avançar uma peça em revisão aprova pelo endpoint, com a versão exibida', async () => {
+/** CP-04A: o quadro não aprova; leva à Central (confirmação, versão e chave). */
+test('peça em revisão: o card leva à Central e não chama o servidor', async () => {
   const user = setup()
-  let recebido: unknown = null
-  let patch = false
+  let chamou = false
 
   server.use(
     http.get('/api/v1/projects/1/contents', () =>
       HttpResponse.json({ data: [{ ...content(1, 'review'), version: 4 }] }),
     ),
-    http.post('/api/v1/contents/1/approve', async ({ request }) => {
-      recebido = await request.json()
-      return HttpResponse.json({ data: { ...content(1, 'approved'), version: 4 } })
+    http.post('/api/v1/contents/1/approve', () => {
+      chamou = true
+      return HttpResponse.json({})
     }),
     http.patch('/api/v1/contents/1', () => {
-      patch = true
-      return HttpResponse.json({ data: content(1, 'approved') })
+      chamou = true
+      return HttpResponse.json({})
     }),
   )
 
   renderWithProviders(<ContentPage />, ROUTE)
 
-  await user.click(await screen.findByRole('button', { name: /avançar/i }))
+  await user.click(await screen.findByRole('button', { name: 'Decidir na Central →' }))
 
-  await waitFor(() => expect(recebido).toEqual({ version: 4 }))
-  expect(patch).toBe(false)
+  // Saiu do quadro (a rota da Central nao existe neste teste) sem decidir nada.
+  await waitFor(() => expect(screen.queryByRole('button', { name: 'Decidir na Central →' })).not.toBeInTheDocument())
+  expect(chamou).toBe(false)
 })
 
 test('o card de source=ai mostra o chip Gerado por IA', async () => {

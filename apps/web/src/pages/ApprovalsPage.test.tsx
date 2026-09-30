@@ -45,13 +45,20 @@ function peca(overrides: Partial<Content> = {}): Content {
   }
 }
 
-function cenario(pecas: Content[]) {
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
+
+function cenario(pecas: Content[], papel: 'reviewer' | 'editor' | 'owner' = 'reviewer') {
   const chamadas: { url: string; body: unknown }[] = []
   let lista = pecas
 
   server.use(
-    http.get('/api/v1/projects/1', () => HttpResponse.json({ data: { id: 1, name: '2M Saúde Feminina' } })),
+    http.get('/api/v1/projects/1', () =>
+      HttpResponse.json({ data: { id: 1, workspace_id: 7, name: '2M Saúde Feminina' } }),
+    ),
     http.get('/api/v1/projects/1/contents', () => HttpResponse.json({ data: lista })),
+    http.get('/api/v1/me', () =>
+      HttpResponse.json({ id: 1, name: 'Ana', email: 'a@x.test', workspaces: [{ id: 7, name: 'W', slug: 'w', role: papel }] }),
+    ),
   )
 
   return {
@@ -79,19 +86,102 @@ test('mostra marca, formato, estado, versão, texto, data e a revisão da IA', a
   expect(screen.queryByText('Já publicada')).not.toBeInTheDocument()
 })
 
-test('aprovar manda a versão que está na tela', async () => {
-  const { chamadas } = cenario([peca()])
+test('aprovar pede confirmação e manda a versão da tela com uma request_key', async () => {
+  const { chamadas, trocarLista } = cenario([peca()])
   server.use(
     http.post('/api/v1/contents/10/approve', async ({ request }) => {
       chamadas.push({ url: 'approve', body: await request.json() })
-      return HttpResponse.json({ data: peca({ status: 'approved', editorial_state: 'approved' }) })
+      trocarLista([])
+      return HttpResponse.json({
+        data: peca({ status: 'approved', editorial_state: 'approved' }),
+        decision: { id: 1, decision: 'approved', version: 3, user: { id: 5, name: 'Dra. Ana' } },
+        replayed: false,
+      })
     }),
   )
+  const user = userEvent.setup()
 
   renderWithProviders(<ApprovalsPage />, ROUTE)
-  await userEvent.setup().click(await screen.findByRole('button', { name: 'Aprovar versão 3' }))
+  await user.click(await screen.findByRole('button', { name: 'Aprovar versão 3' }))
 
-  await waitFor(() => expect(chamadas).toEqual([{ url: 'approve', body: { version: 3 } }]))
+  // Nada vai ao servidor antes de confirmar.
+  const dialogo = screen.getByRole('dialog', { name: 'Confirmar aprovação' })
+  expect(dialogo).toHaveTextContent(/vale só para esta versão/)
+  expect(chamadas).toEqual([])
+
+  await user.click(within(dialogo).getByRole('button', { name: 'Confirmar aprovação' }))
+
+  await waitFor(() => expect(chamadas).toHaveLength(1))
+  const corpo = chamadas[0].body as { expected_version: number; request_key: string }
+  expect(corpo.expected_version).toBe(3)
+  expect(corpo.request_key).toMatch(UUID)
+  // O resultado vem do servidor, e a lista se atualiza depois da resposta.
+  expect(await screen.findByRole('status')).toHaveTextContent('Versão 3 de “Autocuidado em 5 minutos” aprovada por Dra. Ana.')
+  expect(await screen.findByText('Nenhuma peça aguardando decisão.')).toBeInTheDocument()
+})
+
+test('cancelar a confirmação não chama o servidor', async () => {
+  const { chamadas } = cenario([peca()])
+  const user = userEvent.setup()
+
+  renderWithProviders(<ApprovalsPage />, ROUTE)
+  await user.click(await screen.findByRole('button', { name: 'Aprovar versão 3' }))
+  await user.click(screen.getByRole('button', { name: 'Cancelar' }))
+
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  expect(chamadas).toEqual([])
+})
+
+test('replay da mesma chave mostra o resultado original', async () => {
+  cenario([peca()])
+  server.use(
+    http.post('/api/v1/contents/10/approve', () =>
+      HttpResponse.json({
+        data: peca({ status: 'approved', editorial_state: 'approved' }),
+        decision: { id: 1, decision: 'approved', version: 3, user: { id: 5, name: 'Dra. Ana' } },
+        replayed: true,
+      }),
+    ),
+  )
+  const user = userEvent.setup()
+
+  renderWithProviders(<ApprovalsPage />, ROUTE)
+  await user.click(await screen.findByRole('button', { name: 'Aprovar versão 3' }))
+  await user.click(screen.getByRole('button', { name: 'Confirmar aprovação' }))
+
+  expect(await screen.findByRole('status')).toHaveTextContent(/já estava aprovada por Dra\. Ana.*nada novo foi gravado/)
+})
+
+test('quem não revisa vê a peça mas não os botões de decisão', async () => {
+  cenario([peca()], 'editor')
+
+  renderWithProviders(<ApprovalsPage />, ROUTE)
+
+  expect(await screen.findByText(/Aguardando um revisor/)).toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: /Aprovar versão/ })).not.toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: 'Rejeitar' })).not.toBeInTheDocument()
+  expect(screen.getByRole('link', { name: 'Editar' })).toBeInTheDocument()
+})
+
+test('fora de pending_approval o botão Aprovar fica desabilitado e diz por quê', async () => {
+  cenario([peca({ editorial_state: 'in_review', latest_review: null })])
+
+  renderWithProviders(<ApprovalsPage />, ROUTE)
+
+  expect(await screen.findByRole('button', { name: 'Aprovar versão 3' })).toBeDisabled()
+  expect(screen.getByText(/a IA precisa revisar e aprovar esta versão/)).toBeInTheDocument()
+})
+
+test('o carrossel mostra todos os slides, na ordem', async () => {
+  const slide = (id: number) => ({ id, url: `https://x.test/s${id}.jpg` }) as NonNullable<Content['slides']>[number]
+  cenario([peca({ slides: [slide(21), slide(22), slide(23)] })])
+
+  renderWithProviders(<ApprovalsPage />, ROUTE)
+
+  const lista = await screen.findByLabelText('Slides do carrossel')
+  const imagens = within(lista).getAllByRole('img')
+  expect(imagens.map((i) => i.getAttribute('alt'))).toEqual(['Slide 1', 'Slide 2', 'Slide 3'])
+  expect(imagens[2]).toHaveAttribute('src', 'https://x.test/s23.jpg')
 })
 
 test('versão desatualizada: o servidor recusa (409) e a tela avisa e recarrega a versão atual', async () => {
@@ -103,8 +193,11 @@ test('versão desatualizada: o servidor recusa (409) e a tela avisa e recarrega 
     }),
   )
 
+  const user = userEvent.setup()
+
   renderWithProviders(<ApprovalsPage />, ROUTE)
-  await userEvent.setup().click(await screen.findByRole('button', { name: 'Aprovar versão 3' }))
+  await user.click(await screen.findByRole('button', { name: 'Aprovar versão 3' }))
+  await user.click(screen.getByRole('button', { name: 'Confirmar aprovação' }))
 
   expect(await screen.findByRole('alert')).toHaveTextContent(/A peça mudou \(versão 4\).*confira antes de decidir/)
   expect(await screen.findByRole('button', { name: 'Aprovar versão 4' })).toBeInTheDocument()
