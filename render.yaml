@@ -76,8 +76,10 @@ services:
       # A IA roda de verdade. Cada geracao custa: estrategia ~4 centavos, lote de
       # copy ~6. O teto mensal por workspace e a defesa. Para validar a infra sem
       # gastar, troque para `mock` no painel — nenhum codigo muda.
+      # Mock ate a chamada real autorizada (CP-02/CP-05A P1-01): um sync do
+      # blueprint NAO pode religar a IA paga sozinho.
       - key: AI_PROVIDER
-        value: anthropic
+        value: mock
       - key: ANTHROPIC_API_KEY
         sync: false
       - key: AI_WORKSPACE_MONTHLY_BUDGET_CENTS
