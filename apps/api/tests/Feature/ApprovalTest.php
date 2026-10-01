@@ -161,7 +161,7 @@ class ApprovalTest extends TestCase
         $content = $this->aprovadaEAgendada($workspace, $project);
 
         // A recusa vem antes de procurar a sugestao: nem chega a importar se ha uma.
-        $this->postJson("/api/v1/contents/{$content->id}/seo:apply")
+        $this->postJson("/api/v1/contents/{$content->id}/seo:apply", ['expected_version' => $content->fresh()->version])
             ->assertStatus(422)
             ->assertJsonPath('message', 'Peça aprovada não muda o texto. Devolva para revisão antes de aplicar o SEO.');
 

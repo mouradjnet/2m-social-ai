@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Ai\Budget;
+use App\Domain\Editorial\VersionConflict;
 use App\Http\Controllers\Controller;
 use App\Jobs\RunAgentJob;
 use App\Models\AiRun;
@@ -23,14 +24,24 @@ class RewriteController extends Controller
      * arquivava a peca e pedia um LOTE novo, jogando fora as quatro boas e pagando 6
      * centavos para consertar uma.
      *
-     * Guardas, na ordem: peca sem reprovacao (422 — nao ha o que corrigir), reescrita
-     * concorrente (409), orcamento (402).
+     * Guardas, na ordem: sem `expected_version` (422), peca sem reprovacao (422 — nao
+     * ha o que corrigir), versao velha (409), reescrita concorrente (409), orcamento
+     * (402).
+     *
+     * CP-04D: a reescrita corrige a versao que a pessoa viu. A versao vai no input e o
+     * agente confere de novo ao gravar: se alguem editou a peca enquanto a IA
+     * escrevia, o resultado e descartado em vez de apagar a edicao.
      */
     public function generate(Request $request, Content $content): JsonResponse
     {
         $project = $content->project;
 
         Gate::authorize('update', $project);
+
+        $data = $request->validate(['expected_version' => ['required', 'integer', 'min:1']], [
+            'expected_version.required' => 'Falta a versão da peça que você está vendo (expected_version).',
+        ]);
+        $esperada = (int) $data['expected_version'];
 
         $review = ContentReview::query()
             ->where('content_id', $content->id)
@@ -47,6 +58,15 @@ class RewriteController extends Controller
             return response()->json([
                 'message' => 'Só uma peça reprovada pelo revisor, ou com ajustes pedidos por uma pessoa, pode ser reescrita.',
             ], 422);
+        }
+
+        // Antes de pagar: pedir a reescrita de uma versao que ja nao existe e desperdicio.
+        // A corrida de verdade (edicao durante a execucao) e barrada no persist.
+        if ((int) $content->version !== $esperada) {
+            throw new VersionConflict(
+                "A peça mudou (versão {$content->version}) desde que você a abriu (versão {$esperada}). Recarregue antes de pedir a reescrita.",
+                (int) $content->version,
+            );
         }
 
         if ($this->reescritaEmAndamento($project)) {
@@ -72,6 +92,7 @@ class RewriteController extends Controller
                     // A peca e o veredito dela vao no contexto; o AgentContext rebusca
                     // ambos na execucao (o input e registro de intencao).
                     'rewrite_content_id' => $content->id,
+                    'expected_version' => $esperada,
                     // O que o revisor JA reprovou no projeto: consertar este erro sem
                     // cair em outro ja conhecido.
                     'with_past_violations' => true,

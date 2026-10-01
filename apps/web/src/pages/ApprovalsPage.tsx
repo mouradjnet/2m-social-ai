@@ -377,7 +377,7 @@ function PecaParaDecidir({ peca, marca, projectId, podeDecidir, podeRestaurar, o
             Editar
           </Link>
           {review?.verdict === 'fail' && (
-            <Button variant="ghost" onClick={() => regenerar(queryClient, peca.id, projectId)}>
+            <Button variant="ghost" onClick={() => regenerar(queryClient, peca.id, peca.version, projectId)}>
               Nova geração (reescrever)
             </Button>
           )}
@@ -399,7 +399,10 @@ function PecaParaDecidir({ peca, marca, projectId, podeDecidir, podeRestaurar, o
   )
 }
 
-async function regenerar(queryClient: QueryClient, id: number, projectId: string) {
-  await api(`/contents/${id}/rewrite:generate`, { method: 'POST' })
+async function regenerar(queryClient: QueryClient, id: number, version: number | undefined, projectId: string) {
+  await api(`/contents/${id}/rewrite:generate`, {
+    method: 'POST',
+    body: JSON.stringify({ expected_version: version }),
+  })
   await queryClient.invalidateQueries({ queryKey: ['contents', projectId] })
 }

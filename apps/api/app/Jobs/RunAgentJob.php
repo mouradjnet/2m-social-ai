@@ -12,6 +12,7 @@ use App\Ai\Exceptions\OutputRejectedException;
 use App\Ai\Providers\LlmProvider;
 use App\Ai\Providers\LlmRequest;
 use App\Ai\Providers\LlmResponse;
+use App\Domain\Editorial\VersionConflict;
 use App\Domain\Editorial\Versioning;
 use App\Models\AiRun;
 use App\Models\Project;
@@ -82,22 +83,36 @@ class RunAgentJob implements ShouldQueue
             return;
         }
 
-        DB::transaction(function () use ($agent, $project, $output, $run, $startedAt) {
-            // CP-04C: as versoes que o agente criar ficam com a origem e a execucao.
-            Versioning::como(
-                $run->agent === 'rewriter' ? 'ai_rewrite' : 'ai_generation',
-                $run->created_by,
-                fn () => $agent->persist($project, $output['data'], $run),
-                aiRunId: $run->id,
-            );
+        try {
+            DB::transaction(function () use ($agent, $project, $output, $run, $startedAt) {
+                // CP-04C: as versoes que o agente criar ficam com a origem e a execucao.
+                Versioning::como(
+                    $run->agent === 'rewriter' ? 'ai_rewrite' : 'ai_generation',
+                    $run->created_by,
+                    fn () => $agent->persist($project, $output['data'], $run),
+                    aiRunId: $run->id,
+                );
 
+                $run->update([
+                    'status' => 'succeeded',
+                    'output' => $output['data'],
+                    ...$this->gasto(),
+                    'latency_ms' => $this->elapsedMs($startedAt),
+                ]);
+            });
+        } catch (VersionConflict $e) {
+            // CP-04D: a peca mudou enquanto a IA trabalhava. A transacao desfez tudo; o
+            // resultado fica no `output` para consulta, mas nao virou a peca. A chamada
+            // foi paga: o custo e gravado.
             $run->update([
-                'status' => 'succeeded',
+                'status' => 'failed',
                 'output' => $output['data'],
-                ...$this->gasto(),
+                'error' => 'A peça foi alterada enquanto a IA a reescrevia. Para não apagar a alteração, a reescrita não foi aplicada. Confira a versão atual e peça de novo se ainda precisar.',
+                'error_code' => 'content_changed',
                 'latency_ms' => $this->elapsedMs($startedAt),
+                ...$this->gasto(),
             ]);
-        });
+        }
 
         Budget::alertIfAbnormal($run);
     }

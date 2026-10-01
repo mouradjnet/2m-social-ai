@@ -5,6 +5,7 @@ namespace App\Ai\Agents;
 use App\Ai\Exceptions\OutputRejectedException;
 use App\Domain\Editorial\BrandRules;
 use App\Domain\Editorial\FormatStructure;
+use App\Domain\Editorial\Versioning;
 use App\Models\AiRun;
 use App\Models\ContentRevision;
 use App\Models\Project;
@@ -134,6 +135,12 @@ class RewriterAgent implements Agent
     {
         $id = $run->input['rewrite_content_id'] ?? null;
         $peca = $project->contents()->findOrFail($id);
+
+        // CP-04D: a IA reescreveu a versao que a pessoa viu. Se a peca mudou durante a
+        // execucao (edicao humana, SEO aplicado), gravar agora apagaria essa mudanca.
+        // Trava a linha ate o fim da transacao do job. Run sem a versao (criado antes
+        // do CP-04D) cai aqui tambem: na duvida, nao sobrescreve.
+        Versioning::exigir($peca, (int) ($run->input['expected_version'] ?? 0));
 
         $antes = $peca->only(['title', 'caption', 'cta', 'hashtags', 'structure']);
 

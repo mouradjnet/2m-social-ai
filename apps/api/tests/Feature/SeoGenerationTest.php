@@ -100,7 +100,7 @@ class SeoGenerationTest extends TestCase
         $this->generate($project)->assertStatus(202);
         $sugerido = ContentSeo::first()->title;
 
-        $this->postJson("/api/v1/contents/{$content->id}/seo:apply")
+        $this->postJson("/api/v1/contents/{$content->id}/seo:apply", ['expected_version' => $content->fresh()->version])
             ->assertOk()
             ->assertJsonPath('data.title', $sugerido);
 
@@ -119,12 +119,46 @@ class SeoGenerationTest extends TestCase
         $this->assertSame(['#original'], $revisao->changes['hashtags']['from']);
     }
 
+    public function test_aplicar_sem_expected_version_e_422(): void
+    {
+        [, $project] = $this->scene();
+        $content = $this->content($project);
+        $this->generate($project)->assertStatus(202);
+
+        $this->postJson("/api/v1/contents/{$content->id}/seo:apply")
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('expected_version');
+
+        $this->assertSame('Titulo do copywriter', $content->fresh()->title);
+    }
+
+    /** CP-04D: a sugestao foi feita sobre um texto; a edicao feita depois nao some. */
+    public function test_aplicar_com_versao_velha_e_409_e_nao_apaga_a_edicao(): void
+    {
+        [, $project] = $this->scene();
+        $content = $this->content($project);
+        $this->generate($project)->assertStatus(202);
+        $vista = (int) $content->fresh()->version;
+
+        // Alguem edita o titulo depois da sugestao.
+        $this->patchJson("/api/v1/contents/{$content->id}/draft", [
+            'expected_version' => $vista, 'title' => 'Titulo editado a mao',
+        ])->assertOk();
+
+        $this->postJson("/api/v1/contents/{$content->id}/seo:apply", ['expected_version' => $vista])
+            ->assertStatus(409)
+            ->assertJsonPath('current_version', $vista + 1);
+
+        $this->assertSame('Titulo editado a mao', $content->fresh()->title);
+        $this->assertNull(ContentSeo::first()->applied_at);
+    }
+
     public function test_aplicar_sem_sugestao_devolve_422(): void
     {
         [, $project] = $this->scene();
         $content = $this->content($project);
 
-        $this->postJson("/api/v1/contents/{$content->id}/seo:apply")
+        $this->postJson("/api/v1/contents/{$content->id}/seo:apply", ['expected_version' => $content->fresh()->version])
             ->assertStatus(422)
             ->assertJsonPath('message', 'Esta peça não tem sugestão de SEO para aplicar.');
 
@@ -138,7 +172,7 @@ class SeoGenerationTest extends TestCase
         $content = $this->content($project);
         Sanctum::actingAs($this->memberOf($workspace, WorkspaceRole::Viewer));
 
-        $this->postJson("/api/v1/contents/{$content->id}/seo:apply")->assertStatus(403);
+        $this->postJson("/api/v1/contents/{$content->id}/seo:apply", ['expected_version' => $content->fresh()->version])->assertStatus(403);
     }
 
     public function test_sem_peca_em_producao_devolve_422(): void

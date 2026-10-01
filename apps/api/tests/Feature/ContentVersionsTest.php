@@ -142,7 +142,7 @@ class ContentVersionsTest extends TestCase
             'expected_version' => 1, 'reason' => 'Tire a promessa de resultado.', 'request_key' => (string) Str::uuid(),
         ])->assertOk();
 
-        $this->postJson("/api/v1/contents/{$peca->id}/rewrite:generate")->assertStatus(202);
+        $this->postJson("/api/v1/contents/{$peca->id}/rewrite:generate", ['expected_version' => $peca->fresh()->version])->assertStatus(202);
 
         $run = AiRun::where('agent', 'rewriter')->sole();
         $v2 = ContentVersion::where('version', 2)->sole();

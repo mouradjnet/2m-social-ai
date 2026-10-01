@@ -6,8 +6,9 @@ interface Props {
   groups: Record<Column, Content[]>
   pending: boolean
   onMove: (id: number, status: Content['status']) => void
-  onApplySeo: (id: number) => void
-  onRewrite: (id: number) => void
+  // CP-04D: a versão que a pessoa está vendo; o servidor recusa (409) se a peça mudou.
+  onApplySeo: (id: number, version: number | undefined) => void
+  onRewrite: (id: number, version: number | undefined) => void
   onUnarchive: (id: number) => void
   onEdit: (id: number) => void
 }
@@ -68,8 +69,8 @@ export function ContentBoard({
                   onArchive={() => onMove(content.id, 'archived')}
                   // Sem status: o destino e do servidor, que sabe de onde ela saiu.
                   onUnarchive={() => onUnarchive(content.id)}
-                  onApplySeo={() => onApplySeo(content.id)}
-                  onRewrite={() => onRewrite(content.id)}
+                  onApplySeo={() => onApplySeo(content.id, content.version)}
+                  onRewrite={() => onRewrite(content.id, content.version)}
                   onEdit={() => onEdit(content.id)}
                 />
               )

@@ -3,18 +3,26 @@
 namespace Tests\Feature;
 
 use App\Ai\Agents\AgentContext;
+use App\Ai\Agents\AgentRegistry;
 use App\Ai\Agents\RewriterAgent;
 use App\Ai\Exceptions\OutputRejectedException;
+use App\Ai\Providers\LlmProvider;
+use App\Ai\Providers\LlmRequest;
+use App\Ai\Providers\LlmResponse;
+use App\Ai\Providers\MockProvider;
 use App\Enums\WorkspaceRole;
+use App\Jobs\RunAgentJob;
 use App\Models\AiRun;
 use App\Models\Content;
 use App\Models\ContentReview;
 use App\Models\ContentRevision;
+use App\Models\ContentVersion;
 use App\Models\Project;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Models\WorkspaceMember;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Testing\TestResponse;
 use Laravel\Sanctum\Sanctum;
 use Tests\Support\Roteiro;
@@ -93,7 +101,88 @@ class RewriteGenerationTest extends TestCase
 
     private function rewrite(Content $content): TestResponse
     {
-        return $this->postJson("/api/v1/contents/{$content->id}/rewrite:generate");
+        return $this->postJson("/api/v1/contents/{$content->id}/rewrite:generate", ['expected_version' => $content->fresh()->version]);
+    }
+
+    public function test_sem_expected_version_e_422_e_nao_cria_execucao(): void
+    {
+        $workspace = Workspace::factory()->create();
+        $project = Project::factory()->create(['workspace_id' => $workspace->id]);
+        $peca = $this->peca($project);
+        $this->reprova($peca);
+        Sanctum::actingAs($this->membro($workspace, WorkspaceRole::Editor));
+
+        $this->postJson("/api/v1/contents/{$peca->id}/rewrite:generate")
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('expected_version');
+
+        $this->assertSame(0, AiRun::where('agent', 'rewriter')->count());
+    }
+
+    public function test_versao_velha_no_pedido_e_409_e_nao_cria_execucao(): void
+    {
+        $workspace = Workspace::factory()->create();
+        $project = Project::factory()->create(['workspace_id' => $workspace->id]);
+        $peca = $this->peca($project);
+        $this->reprova($peca);
+        $vista = (int) $peca->fresh()->version;
+        Sanctum::actingAs($this->membro($workspace, WorkspaceRole::Editor));
+
+        $this->patchJson("/api/v1/contents/{$peca->id}/draft", [
+            'expected_version' => $vista, 'caption' => 'Corrigi eu mesmo.',
+        ])->assertOk();
+
+        $this->postJson("/api/v1/contents/{$peca->id}/rewrite:generate", ['expected_version' => $vista])
+            ->assertStatus(409)
+            ->assertJsonPath('current_version', $vista + 1);
+
+        $this->assertSame(0, AiRun::where('agent', 'rewriter')->count());
+    }
+
+    /**
+     * CP-04D: a corrida de verdade. A pessoa edita a peca DEPOIS do pedido e ANTES de
+     * a IA gravar. A reescrita nao pode apagar a edicao: o run falha com
+     * `content_changed`, o custo fica registrado e nenhuma versao da IA e criada.
+     */
+    public function test_edicao_durante_a_reescrita_nao_e_sobrescrita(): void
+    {
+        $workspace = Workspace::factory()->create();
+        $project = Project::factory()->create(['workspace_id' => $workspace->id]);
+        $peca = $this->peca($project);
+        $this->reprova($peca);
+        $vista = (int) $peca->fresh()->version;
+        Sanctum::actingAs($this->membro($workspace, WorkspaceRole::Editor));
+
+        Queue::fake();
+        $runId = $this->rewrite($peca)->assertStatus(202)->json('ai_run_id');
+        $this->assertSame($vista, AiRun::findOrFail($runId)->input['expected_version']);
+
+        $this->patchJson("/api/v1/contents/{$peca->id}/draft", [
+            'expected_version' => $vista, 'caption' => 'Corrigi eu mesmo enquanto a IA pensava.',
+        ])->assertOk();
+
+        // A chamada a IA foi paga mesmo descartada: provedor com tokens para provar
+        // que o custo fica gravado.
+        $this->app->bind(LlmProvider::class, fn () => new class implements LlmProvider
+        {
+            public function generate(LlmRequest $request): LlmResponse
+            {
+                return new LlmResponse((new MockProvider)->generate($request)->output, $request->model, inputTokens: 10000, outputTokens: 1000);
+            }
+        });
+
+        (new RunAgentJob($runId))->handle(app(AgentRegistry::class));
+
+        $run = AiRun::findOrFail($runId);
+        $this->assertSame('failed', $run->status);
+        $this->assertSame('content_changed', $run->error_code);
+        $this->assertGreaterThan(0, $run->cost_cents);
+        $this->assertNotNull($run->output);
+
+        $peca->refresh();
+        $this->assertSame('Corrigi eu mesmo enquanto a IA pensava.', $peca->caption);
+        $this->assertSame($vista + 1, (int) $peca->version);
+        $this->assertSame(0, ContentVersion::where('content_id', $peca->id)->where('origin', 'ai_rewrite')->count());
     }
 
     public function test_reescreve_a_peca_no_lugar_e_guarda_o_texto_antigo(): void

@@ -81,10 +81,18 @@ class SeoController extends Controller
      * O texto antigo nao some sem rastro — a revisao sai SEM status e com `changes`
      * contando o de-para, o mesmo mecanismo da remarcacao. E `applied_at` diz qual
      * sugestao virou a peca.
+     *
+     * CP-04D: como toda edicao, exige a versao que a pessoa viu (`expected_version`).
+     * A sugestao foi feita sobre um texto; se a peca mudou depois, aplica-la apagaria
+     * a edicao sem que ninguem visse — 409.
      */
-    public function apply(Content $content): JsonResponse
+    public function apply(Request $request, Content $content): JsonResponse
     {
         Gate::authorize('update', $content->project);
+
+        $data = $request->validate(['expected_version' => ['required', 'integer', 'min:1']], [
+            'expected_version.required' => 'Falta a versão da peça que você está vendo (expected_version).',
+        ]);
 
         // Peca aprovada tem o texto congelado (ADR-13): o humano aprovou ESTE titulo e
         // estas hashtags. Mudar exige voltar para revisao — e aprovar de novo.
@@ -102,7 +110,9 @@ class SeoController extends Controller
             ], 422);
         }
 
-        DB::transaction(function () use ($content, $seo) {
+        DB::transaction(function () use ($content, $seo, $data) {
+            Versioning::exigir($content, (int) $data['expected_version']);
+
             $de = ['title' => $content->title, 'hashtags' => $content->hashtags];
 
             Versioning::como('seo', request()->user()->id, fn () => $content->update(['title' => $seo->title, 'hashtags' => $seo->hashtags]));

@@ -386,7 +386,7 @@ export interface AnalyticsResponse {
 }
 
 /** Classificacao da falha. `provider_failed` e o unico onde insistir ajuda. */
-export type AiRunErrorCode = 'refused' | 'rejected_output' | 'provider_failed'
+export type AiRunErrorCode = 'refused' | 'rejected_output' | 'provider_failed' | 'content_changed'
 
 export interface AiRun {
   id: number

@@ -335,12 +335,13 @@ test('otimizar SEO: manda POST para seo:generate', async () => {
   await waitFor(() => expect(chamado).toBe(true))
 })
 
-test('aplicar SEO: manda POST para seo:apply da peça', async () => {
+test('aplicar SEO: manda POST para seo:apply da peça com a versão vista', async () => {
   const user = setup()
-  let chamado = false
+  let corpo: unknown = null
 
   const comSeo = {
     ...content(1, 'production'),
+    version: 3,
     latest_seo: {
       id: 1,
       title: 'Titulo otimizado',
@@ -353,8 +354,8 @@ test('aplicar SEO: manda POST para seo:apply da peça', async () => {
 
   server.use(
     http.get('/api/v1/projects/1/contents', () => HttpResponse.json({ data: [comSeo] })),
-    http.post('/api/v1/contents/1/seo:apply', () => {
-      chamado = true
+    http.post('/api/v1/contents/1/seo:apply', async ({ request }) => {
+      corpo = await request.json()
       return HttpResponse.json({ data: comSeo })
     }),
   )
@@ -363,7 +364,8 @@ test('aplicar SEO: manda POST para seo:apply da peça', async () => {
 
   await user.click(await screen.findByRole('button', { name: /aplicar seo/i }))
 
-  await waitFor(() => expect(chamado).toBe(true))
+  // CP-04D: sem a versão o servidor recusa (422); com versão velha, 409.
+  await waitFor(() => expect(corpo).toEqual({ expected_version: 3 }))
 })
 
 test('revisar: manda POST para review:generate', async () => {
@@ -468,9 +470,11 @@ test('422 sem estratégia ativa mostra a mensagem e não inicia polling', async 
 test('reescrever manda o POST na PECA reprovada, nao no projeto', async () => {
   const user = setup()
   let chamada: string | null = null
+  let corpo: unknown = null
 
   const reprovada: Content = {
     ...content(9, 'review'),
+    version: 5,
     latest_review: {
       id: 1,
       verdict: 'fail',
@@ -484,8 +488,9 @@ test('reescrever manda o POST na PECA reprovada, nao no projeto', async () => {
 
   server.use(
     http.get('/api/v1/projects/1/contents', () => HttpResponse.json({ data: [reprovada] })),
-    http.post('/api/v1/contents/9/rewrite:generate', ({ request }) => {
+    http.post('/api/v1/contents/9/rewrite:generate', async ({ request }) => {
       chamada = new URL(request.url).pathname
+      corpo = await request.json()
       return HttpResponse.json({ ai_run_id: 51 }, { status: 202 })
     }),
     http.get('/api/v1/ai-runs/51', () => HttpResponse.json(run({ status: 'running', agent: 'rewriter' }))),
@@ -498,6 +503,7 @@ test('reescrever manda o POST na PECA reprovada, nao no projeto', async () => {
   // O MSW so responde ao caminho declarado: se o POST fosse no projeto, nao haveria
   // handler e a requisicao estouraria.
   await waitFor(() => expect(chamada).toBe('/api/v1/contents/9/rewrite:generate'))
+  expect(corpo).toEqual({ expected_version: 5 })
 
   const status = await screen.findByRole('status')
   await waitFor(() => expect(status).toHaveTextContent(/reescrevendo a peça reprovada/i))

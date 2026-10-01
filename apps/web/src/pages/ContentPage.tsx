@@ -88,7 +88,8 @@ export function ContentPage() {
 
   // A IA propoe, o humano aplica: o titulo so muda por este clique.
   const applySeo = useMutation({
-    mutationFn: (id: number) => api(`/contents/${id}/seo:apply`, { method: 'POST' }),
+    mutationFn: ({ id, version }: { id: number; version: number | undefined }) =>
+      api(`/contents/${id}/seo:apply`, { method: 'POST', body: JSON.stringify({ expected_version: version }) }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['contents', projectId] }),
   })
 
@@ -305,11 +306,13 @@ export function ContentPage() {
             groups={groupByStatus(pieces)}
             pending={move.isPending || applySeo.isPending || unarchive.isPending}
             onMove={(id, status) => move.mutate({ id, status })}
-            onApplySeo={(id) => applySeo.mutate(id)}
+            onApplySeo={(id, version) => applySeo.mutate({ id, version })}
             onUnarchive={(id) => unarchive.mutate(id)}
             // A reescrita é por PEÇA, não por projeto — daí o caminho inteiro. É a
             // mesma execução assíncrona dos outros agentes: o ?run= e o polling.
-            onRewrite={(id) => generate({ path: `/contents/${id}/rewrite:generate` })}
+            onRewrite={(id, version) =>
+              generate({ path: `/contents/${id}/rewrite:generate`, body: { expected_version: version } })
+            }
             onEdit={(id) => setEditando(id)}
           />
         )}

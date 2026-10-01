@@ -271,7 +271,7 @@ class ApprovalFlowTest extends TestCase
         $tardia->forceFill(['created_at' => now()->addSeconds(5)])->save();
 
         // Depois, alguem manda a IA reescrever.
-        $this->postJson("/api/v1/contents/{$peca->id}/rewrite:generate")->assertStatus(202);
+        $this->postJson("/api/v1/contents/{$peca->id}/rewrite:generate", ['expected_version' => $peca->fresh()->version])->assertStatus(202);
 
         $peca->refresh();
         $this->assertNotSame('Pequenos hábitos que cabem na rotina.', $peca->caption);

@@ -310,7 +310,7 @@ class RejectAndChangesTest extends TestCase
         $this->pedirAjustes($peca, $this->corpo($peca, 'Tire a promessa de resultado.'))->assertOk();
 
         // A IA aprovou antes; foi a PESSOA que pediu ajuste. O reescritor aceita.
-        $this->postJson("/api/v1/contents/{$peca->id}/rewrite:generate")->assertStatus(202);
+        $this->postJson("/api/v1/contents/{$peca->id}/rewrite:generate", ['expected_version' => $peca->fresh()->version])->assertStatus(202);
 
         $run = AiRun::where('agent', 'rewriter')->sole();
         $this->assertSame('succeeded', $run->status, (string) $run->error);
