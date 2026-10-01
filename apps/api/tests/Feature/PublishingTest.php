@@ -267,12 +267,14 @@ class PublishingTest extends TestCase
 
     public function test_sem_imagem_sem_conta_ou_com_conta_vencida_nao_publica(): void
     {
-        $this->pecaAprovada(comImagem: false);
+        $semImagem = $this->pecaAprovada(comImagem: false);
         $this->dispatch();
         $this->assertStringContainsString('não tem imagem', Publication::withoutGlobalScopes()->sole()->last_error);
 
+        // A peca anterior nao se apaga (as versoes dela sao imutaveis, CP-04E): sai do
+        // agendamento para o dispatch nao a enxergar.
         Publication::withoutGlobalScopes()->delete();
-        Content::withoutGlobalScopes()->delete();
+        DB::table('contents')->where('id', $semImagem->id)->update(['status' => 'archived', 'scheduled_for' => null]);
         $this->pecaAprovada();
         $this->dispatch();
         $this->assertSame('O projeto não tem conta do Instagram conectada.', Publication::withoutGlobalScopes()->sole()->last_error);

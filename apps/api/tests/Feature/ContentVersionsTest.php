@@ -313,6 +313,35 @@ class ContentVersionsTest extends TestCase
         DB::table('content_versions')->where('id', $v->id)->update(['origin' => 'manual_edit']);
     }
 
+    /**
+     * CP-04E: nem por SQL direto, nem pelo cascade da peca, nem por TRUNCATE. Cada
+     * tentativa num savepoint: no Postgres o erro aborta a transacao do teste.
+     */
+    public function test_versao_nao_se_apaga_nem_pelo_cascade_nem_por_truncate(): void
+    {
+        $peca = $this->peca();
+        $v = ContentVersion::where('content_id', $peca->id)->sole();
+
+        $tentativas = [
+            'DELETE direto' => fn () => DB::table('content_versions')->where('id', $v->id)->delete(),
+            'cascade da peça' => fn () => DB::table('contents')->where('id', $peca->id)->delete(),
+            'cascade do projeto' => fn () => DB::table('projects')->where('id', $peca->project_id)->delete(),
+            'TRUNCATE' => fn () => DB::statement('TRUNCATE content_versions CASCADE'),
+        ];
+
+        foreach ($tentativas as $nome => $tentativa) {
+            try {
+                DB::transaction($tentativa);
+                $this->fail("O banco aceitou: {$nome}.");
+            } catch (QueryException $e) {
+                $this->assertStringContainsString('content_versions e imutavel', $e->getMessage(), $nome);
+            }
+        }
+
+        $this->assertSame(1, ContentVersion::where('content_id', $peca->id)->count());
+        $this->assertTrue(Content::withoutGlobalScopes()->whereKey($peca->id)->exists());
+    }
+
     public function test_restauracao_recusa_versao_igual_inexistente_e_midia_removida(): void
     {
         $a = $this->asset('a.jpg');
