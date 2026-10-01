@@ -61,10 +61,12 @@ services:
       - key: SESSION_DRIVER
         value: database
 
-      # A IA roda de verdade. Cada geracao custa: estrategia ~4 centavos, lote de
-      # copy ~6. O teto mensal por workspace e a defesa.
+      # Mock ate a chamada real autorizada (CP-02/CP-05A P1-01): usar este blueprint
+      # nao pode ligar a IA paga sozinho. Com `anthropic`, cada geracao custa
+      # (estrategia ~4 centavos, lote de copy ~6) e o teto mensal por workspace e a
+      # defesa.
       - key: AI_PROVIDER
-        value: anthropic
+        value: mock
       - key: ANTHROPIC_API_KEY
         sync: false
       - key: AI_WORKSPACE_MONTHLY_BUDGET_CENTS
@@ -116,8 +118,9 @@ services:
       - key: SESSION_DRIVER
         value: database
 
+      # O worker e quem chama a IA: o provedor dele decide o gasto. Mock como o web.
       - key: AI_PROVIDER
-        value: anthropic
+        value: mock
       - key: ANTHROPIC_API_KEY
         sync: false
       - key: AI_WORKSPACE_MONTHLY_BUDGET_CENTS
