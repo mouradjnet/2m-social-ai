@@ -2,6 +2,7 @@
 
 namespace App\Domain\Export;
 
+use App\Domain\Editorial\Approval;
 use App\Models\Content;
 use App\Models\Project;
 use Illuminate\Support\Collection;
@@ -25,14 +26,30 @@ class ContentZip
      *  entregaria ao cliente ate peca REPROVADA pelo revisor. */
     private const STATUSES = ['approved', 'scheduled'];
 
-    /** @return Collection<int, Content> */
+    /**
+     * CP-05A P0-01: o status e so o pre-filtro. Entra no zip apenas a peca cuja
+     * aprovacao humana vale para a versao ATUAL — a mesma regra do PublishGate
+     * (Approval::validApproval: ultima decisao `approved`, da versao atual, com o hash
+     * do snapshot batendo). Peca aprovada antes do CP-04 (sem snapshot), ou com o
+     * conteudo mudado por fora do fluxo, continua `approved` no banco mas nao sai
+     * como aprovada. A decisao vigente fica na relacao `aprovacaoVigente` para o CSV.
+     *
+     * @return Collection<int, Content>
+     */
     public static function pecas(Project $project): Collection
     {
         return $project->contents()
             ->whereIn('status', self::STATUSES)
             ->orderByRaw('scheduled_for asc nulls last')
             ->orderBy('id')
-            ->get();
+            ->get()
+            ->filter(function (Content $peca) {
+                $decisao = Approval::validApproval($peca);
+                $peca->setRelation('aprovacaoVigente', $decisao);
+
+                return $decisao !== null;
+            })
+            ->values();
     }
 
     /** Escreve o zip no caminho dado e devolve o nome com que ele deve ser baixado. */
@@ -84,7 +101,9 @@ class ContentZip
         // BOM: sem ele o Excel abre "transparência" como "transparÃªncia".
         fwrite($linhas, "\u{FEFF}");
 
-        fputcsv($linhas, ['Data', 'Hora', 'Canal', 'Formato', 'Pilar', 'Titulo', 'Status']);
+        // Versao e hash da aprovacao vigente: quem recebe o zip confere o que foi
+        // aprovado. O hash e o sha256 do snapshot do conteudo, nada alem dele.
+        fputcsv($linhas, ['Data', 'Hora', 'Canal', 'Formato', 'Pilar', 'Titulo', 'Status', 'Versao aprovada', 'Hash aprovado']);
 
         foreach ($pecas as $peca) {
             // No fuso do PROJETO: este e o calendario que o cliente abre para saber a
@@ -100,6 +119,8 @@ class ContentZip
                 $peca->pillar ?? '',
                 $peca->title,
                 $peca->status === 'scheduled' ? 'Agendado' : 'Aprovado',
+                $peca->aprovacaoVigente->version,
+                $peca->aprovacaoVigente->snapshot_hash,
             ]);
         }
 
