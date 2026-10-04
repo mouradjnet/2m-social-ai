@@ -63,6 +63,29 @@ Para o modo pago, aponte o Blueprint para `render.production.yaml` (ou renomeie-
 - **A IA roda de verdade** (`AI_PROVIDER=anthropic`). Cada geração custa: estratégia ~4 centavos, lote de copy ~6. O teto é `AI_WORKSPACE_MONTHLY_BUDGET_CENTS` (5000 = US$ 50/mês por workspace) — estourou, a API responde **402** e nenhuma execução começa.
 - **Para validar a infra sem gastar:** suba com `AI_PROVIDER=mock`, confirme o fluxo, e troque a variável depois. Nenhum código muda.
 
+## Backup e recuperação do banco (Neon)
+
+O free do Neon só volta **6 horas** no tempo (*Instant restore*), tem **1 snapshot manual** e não faz backup agendado. Depois de 6 horas, o que salva é o dump.
+
+**Rotina.** O container `backup` da VPS roda `deploy/vps/scripts/backup-neon.sh` todo dia, depois do backup local, com o papel `backup_ro` (só leitura). Os dumps ficam em `deploy/vps/backups/neon/` (14 diários, 8 semanais). Liga-se preenchendo `NEON_BACKUP_URL` (sem a senha) e `NEON_BACKUP_PASSWORD` no `.env` da VPS; `sh scripts/status.sh` mostra o último resultado, e o container fica `unhealthy` se o último backup tiver mais de 26 horas. Nada disso avisa ninguém: é preciso olhar.
+
+**Antes de precisar:** o `APP_KEY` do Render tem de estar guardado fora do Render. Sem ele, o banco restaurado perde os tokens do Instagram, que são cifrados com essa chave.
+
+| Situação | Caminho |
+|---|---|
+| Erro percebido em até 6 h | *Instant restore* no console do Neon (Branches → `production` → Restore) |
+| Depois de 6 h, ou projeto perdido | Dump mais recente, restaurado numa branch **nova**, validado e só então ligado ao Render |
+
+**Restaurar por dump:**
+
+1. No Neon, crie a branch `restore-AAAAMMDD` vazia (ou um projeto novo, se o original se perdeu) e copie a URL **direta** dela.
+2. `pg_restore --no-owner --no-privileges --exit-on-error --dbname=<URL da branch nova> <dump>`, com o `pg_restore` **16**.
+3. Confira a contagem de linhas por tabela e a tabela `migrations` antes de apontar o Render para lá.
+4. No Render, troque `DB_URL` pela URL da branch restaurada. O serviço reinicia e roda `migrate`.
+5. Confira `/up`, o login e as telas principais. Mantenha a branch antiga até confirmar.
+
+Nunca restaure com `--clean` sobre a `production`: o destino é sempre uma branch nova ou um banco descartável. A perda máxima com a rotina ligada é de 24 horas.
+
 ## Gotchas
 
 - **O banco entra por `DB_URL`, não por `DB_HOST`/`DB_PORT`.** O Laravel aceita a conexão inteira: `config/database.php` lê `DB_URL` (formato `postgres://…`) antes dos campos separados. Verificado contra o Postgres local.
