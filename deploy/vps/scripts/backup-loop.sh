@@ -16,4 +16,6 @@ while true; do
   sleep $((alvo - agora))
 
   sh /scripts/backup-once.sh || echo "BACKUP FALHOU em $(date)"
+  # O do Neon so roda se configurado, e a falha de um nao impede o outro.
+  [ -z "${NEON_BACKUP_URL:-}" ] || sh /scripts/backup-neon.sh || echo "BACKUP NEON FALHOU em $(date)"
 done

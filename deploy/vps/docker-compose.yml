@@ -164,6 +164,13 @@ services:
       BACKUP_HOUR: ${BACKUP_HOUR:-04}
       BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-14}
       TZ: ${BACKUP_TZ:-America/Sao_Paulo}
+      NEON_BACKUP_URL: ${NEON_BACKUP_URL:-}
+      NEON_BACKUP_PASSWORD: ${NEON_BACKUP_PASSWORD:-}
+    # Saudavel = backup do Neon com menos de 26 h (ou backup do Neon desligado).
+    healthcheck:
+      test: ["CMD-SHELL", "[ -z \"$$NEON_BACKUP_URL\" ] || find /backups/neon/ULTIMO_OK -mmin -1560 | grep -q ."]
+      interval: 10m
+      start_period: 26h
     volumes:
       - ./scripts:/scripts:ro
       - ./backups:/backups

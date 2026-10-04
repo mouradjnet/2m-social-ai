@@ -21,3 +21,8 @@ docker compose exec -T db sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Atc
 
 printf '\nUltimo backup: '
 ls -1t backups/db 2>/dev/null | head -1 || echo "nenhum"
+
+printf '\nBackup do Neon: '
+if [ -f backups/neon/ULTIMA_FALHA ]; then echo "FALHOU: $(cat backups/neon/ULTIMA_FALHA)"
+elif [ -f backups/neon/ULTIMO_OK ]; then echo "ok em $(cat backups/neon/ULTIMO_OK)"
+else echo "nunca rodou"; fi
