@@ -28,6 +28,7 @@ class Performance
             ->where('status', 'published')
             ->where('published_at', '>=', now()->subDays($dias))
             ->orderByDesc('published_at')
+            ->orderBy('id') // desempate: mesmo instante sai na ordem de criacao
             ->get();
 
         $ultimas = PublicationMetric::query()

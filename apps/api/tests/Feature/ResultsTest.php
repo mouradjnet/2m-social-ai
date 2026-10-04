@@ -36,6 +36,10 @@ class ResultsTest extends TestCase
     {
         parent::setUp();
 
+        // Os posts de um teste nascem no mesmo instante: sem isto, a virada do
+        // segundo entre dois `now()` muda a ordem por published_at.
+        $this->freezeTime();
+
         $this->workspace = Workspace::factory()->create();
         $this->project = Project::factory()->create(['workspace_id' => $this->workspace->id]);
         $this->viewer = User::factory()->create();
